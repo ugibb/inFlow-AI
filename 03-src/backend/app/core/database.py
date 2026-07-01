@@ -36,31 +36,35 @@ async def get_db() -> AsyncSession:
             await session.close()
 
 async def init_db():
-    import os, glob, re
+    import os
+    import glob
     from pathlib import Path
+
+    # 确保所有 ORM 模型注册到 metadata，再 create_all
+    import app.core.models  # noqa: F401
+
     migrations_dir = os.path.join(os.path.dirname(__file__), 'migrations')
 
-    # ORM 建表（仅补全缺失表）
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # 每个 SQL 迁移文件独立事务，避免一条失败导致整批回滚
+    # 每条 SQL 独立事务，避免前一条失败导致同文件后续语句（如 CREATE users）回滚
     if os.path.isdir(migrations_dir):
         for sql_file in sorted(glob.glob(os.path.join(migrations_dir, '*.sql'))):
             statements = _split_sql(Path(sql_file).read_text(encoding='utf-8'))
-            async with engine.begin() as conn:
-                for statement in statements:
-                    statement = statement.strip()
-                    if not statement:
-                        continue
-                    try:
+            for statement in statements:
+                statement = statement.strip()
+                if not statement:
+                    continue
+                try:
+                    async with engine.begin() as conn:
                         await conn.execute(text(statement))
-                    except Exception as e:
-                        logger.warning(
-                            "Migration warning (%s): %s",
-                            os.path.basename(sql_file),
-                            e,
-                        )
+                except Exception as e:
+                    logger.warning(
+                        "Migration warning (%s): %s",
+                        os.path.basename(sql_file),
+                        e,
+                    )
 
 
 def _strip_sql_comments(sql: str) -> str:

@@ -463,18 +463,29 @@ trove-redis      Up
 ```bash
 # 测试 HTTP 响应（期望返回 HTTP/1.1 200 或 307）
 curl -I http://127.0.0.1:8080
-
-# 查看管理员账号（首次部署会自动创建）
-docker compose -f docker-compose.yml -f docker-compose.baota.yml logs backend | grep -i admin
 ```
 
-**记下 admin 用户名和密码**，例如输出：
+**默认超管账号**（由数据库迁移 `001_add_user_auth.sql` 自动创建，**不会出现在 backend 日志**）：
 
-```
-Created default admin user: admin / xxxxxxxx
-```
+| 用户名 | 密码 |
+|--------|------|
+| `weaiw` | `Aa41312432` |
 
-若暂时没输出，等 30 秒再执行一次 grep 命令。
+登录后请立即修改密码。
+
+若无法登录，在数据库中检查用户；若 `users` 表不存在，手动触发迁移：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.baota.yml exec backend python -c "
+import asyncio
+import app.core.models
+from app.core.database import init_db
+asyncio.run(init_db())
+"
+
+docker compose -f docker-compose.yml -f docker-compose.baota.yml exec postgres \
+  psql -U trove -d trove -c "SELECT username, is_super_admin, is_active FROM users;"
+```
 
 ---
 
@@ -614,7 +625,7 @@ https://你的域名.com
 ### 14.1 登录
 
 1. 打开 `https://你的域名.com`
-2. 输入第 10 步记下的 **admin 用户名和密码**
+2. 输入默认超管账号 **`weaiw` / `Aa41312432`**（见第 10 步）
 3. 登录成功进入首页
 
 ### 14.2 配置 AI 模型（必做）

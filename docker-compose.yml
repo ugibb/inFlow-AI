@@ -18,7 +18,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./03-src/backend/app/migrations:/docker-entrypoint-initdb.d:ro
+      - ./03-src/backend/app/core/migrations:/docker-entrypoint-initdb.d:ro
     restart: unless-stopped
 
   redis:
