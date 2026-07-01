@@ -45,6 +45,11 @@ async def init_db():
 
     migrations_dir = os.path.join(os.path.dirname(__file__), 'migrations')
 
+    # pgvector / uuid-ossp 必须在 create_all 之前启用（articles.embedding 依赖 vector 类型）
+    async with engine.begin() as conn:
+        await conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
+        await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
