@@ -22,11 +22,9 @@ services:
       TROVE_BASE: http://backend:8000
       TROVE_TOKEN: ${SERVICE_TOKEN_WECHAT_BOT:?set SERVICE_TOKEN_WECHAT_BOT in .env}
       TROVE_PUBLIC_BASE: ${TROVE_PUBLIC_BASE:-http://127.0.0.1:8080}
-      TROVE_ENV: production
       LOG_DIR: log
       LOG_TO_STDOUT: "1"
-      SERVICE_TOKEN_WECHAT_BOT: ${SERVICE_TOKEN_WECHAT_BOT:-}
-      WECHAT_BOT_ACT_AS_USER: ${WECHAT_BOT_ACT_AS_USER:-weaiw}
+      TROVE_ENV: production
     depends_on:
       - backend
       - postgres
