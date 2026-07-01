@@ -57,10 +57,13 @@ class Settings(BaseSettings):
     whisper_model_path: str = ""
     transcribe_timeout_sec: int = 300
 
-    # NOTE: LLM and embedding API config is NOT here. It's loaded dynamically
-    # from `backend/app/config_store.json` (managed via web UI: Settings →
-    # AI 对话模型 / 嵌入模型). Env vars like OPENAI_API_KEY / MINIMAX_API_KEY
-    # only act as fallbacks when nothing is configured in the store.
+    # ── Embedding（语义搜索向量化，非敏感）──────────────────
+    embedding_provider: str = "siliconflow"
+    embedding_api_base: str = "https://api.siliconflow.cn/v1"
+    embedding_model: str = "BAAI/bge-large-zh-v1.5"
+
+    # NOTE: LLM / Embedding 的 API Key 放 .env（SILICONFLOW_API_KEY 等）。
+    # 网页「设置」写入 config_store.json 的覆盖项优先级最高。
 
     def get_allowed_origins(self) -> List[str]:
         """Parse ALLOWED_ORIGINS into a list, stripping whitespace."""

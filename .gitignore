@@ -13,9 +13,8 @@
 03-src/frontend/.next/
 03-src/frontend/out/
 
-# Backend local config
+# Backend local config (UI runtime overrides; secrets go in .env)
 03-src/backend/app/config_store.json
-03-src/backend/app/core/config_store.json
 
 # Local test/sample data (large media files)
 02-docs/data/

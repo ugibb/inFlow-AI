@@ -20,9 +20,11 @@ from functools import lru_cache
 
 import httpx
 
+from app.core.config import get_settings
+
 logger = logging.getLogger(__name__)
 
-CONFIG_FILE = Path(__file__).parent / "config_store.json"
+CONFIG_FILE = Path(__file__).parent.parent / "config_store.json"
 PROJECT_ROOT = Path(__file__).resolve().parents[4]   # .../g_20260615_trove-ai
 
 # 本地开发时从项目根目录加载 .env（确保 DEEPSEEK_API_KEY 等进入 os.environ）
@@ -221,6 +223,16 @@ CONFIG_SCHEMA: Dict[str, dict] = {
 }
 
 
+def _embedding_defaults() -> Dict[str, str]:
+    """Non-secret embedding defaults from config.py."""
+    s = get_settings()
+    return {
+        "provider": s.embedding_provider,
+        "api_base": s.embedding_api_base,
+        "model": s.embedding_model,
+    }
+
+
 # ============================================================
 #  Config store — read/write JSON overrides
 # ============================================================
@@ -263,10 +275,10 @@ def get_effective_config(group: str) -> Dict[str, Any]:
         if key in overrides and overrides[key] not in (None, ""):
             result[key] = overrides[key]
         else:
-            # Try env var: LLM_API_KEY, MINIMAX_API_KEY, EMBEDDING_MODEL etc.
-            env_key = f"{group.upper()}_{key.upper()}"
-            env_val = os.environ.get(env_key)
-            # Also try legacy env var names
+            # Try env var for secrets only (e.g. EMBEDDING_API_KEY)
+            env_val = None
+            if key == "api_key":
+                env_val = os.environ.get(f"{group.upper()}_{key.upper()}")
             if not env_val and group == "llm" and key == "api_key":
                 env_val = os.environ.get("MINIMAX_API_KEY")
             if not env_val and group == "llm" and key == "api_base":
@@ -274,7 +286,12 @@ def get_effective_config(group: str) -> Dict[str, Any]:
             if not env_val and group == "llm" and key == "model":
                 env_val = os.environ.get("LLM_MODEL")
 
-            result[key] = env_val if env_val else field.get("default", "")
+            if env_val:
+                result[key] = env_val
+            elif group == "embedding" and key in _embedding_defaults():
+                result[key] = _embedding_defaults()[key]
+            else:
+                result[key] = field.get("default", "")
 
     return result
 
@@ -334,8 +351,21 @@ def get_llm_config() -> Dict[str, str]:
 
 
 def get_embedding_config() -> Dict[str, str]:
-    """Get effective embedding config."""
-    return get_effective_config("embedding")
+    """Get effective embedding config (config.py defaults + .env API keys)."""
+    cfg = get_effective_config("embedding")
+    overrides = _load_overrides().get("embedding", {})
+    api_key = (cfg.get("api_key") or "").strip()
+
+    if api_key or overrides.get("api_key"):
+        return cfg
+
+    for env_name in ("EMBEDDING_API_KEY", "SILICONFLOW_API_KEY", "OPENAI_API_KEY"):
+        env_key = (os.environ.get(env_name) or "").strip()
+        if env_key:
+            cfg["api_key"] = env_key
+            break
+
+    return cfg
 
 
 def get_plugins_config() -> Dict[str, str]:
@@ -357,6 +387,8 @@ def get_all_schemas() -> Dict[str, dict]:
         }
         for field in schema["fields"]:
             f = dict(field)
+            if group == "embedding" and f["key"] in _embedding_defaults():
+                f["default"] = _embedding_defaults()[f["key"]]
             # Remove internal flags
             f.pop("secret", None)
             entry["fields"].append(f)
