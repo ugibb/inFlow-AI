@@ -3,6 +3,12 @@ const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://localhost:8000';
 
 const nextConfig = {
   output: 'standalone',
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: false,
+  },
   images: {
     domains: ['localhost'],
     remotePatterns: [

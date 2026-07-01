@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+.git
+.gitignore
+*.log
+.DS_Store
+tsconfig.tsbuildinfo
+prototype-step-log-hover.html

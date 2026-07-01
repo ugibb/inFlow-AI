@@ -50,7 +50,13 @@ fi
 
 info "构建并启动 inFlow AI（宝塔模式，监听 127.0.0.1:8080）..."
 docker compose "${COMPOSE_FILES[@]}" down 2>/dev/null || true
-docker compose "${COMPOSE_FILES[@]}" build
+if ! docker compose "${COMPOSE_FILES[@]}" build; then
+  error "镜像构建失败。查看 frontend 详细日志："
+  echo "  docker compose ${COMPOSE_FILES[*]} build frontend --progress=plain 2>&1 | tail -80"
+  echo ""
+  echo "  常见原因：内存不足（free -h 查看，建议 ≥4GB 可用）；可临时加 swap 后重试"
+  exit 1
+fi
 docker compose "${COMPOSE_FILES[@]}" up -d
 
 info "等待服务就绪..."
