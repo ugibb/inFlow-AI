@@ -81,12 +81,12 @@ if [ ! -f 03-src/backend/app/config_store.json ] && [ -f 03-src/backend/app/conf
 fi
 
 info "停止已有 inFlow AI 容器..."
-docker compose down 2>/dev/null || true
+docker compose -f docker-compose.yml -f docker-compose.local.yml down 2>/dev/null || true
 
 kill_port "${HTTP_PORT}"
 
 info "启动 inFlow AI 服务栈..."
-docker compose up -d
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 
 info "等待服务就绪..."
 for i in $(seq 1 30); do
@@ -94,7 +94,7 @@ for i in $(seq 1 30); do
     break
   fi
   if [ "$i" -eq 30 ]; then
-    warn "服务尚未在 30 秒内响应，请检查日志: docker compose logs -f"
+    warn "服务尚未在 30 秒内响应，请检查: docker compose -f docker-compose.yml -f docker-compose.local.yml logs -f"
     exit 1
   fi
   sleep 2
@@ -106,8 +106,8 @@ echo "  访问地址: http://localhost:${HTTP_PORT}"
 echo "  API 文档: http://localhost:${HTTP_PORT}/api/docs"
 echo ""
 info "首次登录请查看超管账号密码:"
-docker compose logs backend 2>/dev/null | grep -i admin || warn "暂未生成 admin 日志，稍后再试: docker compose logs backend | grep -i admin"
+docker compose logs backend 2>/dev/null | grep -i admin || warn "暂未生成 admin 日志，稍后再试: docker compose -f docker-compose.yml -f docker-compose.local.yml logs backend | grep -i admin"
 echo ""
 info "常用命令:"
-echo "  查看日志: docker compose logs -f"
-echo "  停止服务: docker compose down"
+echo "  查看日志: docker compose -f docker-compose.yml -f docker-compose.local.yml logs -f"
+echo "  停止服务: docker compose -f docker-compose.yml -f docker-compose.local.yml down"

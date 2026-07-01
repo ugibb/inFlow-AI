@@ -231,6 +231,44 @@ systemctl start docker
 systemctl enable docker
 ```
 
+### 6.3 配置 Docker 镜像加速（腾讯云必做）
+
+国内 CVM 直连 `docker.io` 常超时（`i/o timeout`），构建前必须配置镜像加速与 DNS。
+
+```bash
+# 若已有 /etc/docker/daemon.json，先备份
+cp /etc/docker/daemon.json /etc/docker/daemon.json.bak 2>/dev/null || true
+
+cat > /etc/docker/daemon.json <<'EOF'
+{
+  "registry-mirrors": [
+    "https://mirror.ccs.tencentyun.com"
+  ],
+  "dns": ["119.29.29.29", "223.5.5.5", "8.8.8.8"]
+}
+EOF
+
+systemctl daemon-reload
+systemctl restart docker
+```
+
+验证加速是否生效：
+
+```bash
+docker info | grep -A3 "Registry Mirrors"
+```
+
+测试拉取基础镜像（应能在 30 秒内完成）：
+
+```bash
+docker pull node:20-alpine
+docker pull python:3.11-slim
+```
+
+若仍超时，在腾讯云控制台检查：
+- 安全组是否放行 **出站** 全部流量（或至少 TCP 443）
+- 实例是否有公网 IP / 已绑定 NAT 网关
+
 ---
 
 ## 第 7 步：上传项目代码到服务器
@@ -260,12 +298,15 @@ ls -la 03-src/backend/Dockerfile 03-src/frontend/Dockerfile
 # 进入本地项目目录
 cd /Users/你的用户名/Documents/01-CC/98-Content/g_20260615_trove-ai
 
-# 打包（排除大目录）
+# 打包（排除大目录与本地数据）
 tar czf /tmp/inflow-ai.tar.gz \
   --exclude='.venv' \
   --exclude='node_modules' \
   --exclude='03-src/frontend/.next' \
   --exclude='04-log' \
+  --exclude='02-docs/data' \
+  --exclude='02-docs/data-' \
+  --exclude='03-src/backend/data' \
   --exclude='.git' \
   .
 
@@ -700,6 +741,16 @@ find /www/backup -name "inflow_*.sql" -mtime +7 -delete
 ### 问题：502 Bad Gateway
 
 ```bash
+# 0. 确认 nginx 容器在运行（应有 5 个容器，含 trove-nginx）
+cd /www/wwwroot/inflow-ai
+docker compose -f docker-compose.yml -f docker-compose.baota.yml ps -a
+
+# 若 trove-nginx 为 Exited 或未列出：
+docker pull nginx:alpine
+ls -la 03-src/nginx/nginx.conf
+docker compose -f docker-compose.yml -f docker-compose.baota.yml up -d nginx
+docker compose -f docker-compose.yml -f docker-compose.baota.yml logs --tail 50 nginx
+
 # 1. 检查 Docker 容器
 cd /www/wwwroot/inflow-ai
 docker compose -f docker-compose.yml -f docker-compose.baota.yml ps
@@ -721,6 +772,22 @@ free -h
 vi /www/wwwroot/inflow-ai/docker-compose.yml
 # 将 backend 的 --workers 2 改为 --workers 1
 ```
+
+### 问题：拉取镜像超时 `registry-1.docker.io ... i/o timeout`
+
+说明 Docker 无法访问 Docker Hub，按 [第 6.3 步](#63-配置-docker-镜像加速腾讯云必做) 配置 `registry-mirrors` 后重试：
+
+```bash
+systemctl restart docker
+cd /www/wwwroot/inflow-ai
+docker pull node:20-alpine
+docker pull python:3.11-slim
+docker compose -f docker-compose.yml -f docker-compose.baota.yml build --no-cache
+```
+
+### 问题：`apk add` / DNS `transient error`
+
+构建容器内 DNS 解析失败，确认 `daemon.json` 含 `dns` 字段（见第 6.3 步），重启 Docker 后重建。
 
 ### 问题：数据库连接失败
 

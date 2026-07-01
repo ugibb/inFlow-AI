@@ -31,6 +31,12 @@ if ! docker compose version &>/dev/null; then
   exit 1
 fi
 
+if ! docker info 2>/dev/null | grep -q "Registry Mirrors"; then
+  warn "未检测到 Docker 镜像加速，国内 CVM 拉取 docker.io 可能超时"
+  echo "  请配置 /etc/docker/daemon.json 后执行 systemctl restart docker"
+  echo "  详见 02-docs/DEPLOY_BAOTA_STEP_BY_STEP.md 第 6.3 步"
+fi
+
 # 检查 .env
 if [ ! -f .env ]; then
   if [ -f .env.example ]; then
@@ -57,7 +63,35 @@ if ! docker compose "${COMPOSE_FILES[@]}" build; then
   echo "  常见原因：内存不足（free -h 查看，建议 ≥4GB 可用）；可临时加 swap 后重试"
   exit 1
 fi
+info "拉取运行时基础镜像（nginx / postgres / redis）..."
+docker pull nginx:alpine
+docker compose "${COMPOSE_FILES[@]}" pull postgres redis 2>/dev/null || true
 docker compose "${COMPOSE_FILES[@]}" up -d
+# 确保 nginx 端口映射为 127.0.0.1:8080（避免与宝塔 80 端口冲突的旧容器残留）
+docker compose "${COMPOSE_FILES[@]}" up -d --force-recreate nginx
+
+REQUIRED_SERVICES=(nginx backend frontend postgres redis)
+missing=()
+for svc in "${REQUIRED_SERVICES[@]}"; do
+  if ! docker compose "${COMPOSE_FILES[@]}" ps --status running --services | grep -qx "$svc"; then
+    missing+=("$svc")
+  fi
+done
+if [ "${#missing[@]}" -gt 0 ]; then
+  error "以下服务未运行: ${missing[*]}"
+  for svc in "${missing[@]}"; do
+    echo ""
+    echo "── ${svc} 日志 ──"
+    docker compose "${COMPOSE_FILES[@]}" logs --tail 40 "$svc" 2>/dev/null || true
+  done
+  if printf '%s\n' "${missing[@]}" | grep -qx nginx; then
+    echo ""
+    echo "  常见原因: nginx:alpine 未拉取、8080 被占用、03-src/nginx/nginx.conf 缺失"
+    echo "  尝试: docker pull nginx:alpine"
+    echo "        docker compose ${COMPOSE_FILES[*]} up -d nginx"
+  fi
+  exit 1
+fi
 
 info "等待服务就绪..."
 for i in $(seq 1 60); do
