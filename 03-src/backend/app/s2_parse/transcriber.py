@@ -46,13 +46,16 @@ async def transcribe_job(
     verbose_path = transcript_base.parent / (transcript_base.stem + "_verbose.json")
 
     transcriber = _build_transcriber()
+    from app.s2_parse.audio.service import TranscriptionService
+
+    sf_service = TranscriptionService()
     size_mb = audio_dest.stat().st_size / 1024 / 1024 if audio_dest.is_file() else 0.0
+    if sf_service.has_siliconflow:
+        backend_label = "硅基流动 SenseVoice（国内）→ Groq / 本地 Whisper 备选"
+    else:
+        backend_label = transcriber.backend_label()
     if phase:
-        phase.start(
-            backend=transcriber.backend_label(),
-            # file=audio_dest.name,
-            # size=f"{size_mb:.1f}MB" if size_mb else "待下载",
-        )
+        phase.start(backend=backend_label)
 
     if audio_dest.is_file() and audio_dest.stat().st_size > 0:
         audio_path = audio_dest
@@ -82,8 +85,14 @@ async def transcribe_job(
         if emit_log is not None:
             asyncio.run_coroutine_threadsafe(emit_log(msg), loop)
 
-    # if phase:
-    #     phase.detail(f"提交 ASR 转录任务 | {transcriber.backend_label()} | {size_mb:.1f} MB")
+    if sf_service.has_siliconflow:
+        sf_text = await sf_service.transcribe_file(audio_path, progress_cb=_emit_sync)
+        if sf_text:
+            _save_plain_transcript(sf_text, transcript_base, language="zh")
+            if phase:
+                phase.end(lang="zh", audio=f"{size_mb:.1f}MB")
+            return str(verbose_path)
+        _emit_sync("硅基流动转录失败，回退 Groq / 本地 Whisper")
 
     result = await loop.run_in_executor(
         None,
@@ -121,3 +130,19 @@ def _ext_from_url(url: str) -> str:
     path = urlparse(url).path
     suffix = Path(path).suffix.lower()
     return suffix if suffix in {".mp3", ".m4a", ".ogg", ".flac", ".wav", ".aac"} else ".mp3"
+
+
+def _save_plain_transcript(text: str, transcript_base: Path, *, language: str = "zh") -> None:
+    """Write _asr.txt / _asr.json / _asr_verbose.json from plain transcript text."""
+    from app.s2_parse.audio.transcriber import _save_response_files
+
+    _save_response_files(
+        {
+            "text": text,
+            "language": language,
+            "task": "transcribe",
+            "duration": None,
+            "segments": [],
+        },
+        transcript_base,
+    )

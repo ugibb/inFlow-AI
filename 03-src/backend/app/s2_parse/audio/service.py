@@ -7,7 +7,7 @@ import logging
 import os
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import httpx
 
@@ -43,6 +43,19 @@ def preload_whisper():
         logger.warning(f"whisper preload failed (will retry on first use): {e}")
 
 
+def _audio_mime_type(path: Path) -> str:
+    ext = path.suffix.lower()
+    return {
+        ".mp3": "audio/mpeg",
+        ".m4a": "audio/mp4",
+        ".wav": "audio/wav",
+        ".ogg": "audio/ogg",
+        ".flac": "audio/flac",
+        ".aac": "audio/aac",
+        ".mp4": "video/mp4",
+    }.get(ext, "application/octet-stream")
+
+
 class TranscriptionService:
     DEFAULT_MODEL = "FunAudioLLM/SenseVoiceSmall"
     WHISPER_MODEL = "tiny"  # small, fast, works for Chinese
@@ -60,6 +73,22 @@ class TranscriptionService:
     def available(self) -> bool:
         # Always available: either SF API or local whisper
         return True
+
+    @property
+    def has_siliconflow(self) -> bool:
+        return bool((self.api_key or "").strip())
+
+    async def transcribe_file(
+        self,
+        path: Path,
+        *,
+        progress_cb: Optional[Callable[[str], None]] = None,
+    ) -> Optional[str]:
+        """Transcribe a local audio file; prefers SiliconFlow when API key is set."""
+        path = Path(path)
+        if self.has_siliconflow:
+            return await self._transcribe_siliconflow(path, progress_cb=progress_cb)
+        return await self._transcribe_whisper(path)
 
     async def transcribe_url(
         self,
@@ -127,7 +156,12 @@ class TranscriptionService:
         # Fallback to local faster-whisper
         return await self._transcribe_whisper(path)
 
-    async def _transcribe_siliconflow(self, path: Path) -> Optional[str]:
+    async def _transcribe_siliconflow(
+        self,
+        path: Path,
+        *,
+        progress_cb: Optional[Callable[[str], None]] = None,
+    ) -> Optional[str]:
         try:
             with open(path, "rb") as f:
                 file_bytes = f.read()
@@ -135,9 +169,21 @@ class TranscriptionService:
             logger.warning(f"read local file failed: {e}")
             return None
 
+        size_mb = len(file_bytes) / (1024 * 1024)
+        if progress_cb:
+            progress_cb(f"硅基流动 SenseVoice 转录中 | {path.name} | {size_mb:.1f} MB")
+
+        from app.core.config import get_settings
+        timeout_s = max(
+            float(get_settings().transcribe_timeout_sec),
+            min(1800.0, size_mb * 8.0),
+        )
+
         try:
-            async with httpx.AsyncClient(timeout=self.TRANSCRIBE_TIMEOUT_S) as client:
-                files = {"file": (path.name, file_bytes, "video/mp4")}
+            async with httpx.AsyncClient(timeout=timeout_s) as client:
+                files = {
+                    "file": (path.name, file_bytes, _audio_mime_type(path)),
+                }
                 data = {"model": self.DEFAULT_MODEL}
                 resp = await client.post(
                     f"{self.api_base}/audio/transcriptions",
@@ -149,6 +195,10 @@ class TranscriptionService:
                 logger.warning(
                     f"SF transcribe HTTP {resp.status_code}: {resp.text[:200]}"
                 )
+                if progress_cb:
+                    progress_cb(
+                        f"硅基流动转录失败 HTTP {resp.status_code}：{resp.text[:120]}"
+                    )
                 return None
             j = resp.json()
             text = (j.get("text") or "").strip()
@@ -156,9 +206,13 @@ class TranscriptionService:
                 logger.warning(f"SF transcribe returned empty text: {j}")
                 return None
             logger.info(f"SF transcribe OK: {len(text)} chars")
+            if progress_cb:
+                progress_cb(f"硅基流动转录完成 | 字数 {len(text)}")
             return text
         except Exception as e:
             logger.exception(f"SF transcribe call error: {e}")
+            if progress_cb:
+                progress_cb(f"硅基流动转录异常：{e}")
             return None
 
     async def _transcribe_whisper(self, path: Path) -> Optional[str]:
