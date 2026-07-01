@@ -36,24 +36,13 @@ services:
       - .env
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
     environment:
+      # 仅保留 compose 拼装项；API Key 等一律由 env_file: .env 注入（避免 ${VAR:-} 空值覆盖 env_file）
       DATABASE_URL: postgresql+asyncpg://trove:${POSTGRES_PASSWORD}@postgres:5432/trove
       DATABASE_URL_SYNC: postgresql://trove:${POSTGRES_PASSWORD}@postgres:5432/trove
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
       LOG_DIR: log
       LOG_TO_STDOUT: "1"
-      # Optional API keys — recommended to configure via web UI (Settings) instead
-      MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      SILICONFLOW_API_KEY: ${SILICONFLOW_API_KEY:-}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
-      # Used by wechat-bot integration if enabled
-      SERVICE_TOKENS: ${SERVICE_TOKENS:-}
-      SERVICE_TOKEN_WECHAT_BOT: ${SERVICE_TOKEN_WECHAT_BOT:-}
-      TROVE_PUBLIC_BASE: ${TROVE_PUBLIC_BASE:-}
-      WECHAT_BOT_ACT_AS_USER: ${WECHAT_BOT_ACT_AS_USER:-weaiw}
       TROVE_ENV: production
     depends_on:
       - postgres
