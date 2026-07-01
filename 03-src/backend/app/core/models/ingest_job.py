@@ -78,7 +78,7 @@ class IngestJob(Base):
     error_message = Column(Text, nullable=True)
 
     # Per-step runtime logs — appended during active steps for live progress visibility
-    step_logs = Column(JSONB, nullable=False, server_default="'[]'::jsonb")
+    step_logs = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
