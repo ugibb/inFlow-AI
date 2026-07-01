@@ -178,8 +178,10 @@ class TroveClient:
         if r.status_code == 401:
             return False, (
                 "❌ 添加失败：后端未认可 bot 凭证。"
-                "请确认 .env 中 SERVICE_TOKENS 与 SERVICE_TOKEN_WECHAT_BOT 已配置，"
-                "并执行 ./stop-local.sh && ./start-local.sh 重启。"
+                "请确认 .env 中 SERVICE_TOKENS 与 SERVICE_TOKEN_WECHAT_BOT 一致，"
+                "且 SERVICE_TOKENS 含「token:weaiw」。"
+                "本地：./stop-local.sh && ./start-local.sh；"
+                "Docker：docker compose up -d --force-recreate backend wechat-bot。"
             ), None, None
         if r.status_code == 503:
             return False, (
