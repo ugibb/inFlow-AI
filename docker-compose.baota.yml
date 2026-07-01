@@ -14,6 +14,8 @@ services:
     image: trove-backend:latest
     container_name: trove-wechat-bot
     command: python -m app.extensions.wechat.bot
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://trove:${POSTGRES_PASSWORD}@postgres:5432/trove
       DATABASE_URL_SYNC: postgresql://trove:${POSTGRES_PASSWORD}@postgres:5432/trove
