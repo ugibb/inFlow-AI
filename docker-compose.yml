@@ -32,12 +32,14 @@ services:
       dockerfile: Dockerfile
     container_name: trove-backend
     image: trove-backend:latest
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
     environment:
       DATABASE_URL: postgresql+asyncpg://trove:${POSTGRES_PASSWORD}@postgres:5432/trove
       DATABASE_URL_SYNC: postgresql://trove:${POSTGRES_PASSWORD}@postgres:5432/trove
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+      LOG_DIR: log
+      LOG_TO_STDOUT: "1"
       # Optional API keys — recommended to configure via web UI (Settings) instead
       MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}

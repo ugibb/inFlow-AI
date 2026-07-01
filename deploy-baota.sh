@@ -105,6 +105,13 @@ for i in $(seq 1 60); do
   sleep 2
 done
 
+if ! curl -sf "http://127.0.0.1:8080/api/health" 2>/dev/null | grep -q '"status"'; then
+  warn "前端可访问，但后端 /api/health 未就绪"
+  echo "  查看后端日志: docker compose ${COMPOSE_FILES[*]} logs backend --tail 80"
+  echo "  容器内日志文件: docker compose ${COMPOSE_FILES[*]} exec backend ls -la log/ 2>/dev/null || true"
+  exit 1
+fi
+
 echo ""
 info "inFlow AI 已启动（宝塔模式）"
 echo "  本机访问: http://127.0.0.1:8080"

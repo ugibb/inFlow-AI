@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import datetime
 import logging
+import os
+import sys
 from pathlib import Path
 from typing import Iterable
 
@@ -31,6 +33,13 @@ _LEVEL_MAP: dict[str, int] = {
 }
 
 _configured = False
+
+
+def _use_stdout_logging() -> bool:
+    flag = os.environ.get("LOG_TO_STDOUT", "").strip().lower()
+    if flag in ("1", "true", "yes", "on"):
+        return True
+    return os.environ.get("TROVE_ENV", "").strip().lower() == "production"
 
 
 class _TroveFormatter(logging.Formatter):
@@ -103,10 +112,24 @@ def setup_logging(
 
     formatter = _TroveFormatter(_LOG_FORMAT, datefmt=_DATE_FORMAT)
 
-    file_handler = logging.FileHandler(log_file, encoding="utf-8")
-    file_handler.setLevel(file_level)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    handlers: list[logging.Handler] = []
+    try:
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler.setLevel(file_level)
+        file_handler.setFormatter(formatter)
+        handlers.append(file_handler)
+    except OSError as exc:
+        logging.basicConfig(level=file_level, stream=sys.stderr)
+        logging.getLogger(name).warning("File logging disabled (%s): %s", log_file, exc)
+
+    if _use_stdout_logging():
+        stream_handler = logging.StreamHandler(sys.stderr)
+        stream_handler.setLevel(file_level)
+        stream_handler.setFormatter(formatter)
+        handlers.append(stream_handler)
+
+    for handler in handlers:
+        logger.addHandler(handler)
 
     logger.propagate = False
     _configured = True
@@ -167,13 +190,13 @@ def configure_third_party_loggers(
 
 
 def _attach_trove_handlers_to(logger_names: Iterable[str]) -> None:
-    """让第三方 logger 复用 trove 的文件 handler，统一时间戳格式。"""
+    """让第三方 logger 复用 trove 的 handler，统一时间戳格式。"""
     trove = logging.getLogger(_ROOT_LOGGER_NAME)
     if not trove.handlers:
         return
-    trove_handler = trove.handlers[0]
     for name in logger_names:
         ext = logging.getLogger(name)
         ext.handlers.clear()
-        ext.addHandler(trove_handler)
+        for handler in trove.handlers:
+            ext.addHandler(handler)
         ext.propagate = False

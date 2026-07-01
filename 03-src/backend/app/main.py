@@ -199,10 +199,12 @@ async def lifespan(app: FastAPI):
     await init_db()
 
     # Preload whisper model at startup (avoid timeout on first ASR request)
+    import os
     import concurrent.futures
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    from app.s2_parse.audio.service import preload_whisper
-    asyncio.get_running_loop().run_in_executor(executor, preload_whisper)
+    if os.environ.get("TROVE_ENV", "").lower() != "production":
+        from app.s2_parse.audio.service import preload_whisper
+        asyncio.get_running_loop().run_in_executor(executor, preload_whisper)
 
     # Recover captured-but-unprocessed jobs from previous server run
     from app.s1_ingest.orchestrator import recover_captured_jobs
