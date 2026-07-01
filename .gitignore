@@ -1,0 +1,47 @@
+# Secrets — never commit
+.env
+*.pem
+
+# Python
+.venv/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+
+# Node / Next.js
+**/node_modules/
+03-src/frontend/.next/
+03-src/frontend/out/
+
+# Backend local config
+03-src/backend/app/config_store.json
+03-src/backend/app/core/config_store.json
+
+# Local test/sample data (large media files)
+02-docs/data/
+02-docs/data-/
+03-src/backend/data/
+
+# OS
+.DS_Store
+._*
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+log/
+04-log/
+
+# Project local artifacts
+_archive/
+项目记忆.md
+
+# Built plugin artifacts (re-built from source)
+03-src/backend/app/static/obsidian-plugin/main.js
+03-src/backend/app/static/obsidian-plugin/manifest.json
+03-src/backend/app/static/obsidian-plugin/styles.css

@@ -1,0 +1,554 @@
+{
+  "categories": [
+    "极简",
+    "精致",
+    "醒目",
+    "聚焦",
+    "媒体",
+    "温暖",
+    "艺术",
+    "品牌"
+  ],
+  "themes": {
+    "bauhaus": {
+      "slug": "bauhaus",
+      "name": "包豪斯",
+      "description": "红蓝黄三原色 #E30613/#004D9F/#F5A623，粗黑边框，几何构成主义风格，适合设计师、创意类内容",
+      "category": "艺术",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#f0f0f0",
+        "--theme-accent": "#E30613",
+        "--theme-text": "#1a1a1a",
+        "--theme-heading": "#ffffff",
+        "--theme-card-bg": "linear-gradient(135deg, #fff4d6 0%, #fff8ea 100%)",
+        "--theme-border": "#f9d2d4",
+        "--theme-shadow": "#fbe1e2",
+        "--theme-bg-dark": "#1a1a1a"
+      }
+    },
+    "bold-blue": {
+      "slug": "bold-blue",
+      "name": "醒目·蓝",
+      "description": "醒目蓝 #4B6EF5 填充标题+色块h3，适合新闻/公告/重点内容",
+      "category": "醒目",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#282c34",
+        "--theme-accent": "#4B6EF5",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#ffffff",
+        "--theme-card-bg": "linear-gradient(135deg, rgba(75,110,245,0.05), rgba(75,110,245,0.02))",
+        "--theme-border": "#dee4fd",
+        "--theme-shadow": "#e9edfd",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "bold-green": {
+      "slug": "bold-green",
+      "name": "醒目·绿",
+      "description": "醒目绿 #2BAE85 填充标题+色块h3，适合新闻/公告/重点内容",
+      "category": "醒目",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#282c34",
+        "--theme-accent": "#2BAE85",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#ffffff",
+        "--theme-card-bg": "linear-gradient(135deg, rgba(43,174,133,0.05), rgba(43,174,133,0.02))",
+        "--theme-border": "#d8f0e9",
+        "--theme-shadow": "#e5f5f0",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "bold-navy": {
+      "slug": "bold-navy",
+      "name": "醒目·藏青",
+      "description": "醒目藏青 #1F4F8A 填充标题+色块h3，适合新闻/公告/重点内容",
+      "category": "醒目",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#282c34",
+        "--theme-accent": "#1F4F8A",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#ffffff",
+        "--theme-card-bg": "linear-gradient(135deg, rgba(31,79,138,0.05), rgba(31,79,138,0.02))",
+        "--theme-border": "#d6dfe9",
+        "--theme-shadow": "#e4e9f0",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "bytedance": {
+      "slug": "bytedance",
+      "name": "字节蓝",
+      "description": "字节蓝青渐变 #1677FF/#05D4CD，渐变胶囊标题，科技商务感，适合 SaaS 产品、技术方案介绍",
+      "category": "品牌",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#f7f8fa",
+        "--theme-accent": "#1677FF",
+        "--theme-text": "#4e5969",
+        "--theme-heading": "#1d2129",
+        "--theme-card-bg": "#f2f3f5",
+        "--theme-border": "#d5e6ff",
+        "--theme-shadow": "#e3eeff",
+        "--theme-bg-dark": "#0d1117"
+      }
+    },
+    "chinese": {
+      "slug": "chinese",
+      "name": "中国风",
+      "description": "中国红 #8B1E22 强调，楷体标题，宣纸色背景，古典文化感，适合传统文化、国潮、中式美学内容",
+      "category": "艺术",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#faf8f5",
+        "--theme-accent": "#8B1E22",
+        "--theme-text": "#333333",
+        "--theme-heading": "#8B1E22",
+        "--theme-card-bg": "rgba(139,30,34,0.03)",
+        "--theme-border": "#ead6d7",
+        "--theme-shadow": "#f1e4e4",
+        "--theme-bg-dark": "#1a1410"
+      }
+    },
+    "coffee-house": {
+      "slug": "coffee-house",
+      "name": "咖啡",
+      "description": "咖啡棕 #8d6e63 沉稳温暖，衬线字体感，适合读书/文化/深度内容",
+      "category": "温暖",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#ece2d4",
+        "--theme-accent": "#8d6e63",
+        "--theme-text": "#3e2723",
+        "--theme-heading": "#4a302a",
+        "--theme-card-bg": "linear-gradient(180deg, rgba(236,226,212,0.96) 0%, rgba(245,239,230,0.96) 100%)",
+        "--theme-border": "#eae4e2",
+        "--theme-shadow": "#f1edec",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "elegant-blue": {
+      "slug": "elegant-blue",
+      "name": "精致·蓝",
+      "description": "精致蓝 #4B6EF5 左侧双线边框+渐变表头，适合杂志/设计/高端内容",
+      "category": "精致",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#282c34",
+        "--theme-accent": "#4B6EF5",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#4B6EF5",
+        "--theme-card-bg": "linear-gradient(135deg, rgba(75,110,245,0.05), rgba(75,110,245,0.02))",
+        "--theme-border": "#dee4fd",
+        "--theme-shadow": "#e9edfd",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "elegant-green": {
+      "slug": "elegant-green",
+      "name": "精致·绿",
+      "description": "精致绿 #2BAE85 左侧双线边框+渐变表头，适合杂志/设计/高端内容",
+      "category": "精致",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#282c34",
+        "--theme-accent": "#2BAE85",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#2BAE85",
+        "--theme-card-bg": "linear-gradient(135deg, rgba(43,174,133,0.05), rgba(43,174,133,0.02))",
+        "--theme-border": "#d8f0e9",
+        "--theme-shadow": "#e5f5f0",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "elegant-navy": {
+      "slug": "elegant-navy",
+      "name": "精致·藏青",
+      "description": "精致藏青 #1F4F8A 左侧双线边框+渐变表头，适合杂志/设计/高端内容",
+      "category": "精致",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#282c34",
+        "--theme-accent": "#1F4F8A",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#1F4F8A",
+        "--theme-card-bg": "linear-gradient(135deg, rgba(31,79,138,0.05), rgba(31,79,138,0.02))",
+        "--theme-border": "#d6dfe9",
+        "--theme-shadow": "#e4e9f0",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "focus-blue": {
+      "slug": "focus-blue",
+      "name": "聚焦·蓝",
+      "description": "聚焦蓝 #4B6EF5 居中标题+上下线，适合品牌/展示/营销内容",
+      "category": "聚焦",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#282c34",
+        "--theme-accent": "#4B6EF5",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#4B6EF5",
+        "--theme-card-bg": "rgba(75,110,245,0.05)",
+        "--theme-border": "#dee4fd",
+        "--theme-shadow": "#e9edfd",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "focus-gold": {
+      "slug": "focus-gold",
+      "name": "聚焦·金",
+      "description": "聚焦金 #C8A062 居中标题+上下线，适合品牌/展示/营销内容",
+      "category": "聚焦",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#282c34",
+        "--theme-accent": "#C8A062",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#C8A062",
+        "--theme-card-bg": "rgba(200,160,98,0.05)",
+        "--theme-border": "#f5ede2",
+        "--theme-shadow": "#f8f3ec",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "focus-red": {
+      "slug": "focus-red",
+      "name": "聚焦·红",
+      "description": "聚焦红 #F25C54 居中标题+上下线，适合品牌/展示/营销内容",
+      "category": "聚焦",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#282c34",
+        "--theme-accent": "#F25C54",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#F25C54",
+        "--theme-card-bg": "rgba(242,92,84,0.05)",
+        "--theme-border": "#fce1e0",
+        "--theme-shadow": "#fdebea",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "github": {
+      "slug": "github",
+      "name": "GitHub",
+      "description": "GitHub 蓝 #0969DA 强调，灰色边框系统，白底开发者风格，适合技术博客、代码分享",
+      "category": "极简",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#f6f8fa",
+        "--theme-accent": "#0969da",
+        "--theme-text": "#1f2328",
+        "--theme-heading": "#1f2328",
+        "--theme-card-bg": "#f6f8fa",
+        "--theme-border": "#d2e4f8",
+        "--theme-shadow": "#e1edfa",
+        "--theme-bg-dark": "#0d1117"
+      }
+    },
+    "ink": {
+      "slug": "ink",
+      "name": "墨韵",
+      "description": "纯黑 #000000 强调，Georgia 衬线体，极简黑白灰，适合深度长文、文学评论、严肃写作",
+      "category": "艺术",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#f5f5f5",
+        "--theme-accent": "#000000",
+        "--theme-text": "#111111",
+        "--theme-heading": "#000000",
+        "--theme-card-bg": "#fafafa",
+        "--theme-border": "#d1d1d1",
+        "--theme-shadow": "#e0e0e0",
+        "--theme-bg-dark": "#111111"
+      }
+    },
+    "lavender-dream": {
+      "slug": "lavender-dream",
+      "name": "薰衣草",
+      "description": "薰衣草紫 #9b7fd4 梦幻优雅，渐变背景，适合美妆/艺术/灵感内容",
+      "category": "温暖",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#ece4ff",
+        "--theme-accent": "#9b7fd4",
+        "--theme-text": "#3d3155",
+        "--theme-heading": "#5f4688",
+        "--theme-card-bg": "linear-gradient(180deg, rgba(236,228,255,0.98) 0%, rgba(245,240,255,0.9) 100%)",
+        "--theme-border": "#ede7f7",
+        "--theme-shadow": "#f3eff9",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "magazine": {
+      "slug": "magazine",
+      "name": "杂志",
+      "description": "Apple 蓝紫渐变 #007AFF/#5856D6，圆角渐变标签，现代杂志风格，适合产品评测、科技资讯",
+      "category": "媒体",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#fbfbfd",
+        "--theme-accent": "#007AFF",
+        "--theme-text": "#333333",
+        "--theme-heading": "#ffffff",
+        "--theme-card-bg": "rgba(0,0,0,0.02)",
+        "--theme-border": "#d1e7ff",
+        "--theme-shadow": "#e0efff",
+        "--theme-bg-dark": "#1c1c1e"
+      }
+    },
+    "midnight": {
+      "slug": "midnight",
+      "name": "暗夜",
+      "description": "粉紫蓝渐变 #F472B6/#8B5CF6/#60A5FA，赛博朋克霓虹光效，适合 AI/Web3/科技前沿话题",
+      "category": "艺术",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#fbfbfd",
+        "--theme-accent": "#8B5CF6",
+        "--theme-text": "#333333",
+        "--theme-heading": "#ffffff",
+        "--theme-card-bg": "linear-gradient(135deg, rgba(244,114,182,0.05), rgba(168,85,247,0.02))",
+        "--theme-border": "#eae1fd",
+        "--theme-shadow": "#f1ebfd",
+        "--theme-bg-dark": "#0f0f1a"
+      }
+    },
+    "minimal-blue": {
+      "slug": "minimal-blue",
+      "name": "简约·蓝",
+      "description": "简约蓝 #4B6EF5 极简风格，无装饰标题，适合商务/科技/专业内容",
+      "category": "极简",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#282c34",
+        "--theme-accent": "#4B6EF5",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#4B6EF5",
+        "--theme-card-bg": "#f7f7f7",
+        "--theme-border": "#dee4fd",
+        "--theme-shadow": "#e9edfd",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "minimal-gold": {
+      "slug": "minimal-gold",
+      "name": "简约·金",
+      "description": "简约金 #C8A062 极简风格，无装饰标题，适合商务/科技/专业内容",
+      "category": "极简",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#282c34",
+        "--theme-accent": "#C8A062",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#C8A062",
+        "--theme-card-bg": "#f7f7f7",
+        "--theme-border": "#f5ede2",
+        "--theme-shadow": "#f8f3ec",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "minimal-gray": {
+      "slug": "minimal-gray",
+      "name": "简约·灰",
+      "description": "简约灰 #4E5969 极简风格，无装饰标题，适合商务/科技/专业内容",
+      "category": "极简",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#282c34",
+        "--theme-accent": "#4E5969",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#4E5969",
+        "--theme-card-bg": "#f7f7f7",
+        "--theme-border": "#dfe1e4",
+        "--theme-shadow": "#e9ebed",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "minimal-navy": {
+      "slug": "minimal-navy",
+      "name": "简约·藏青",
+      "description": "简约藏青 #1F4F8A 极简风格，无装饰标题，适合商务/科技/专业内容",
+      "category": "极简",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#282c34",
+        "--theme-accent": "#1F4F8A",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#1F4F8A",
+        "--theme-card-bg": "#f7f7f7",
+        "--theme-border": "#d6dfe9",
+        "--theme-shadow": "#e4e9f0",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "minimal-red": {
+      "slug": "minimal-red",
+      "name": "简约·红",
+      "description": "简约红 #F25C54 极简风格，无装饰标题，适合商务/科技/专业内容",
+      "category": "极简",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#282c34",
+        "--theme-accent": "#F25C54",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#F25C54",
+        "--theme-card-bg": "#f7f7f7",
+        "--theme-border": "#fce1e0",
+        "--theme-shadow": "#fdebea",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "mint-fresh": {
+      "slug": "mint-fresh",
+      "name": "薄荷",
+      "description": "薄荷绿 #1a7a5a 清新自然，圆角卡片，适合生活/健康/清新内容",
+      "category": "温暖",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#e0f5ec",
+        "--theme-accent": "#1a7a5a",
+        "--theme-text": "#2d4a3e",
+        "--theme-heading": "#1d5e49",
+        "--theme-card-bg": "linear-gradient(180deg, rgba(224,245,236,0.96) 0%, rgba(240,250,245,0.96) 100%)",
+        "--theme-border": "#d5e7e1",
+        "--theme-shadow": "#e3efeb",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "newspaper": {
+      "slug": "newspaper",
+      "name": "报纸",
+      "description": "纽约时报风 #326891 蓝灰，Georgia 衬线体，居中双线标题，适合新闻评论、行业分析",
+      "category": "媒体",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#f0ede8",
+        "--theme-accent": "#326891",
+        "--theme-text": "#000000",
+        "--theme-heading": "#111111",
+        "--theme-card-bg": "#f7f3ee",
+        "--theme-border": "#dae3eb",
+        "--theme-shadow": "#e6ecf1",
+        "--theme-bg-dark": "#1a1712"
+      }
+    },
+    "sports": {
+      "slug": "sports",
+      "name": "运动",
+      "description": "运动绿 #00A968 + 渐变色带，活力动感，适合体育/健身/户外内容",
+      "category": "艺术",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#ffffff",
+        "--theme-accent": "#00A968",
+        "--theme-text": "#2c2c2c",
+        "--theme-heading": "#ffffff",
+        "--theme-card-bg": "#f8f8f8",
+        "--theme-border": "#d1efe3",
+        "--theme-shadow": "#e0f4ec",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "sspai": {
+      "slug": "sspai",
+      "name": "少数派",
+      "description": "少数派红 #D71A1B 强调，衬线体标题，清爽白底，适合数码评测、效率工具分享",
+      "category": "媒体",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#fafafa",
+        "--theme-accent": "#D71A1B",
+        "--theme-text": "#333333",
+        "--theme-heading": "#2d2d2d",
+        "--theme-card-bg": "linear-gradient(180deg, #fff8f8 0%, #fffdfd 100%)",
+        "--theme-border": "#f7d5d5",
+        "--theme-shadow": "#fae3e3",
+        "--theme-bg-dark": "#1a1a1a"
+      }
+    },
+    "sunset-amber": {
+      "slug": "sunset-amber",
+      "name": "日落",
+      "description": "日落琥珀 #d37a45 温暖浓郁，渐变背景，适合故事/情感/旅行内容",
+      "category": "温暖",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#f5e6d0",
+        "--theme-accent": "#d37a45",
+        "--theme-text": "#3d2c1e",
+        "--theme-heading": "#8d4d2e",
+        "--theme-card-bg": "linear-gradient(180deg, rgba(249,236,217,0.96) 0%, rgba(247,228,204,0.88) 100%)",
+        "--theme-border": "#f7e7dd",
+        "--theme-shadow": "#f9efe8",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "terracotta": {
+      "slug": "terracotta",
+      "name": "赤陶",
+      "description": "赤陶橙 #C86442 强调，暖灰文字，白底纹理，适合知识分享、自媒体干货",
+      "category": "温暖",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#fafaf9",
+        "--theme-accent": "#C86442",
+        "--theme-text": "#222222",
+        "--theme-heading": "#ffffff",
+        "--theme-card-bg": "#f6f6f4",
+        "--theme-border": "#f5e3dc",
+        "--theme-shadow": "#f8ece8",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    },
+    "wechat-native": {
+      "slug": "wechat-native",
+      "name": "微信原生",
+      "description": "微信绿 #07c160 原生风格，适合官方/正式/通用内容",
+      "category": "品牌",
+      "is_dark": false,
+      "vars": {
+        "--theme-bg": "#ffffff",
+        "--theme-bg-secondary": "#f0f7f2",
+        "--theme-accent": "#07c160",
+        "--theme-text": "#333333",
+        "--theme-heading": "#163325",
+        "--theme-card-bg": "linear-gradient(135deg, #f0f7f2 0%, #f8fcf9 100%)",
+        "--theme-border": "#d2f3e2",
+        "--theme-shadow": "#e1f7eb",
+        "--theme-bg-dark": "#1e1e1e"
+      }
+    }
+  }
+}

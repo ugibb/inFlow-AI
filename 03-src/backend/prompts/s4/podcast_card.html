@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 750px;
+    height: 1000px;
+    overflow: hidden;
+    font-family: "PingFang SC", "Noto Sans CJK SC", "Noto Sans SC", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .card {
+    width: 750px;
+    height: 1000px;
+    background: #F5EEE0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    border: 3px solid #1A1526;
+  }
+
+  /* ── 纸张颗粒感 ── */
+  .grain {
+    position: absolute;
+    inset: 0;
+    opacity: 0.025;
+    pointer-events: none;
+    z-index: 20;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    background-size: 200px 200px;
+  }
+
+  /* ═══════════════════════════════
+     顶部 Header Bar
+  ═══════════════════════════════ */
+  .header-bar {
+    height: 46px;
+    background: #1A1526;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 2;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    height: 100%;
+  }
+
+  .header-amber {
+    width: 120px;
+    height: 100%;
+    background: #E8920A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .header-amber span {
+    font-size: 9px;
+    font-weight: 900;
+    color: #1A1526;
+    letter-spacing: 0.25em;
+    font-family: "SF Mono", "Courier New", monospace;
+  }
+
+  .header-vline {
+    width: 1px;
+    height: 22px;
+    background: rgba(255,255,255,0.1);
+    margin: 0 18px;
+  }
+
+  .header-digest {
+    font-size: 10px;
+    font-weight: 700;
+    color: #E8920A;
+    letter-spacing: 0.2em;
+    font-family: "SF Mono", "Courier New", monospace;
+  }
+
+  .header-meta {
+    font-size: 9px;
+    color: rgba(255,255,255,0.25);
+    letter-spacing: 0.1em;
+    font-family: "SF Mono", "Courier New", monospace;
+    padding-right: 20px;
+  }
+
+  /* ═══════════════════════════════
+     上部：封面区（深色背景）
+  ═══════════════════════════════ */
+  .cover-section {
+    background: #1A1526;
+    padding: 24px 32px 22px;
+    display: flex;
+    gap: 22px;
+    align-items: center;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 封面图 */
+  .cover-art {
+    width: 110px;
+    height: 110px;
+    border-radius: 10px;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 2px solid rgba(232,146,10,0.4);
+    background: #2A2040;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+
+  .cover-art img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+
+  /* 标题信息 */
+  .cover-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .platform-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #E8920A;
+    flex-shrink: 0;
+  }
+
+  .badge-text {
+    font-size: 10px;
+    font-weight: 700;
+    color: #E8920A;
+    letter-spacing: 0.16em;
+    font-family: "SF Mono", "Courier New", monospace;
+    text-transform: uppercase;
+  }
+
+  .show-name {
+    font-size: 12px;
+    color: rgba(255,255,255,0.45);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  /* 书名标签 */
+  .book-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(232,146,10,0.12);
+    border: 1px solid rgba(232,146,10,0.3);
+    border-radius: 3px;
+    padding: 2px 7px;
+    width: fit-content;
+  }
+
+  .book-tag span {
+    font-size: 10px;
+    color: rgba(232,146,10,0.85);
+    letter-spacing: 0.04em;
+  }
+
+  .ep-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #F5EEE0;
+    line-height: 1.45;
+    letter-spacing: 0.01em;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* EP 编号 + 时长 */
+  .ep-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 2px;
+  }
+
+  .ep-chip {
+    font-size: 10px;
+    font-weight: 700;
+    color: #1A1526;
+    background: #E8920A;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-family: "SF Mono", "Courier New", monospace;
+    letter-spacing: 0.08em;
+  }
+
+  .ep-time {
+    font-size: 10px;
+    color: rgba(255,255,255,0.3);
+    font-family: "SF Mono", "Courier New", monospace;
+    letter-spacing: 0.08em;
+  }
+
+  /* ═══════════════════════════════
+     撕线（水平）
+  ═══════════════════════════════ */
+  .tear-h {
+    height: 0;
+    border-top: 2.5px dashed rgba(26,21,38,0.18);
+    margin: 0 -3px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 3;
+  }
+
+  /* 左右两端的半圆凹口 */
+  .tear-h::before, .tear-h::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 9px;
+    background: #F5EEE0;
+    top: -9px;
+  }
+
+  .tear-h::before {
+    left: -3px;
+    border-bottom: 3px solid #1A1526;
+    border-right: 3px solid #1A1526;
+    border-left: 3px solid #1A1526;
+    border-radius: 0 0 9px 9px;
+  }
+
+  .tear-h::after {
+    right: -3px;
+    border-bottom: 3px solid #1A1526;
+    border-right: 3px solid #1A1526;
+    border-left: 3px solid #1A1526;
+    border-radius: 0 0 9px 9px;
+  }
+
+  /* ═══════════════════════════════
+     要点区
+  ═══════════════════════════════ */
+  .points-section {
+    padding: 22px 32px 18px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 1;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .section-label {
+    font-size: 9px;
+    font-weight: 800;
+    color: rgba(26,21,38,0.35);
+    letter-spacing: 0.25em;
+    font-family: "SF Mono", "Courier New", monospace;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .section-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(26,21,38,0.1);
+  }
+
+  /* 五顶帽子颜色 */
+  .hat-red    { background: #E85050; }
+  .hat-yellow { background: #D4A017; }
+  .hat-blue   { background: #4A90D9; }
+  .hat-white  { background: #A898C0; border: 1px solid rgba(26,21,38,0.15); }
+  .hat-black  { background: #2C2440; }
+
+  /* 要点列表 */
+  .kp-list {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    flex: 1;
+  }
+
+  .kp-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .kp-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+
+  .kp-hat-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .kp-num {
+    font-size: 11px;
+    font-weight: 800;
+    color: #E8920A;
+    font-family: "SF Mono", "Courier New", monospace;
+    flex-shrink: 0;
+    min-width: 20px;
+    letter-spacing: 0.04em;
+  }
+
+  .kp-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .kp-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: rgba(26,21,38,0.4);
+    letter-spacing: 0.12em;
+    font-family: "SF Mono", "Courier New", monospace;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+
+  .kp-txt {
+    font-size: 13px;
+    color: #2C2440;
+    line-height: 1.55;
+    letter-spacing: 0.01em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ═══════════════════════════════
+     金句区
+  ═══════════════════════════════ */
+  .quote-section {
+    margin: 0 32px 20px;
+    border-left: 3px solid #E8920A;
+    padding: 12px 16px;
+    background: rgba(232,146,10,0.07);
+    border-radius: 0 8px 8px 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .quote-label {
+    font-size: 8px;
+    font-weight: 800;
+    color: #E8920A;
+    letter-spacing: 0.25em;
+    font-family: "SF Mono", "Courier New", monospace;
+    margin-bottom: 6px;
+  }
+
+  .quote-txt {
+    font-size: 13px;
+    color: #5C5070;
+    line-height: 1.7;
+    font-style: italic;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .quote-author {
+    margin-top: 6px;
+    font-size: 10px;
+    color: rgba(92,80,112,0.6);
+    letter-spacing: 0.08em;
+    font-family: "SF Mono", "Courier New", monospace;
+  }
+
+  /* ═══════════════════════════════
+     底部条（深色）
+  ═══════════════════════════════ */
+  .footer-bar {
+    height: 52px;
+    background: #1A1526;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* 仿条形码 */
+  .barcode {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 22px;
+    opacity: 0.3;
+  }
+
+  .b { background: #F5EEE0; border-radius: 1px; }
+
+  .footer-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .read-chip {
+    font-size: 9px;
+    color: rgba(245,238,224,0.4);
+    letter-spacing: 0.1em;
+    font-family: "SF Mono", "Courier New", monospace;
+    border: 1px solid rgba(245,238,224,0.15);
+    border-radius: 3px;
+    padding: 3px 8px;
+  }
+
+  .footer-brand {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(245,238,224,0.25);
+    letter-spacing: 0.2em;
+    font-family: "SF Mono", "Courier New", monospace;
+  }
+
+  .footer-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #E8920A;
+    opacity: 0.5;
+  }
+
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="grain"></div>
+
+  <!-- ══ HEADER BAR ══ -->
+  <div class="header-bar">
+    <div class="header-left">
+      <div class="header-amber"><span>PODCAST</span></div>
+      <div class="header-vline"></div>
+      <div class="header-digest">AI DIGEST</div>
+    </div>
+    <!-- Jinja2: {{ parsed_date }} -->
+    <div class="header-meta">2026.06.25 · TROVE</div>
+  </div>
+
+  <!-- ══ COVER SECTION ══ -->
+  <div class="cover-section">
+    <div class="cover-art">
+      <!-- Jinja2: <img src="{{ cover_image_url }}" ...> -->
+      <img
+        src="https://picsum.photos/seed/fandengjy/220/220"
+        alt="cover"
+        onerror="this.parentElement.style.background='#2A2040'"
+      />
+    </div>
+    <div class="cover-info">
+      <div class="platform-badge">
+        <div class="badge-dot"></div>
+        <!-- Jinja2: {{ platform_name }} -->
+        <div class="badge-text">小宇宙</div>
+      </div>
+      <!-- Jinja2: {{ show_name }} -->
+      <div class="show-name">樊登读书 · 付立平</div>
+      <!-- 书名标签 -->
+      <div class="book-tag">
+        <span>《给孩子的五顶学习帽》</span>
+      </div>
+      <!-- Jinja2: {{ title }} -->
+      <h1 class="ep-title">从"要我学"到"我要学"，五步构建孩子学习内驱力</h1>
+      <div class="ep-meta-row">
+        <!-- Jinja2: EP.{{ episode_number }} -->
+        <div class="ep-chip">EP.69</div>
+        <!-- Jinja2: {{ reading_time }} MIN -->
+        <div class="ep-time">约 60 MIN</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 撕线 ══ -->
+  <div class="tear-h"></div>
+
+  <!-- ══ 要点区 ══ -->
+  <div class="points-section">
+    <div class="section-header">
+      <div class="section-label">五顶学习帽 · KEY POINTS</div>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="kp-list">
+      <!-- Jinja2: {% for point in key_points[:5] %} -->
+
+      <div class="kp-item">
+        <div class="kp-left">
+          <div class="kp-hat-dot hat-red"></div>
+          <div class="kp-num">01·</div>
+        </div>
+        <div class="kp-content">
+          <div class="kp-label">情绪自控力</div>
+          <div class="kp-txt">家长先学"积极暂停"，代替情绪爆发——孩子的情绪管理从模仿父母开始</div>
+        </div>
+      </div>
+
+      <div class="kp-item">
+        <div class="kp-left">
+          <div class="kp-hat-dot hat-yellow"></div>
+          <div class="kp-num">02·</div>
+        </div>
+        <div class="kp-content">
+          <div class="kp-label">习惯自控力</div>
+          <div class="kp-txt">让孩子自主制定「日常惯例表」，家长温和提醒而非命令，自律源于自主</div>
+        </div>
+      </div>
+
+      <div class="kp-item">
+        <div class="kp-left">
+          <div class="kp-hat-dot hat-blue"></div>
+          <div class="kp-num">03·</div>
+        </div>
+        <div class="kp-content">
+          <div class="kp-label">学习竞争力</div>
+          <div class="kp-txt">知识留存靠"输出"，讲给别人听比反复阅读效率高 90%——大脑需要"摩擦"才能记住</div>
+        </div>
+      </div>
+
+      <div class="kp-item">
+        <div class="kp-left">
+          <div class="kp-hat-dot hat-white"></div>
+          <div class="kp-num">04·</div>
+        </div>
+        <div class="kp-content">
+          <div class="kp-label">学习内驱力</div>
+          <div class="kp-txt">给孩子归属感·自主感·胜任感，比"考好大学"更持久——这是人生的发动机</div>
+        </div>
+      </div>
+
+      <div class="kp-item">
+        <div class="kp-left">
+          <div class="kp-hat-dot hat-black"></div>
+          <div class="kp-num">05·</div>
+        </div>
+        <div class="kp-content">
+          <div class="kp-label">学习抗逆力</div>
+          <div class="kp-txt">家庭是安全港湾，无条件包容失败，比人为制造逆境更能培养孩子的心理韧性</div>
+        </div>
+      </div>
+
+      <!-- Jinja2: {% endfor %} -->
+    </div>
+  </div>
+
+  <!-- ══ 金句区 ══ -->
+  <div class="quote-section">
+    <div class="quote-label">KEY INSIGHT</div>
+    <!-- Jinja2: {{ summary_first_sentence }} -->
+    <div class="quote-txt">「每个孩子都是一颗好种子，问题不在孩子，在于土壤——当家长成为助力而非阻力，孩子自然从"要我学"变成"我要学"。」</div>
+    <div class="quote-author">— 付立平</div>
+  </div>
+
+  <!-- ══ FOOTER ══ -->
+  <div class="footer-bar">
+    <div class="barcode">
+      <div class="b" style="width:2px;height:20px;"></div>
+      <div class="b" style="width:1px;height:14px;"></div>
+      <div class="b" style="width:3px;height:20px;"></div>
+      <div class="b" style="width:1px;height:11px;"></div>
+      <div class="b" style="width:2px;height:20px;"></div>
+      <div class="b" style="width:1px;height:16px;"></div>
+      <div class="b" style="width:1px;height:20px;"></div>
+      <div class="b" style="width:3px;height:13px;"></div>
+      <div class="b" style="width:2px;height:20px;"></div>
+      <div class="b" style="width:1px;height:10px;"></div>
+      <div class="b" style="width:2px;height:20px;"></div>
+      <div class="b" style="width:1px;height:15px;"></div>
+      <div class="b" style="width:3px;height:20px;"></div>
+      <div class="b" style="width:1px;height:20px;"></div>
+      <div class="b" style="width:2px;height:17px;"></div>
+      <div class="b" style="width:1px;height:20px;"></div>
+    </div>
+
+    <div class="footer-right">
+      <!-- Jinja2: {{ read_url }} -->
+      <div class="read-chip">精读全文 ↗</div>
+      <div class="footer-dot"></div>
+      <div class="footer-brand">TROVE</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=750px, initial-scale=1.0">
+<title>{{ title }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap">
+<style>
+/* ── Reset ─────────────────────────────────────────────────────────── */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ── Tokens ─────────────────────────────────────────────────────────── */
+:root {
+  --bg:          #0E1117;
+  --bg-section:  #141928;
+  --bg-card:     #1A2136;
+  --bg-card2:    #1F2740;
+  --border:      rgba(255,255,255,0.07);
+  --gold:        #C9A84C;
+  --gold-light:  #F0D080;
+  --gold-dim:    rgba(201,168,76,0.14);
+  --gold-border: rgba(201,168,76,0.28);
+  --text:        #EDF2F7;
+  --sub:         #A0AEC0;
+  --dim:         #5A6A80;
+  --radius:      14px;
+  --radius-sm:   9px;
+  --serif:       'Noto Serif SC', "Hiragino Mincho Pro", "STSong", Georgia, serif;
+  --sans:        'Noto Sans SC', "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+/* ── Base ────────────────────────────────────────────────────────────── */
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  width: 750px;
+  margin: 0 auto;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   HEADER BAR
+───────────────────────────────────────────────────────────────────── */
+.header-bar {
+  background: var(--bg-section);
+  border-bottom: 1px solid var(--border);
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--sub);
+}
+.header-source {
+  color: var(--gold);
+  font-weight: 600;
+}
+.header-sep { color: var(--dim); }
+.header-right {
+  font-size: 12px;
+  color: var(--dim);
+  letter-spacing: 0.05em;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   HERO
+───────────────────────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  padding: 56px 44px 44px;
+  background: linear-gradient(145deg, #0E1117 0%, #141A2E 52%, #1A1030 100%);
+  border-bottom: 1px solid rgba(201,168,76,0.18);
+  overflow: hidden;
+}
+/* 右上蓝光 */
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -80px; right: -80px;
+  width: 380px; height: 380px;
+  background: radial-gradient(circle, rgba(74,144,217,0.11) 0%, transparent 68%);
+  pointer-events: none;
+}
+/* 左下暖光 */
+.hero::after {
+  content: '';
+  position: absolute;
+  bottom: -50px; left: -60px;
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(232,93,74,0.07) 0%, transparent 68%);
+  pointer-events: none;
+}
+
+/* 来源 badge */
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--gold-dim);
+  border: 1px solid var(--gold-border);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 12px;
+  color: var(--gold-light);
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  margin-bottom: 14px;
+}
+
+/* EP 编号 */
+.ep-label {
+  font-size: 12px;
+  color: var(--gold);
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+
+.hero-title {
+  font-family: var(--serif);
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1.3;
+  color: #FFFFFF;
+  margin-bottom: 20px;
+  letter-spacing: -0.01em;
+  word-break: keep-all;
+}
+
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+.hero-tag {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.11);
+  border-radius: 6px;
+  padding: 4px 11px;
+  font-size: 12px;
+  color: var(--sub);
+  letter-spacing: 0.03em;
+}
+
+/* Speakers — 1-4 人横排卡片 */
+.speakers {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.speakers.cnt-1 { justify-content: center; }
+.speakers.cnt-1 .speaker-card { max-width: 260px; }
+
+.speaker-card {
+  flex: 1;
+  position: relative;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 18px 12px 14px;
+  text-align: center;
+  min-width: 0;
+}
+.speaker-card.is-host {
+  border-color: var(--gold-border);
+  background: rgba(201,168,76,0.06);
+}
+.host-badge {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--gold);
+  color: #0E1117;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.speaker-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border: 2px solid;
+  margin: 0 auto 8px;
+}
+.speaker-avatar.host  { background: rgba(201,168,76,0.12); border-color: var(--gold); }
+.speaker-avatar.guest { background: rgba(74,144,217,0.12); border-color: #4A90D9; }
+.speaker-name { font-size: 14px; font-weight: 700; color: white; margin-bottom: 2px; }
+.speaker-role { font-size: 11px; color: var(--dim); line-height: 1.4; }
+.speaker-stance {
+  display: inline-block;
+  margin-top: 6px;
+  background: rgba(74,144,217,0.15);
+  color: #7EB8F0;
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.speakers-vline {
+  width: 1px;
+  height: 50px;
+  background: var(--border);
+  align-self: center;
+  flex-shrink: 0;
+}
+
+.hero-meta {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  gap: 20px;
+  font-size: 12px;
+  color: var(--dim);
+}
+.hero-meta span { display: flex; align-items: center; gap: 4px; }
+
+/* ─────────────────────────────────────────────────────────────────────
+   CORE QUOTE
+───────────────────────────────────────────────────────────────────── */
+.core-quote-wrap {
+  padding: 36px 44px;
+  background: var(--bg);
+}
+.core-quote-inner {
+  background: linear-gradient(135deg, rgba(201,168,76,0.10) 0%, rgba(74,120,220,0.06) 100%);
+  border: 1px solid var(--gold-border);
+  border-radius: var(--radius);
+  padding: 28px 30px;
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+}
+.core-quote-inner::before {
+  content: '"';
+  position: absolute;
+  top: -10px; left: 12px;
+  font-size: 110px;
+  font-family: Georgia, "Times New Roman", serif;
+  color: rgba(201,168,76,0.07);
+  line-height: 1;
+  pointer-events: none;
+}
+.core-quote-label {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--gold);
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.core-quote-text {
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   KEY POINTS
+───────────────────────────────────────────────────────────────────── */
+.key-points-wrap {
+  padding: 0 44px 36px;
+  background: var(--bg);
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.section-label {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--gold);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.section-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--gold-border), transparent);
+}
+
+.key-points-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.key-point-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 15px 18px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.key-point-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--gold-dim);
+  border: 1px solid var(--gold-border);
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.key-point-text {
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.65;
+  flex: 1;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   OPTIONAL BLOCK — shared structure
+───────────────────────────────────────────────────────────────────── */
+.opt-wrap {
+  padding: 0 44px 36px;
+  background: var(--bg);
+}
+.opt-inner {
+  background: var(--bg-section);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 26px;
+}
+.opt-title {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.opt-title::before {
+  content: '';
+  width: 4px;
+  height: 18px;
+  background: linear-gradient(180deg, var(--gold), var(--gold-light));
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── type: list ── */
+.opt-list { display: flex; flex-direction: column; gap: 12px; }
+.opt-list-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+  position: relative;
+  overflow: hidden;
+}
+/* color stripe — driven by inline style on the element */
+.opt-list-item::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--item-color, var(--gold));
+  border-radius: 2px 0 0 2px;
+}
+.opt-list-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.opt-list-content { flex: 1; }
+.opt-list-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 4px;
+}
+.opt-list-desc {
+  font-size: 13px;
+  color: var(--sub);
+  line-height: 1.6;
+}
+
+/* ── type: steps ── */
+.opt-steps { display: flex; flex-direction: column; gap: 0; }
+.opt-step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  position: relative;
+  padding-bottom: 16px;
+}
+.opt-step:last-child { padding-bottom: 0; }
+.opt-step-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+.opt-step-num {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--gold-dim);
+  border: 1px solid var(--gold-border);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.opt-step-line {
+  width: 1px;
+  flex: 1;
+  min-height: 16px;
+  background: rgba(255,255,255,0.07);
+  margin-top: 4px;
+}
+.opt-step:last-child .opt-step-line { display: none; }
+.opt-step-body { flex: 1; padding-top: 3px; }
+.opt-step-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 3px;
+}
+.opt-step-desc {
+  font-size: 13px;
+  color: var(--sub);
+  line-height: 1.55;
+}
+
+/* ── type: pills ── */
+.opt-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.opt-pill {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+}
+.opt-pill-emoji { font-size: 20px; }
+.opt-pill-text { font-size: 14px; font-weight: 600; color: var(--text); }
+
+/* ── type: compare ── */
+.opt-compare { display: flex; gap: 12px; }
+.opt-compare-col {
+  flex: 1;
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.opt-compare-header {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+.opt-compare-col.before .opt-compare-header { background: rgba(239,68,68,0.12); color: #FC8181; }
+.opt-compare-col.after  .opt-compare-header { background: rgba(72,187,120,0.12); color: #68D391; }
+.opt-compare-items { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.opt-compare-item {
+  font-size: 13px;
+  color: var(--sub);
+  line-height: 1.5;
+  display: flex;
+  gap: 6px;
+}
+.opt-compare-col.before .opt-compare-item::before { content: '✗'; color: #FC8181; flex-shrink: 0; }
+.opt-compare-col.after  .opt-compare-item::before { content: '✓'; color: #68D391; flex-shrink: 0; }
+
+/* ─────────────────────────────────────────────────────────────────────
+   QUOTES
+───────────────────────────────────────────────────────────────────── */
+.quotes-wrap {
+  padding: 0 44px 36px;
+  background: var(--bg);
+}
+.quotes-list { display: flex; flex-direction: column; gap: 10px; }
+.quote-item {
+  background: var(--bg-card);
+  border-left: 3px solid var(--gold);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 15px 18px;
+  font-size: 14px;
+  color: var(--sub);
+  line-height: 1.75;
+}
+.quote-item strong { color: var(--gold-light); font-weight: 600; }
+
+/* ─────────────────────────────────────────────────────────────────────
+   FOOTER
+───────────────────────────────────────────────────────────────────── */
+.footer {
+  background: var(--bg-section);
+  border-top: 1px solid rgba(201,168,76,0.15);
+  padding: 30px 44px 40px;
+}
+.footer-book {
+  background: var(--gold-dim);
+  border: 1px solid var(--gold-border);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.footer-book-icon { font-size: 26px; flex-shrink: 0; }
+.footer-book-label {
+  font-size: 11px;
+  color: var(--gold);
+  letter-spacing: 0.1em;
+  font-weight: 500;
+  margin-bottom: 3px;
+}
+.footer-book-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: white;
+}
+
+.footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+.footer-source {
+  font-size: 12px;
+  color: var(--dim);
+  line-height: 1.7;
+}
+.footer-brand {
+  text-align: right;
+  font-size: 13px;
+  color: var(--gold);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.footer-brand small {
+  display: block;
+  font-size: 11px;
+  color: var(--dim);
+  font-weight: 400;
+  margin-top: 2px;
+}
+</style>
+</head>
+<body>
+
+{# ═══ HEADER BAR ═══════════════════════════════════════════════════ #}
+<header class="header-bar">
+  <div class="header-left">
+    <span class="header-source">{{ source }}</span>
+    <span class="header-sep">·</span>
+    <span>播客精华卡</span>
+  </div>
+  <div class="header-right">inFlow AI</div>
+</header>
+
+{# ═══ HERO ════════════════════════════════════════════════════════ #}
+<section class="hero">
+
+  <div class="source-badge">
+    <span>🎙</span> {{ source }}
+    {% if category %} &nbsp;·&nbsp; {{ category }}{% endif %}
+  </div>
+
+  {% if ep %}<div class="ep-label">{{ ep }}</div>{% endif %}
+
+  <h1 class="hero-title">{{ title }}</h1>
+
+  {% if tags %}
+  <div class="hero-tags">
+    {% for tag in tags %}
+    <span class="hero-tag">{{ tag }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="speakers cnt-{{ guests|length }}">
+    {% for g in guests %}
+    <div class="speaker-card{% if g.is_host %} is-host{% endif %}">
+      {% if g.is_host %}<div class="host-badge">主持</div>{% endif %}
+      <div class="speaker-avatar {% if g.is_host %}host{% else %}guest{% endif %}">{{ g.emoji }}</div>
+      <div class="speaker-name">{{ g.name }}</div>
+      <div class="speaker-role">{{ g.role or ('主持人' if g.is_host else '嘉宾') }}</div>
+      {% if g.stance %}<div class="speaker-stance">{{ g.stance }}</div>{% endif %}
+    </div>
+    {% if not loop.last %}<div class="speakers-vline"></div>{% endif %}
+    {% endfor %}
+  </div>
+
+  <div class="hero-meta">
+    {% if duration_min %}<span>⏱ {{ duration_min }} 分钟</span>{% endif %}
+    <span>📖 约 {{ reading_time }} min 阅读</span>
+  </div>
+</section>
+
+{# ═══ CORE QUOTE ══════════════════════════════════════════════════ #}
+<div class="core-quote-wrap">
+  <div class="core-quote-inner">
+    <div class="core-quote-label">CORE INSIGHT</div>
+    <div class="core-quote-text">{{ core_quote }}</div>
+  </div>
+</div>
+
+{# ═══ KEY POINTS ══════════════════════════════════════════════════ #}
+<div class="key-points-wrap">
+  <div class="section-header">
+    <span class="section-label">KEY POINTS</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="key-points-list">
+    {% for point in key_points %}
+    <div class="key-point-item">
+      <div class="key-point-num">{{ loop.index }}</div>
+      <div class="key-point-text">{{ point }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{# ═══ OPTIONAL BLOCK ══════════════════════════════════════════════ #}
+{% if optional_block %}
+<div class="opt-wrap">
+  <div class="opt-inner">
+    <div class="opt-title">{{ optional_block.title }}</div>
+
+    {# ── list type ── #}
+    {% if optional_block.type == 'list' %}
+    <div class="opt-list">
+      {% for item in optional_block['items'] %}
+      <div class="opt-list-item"{% if item.color %} style="--item-color: {{ item.color }}"{% endif %}>
+        {% if item.icon %}<div class="opt-list-icon">{{ item.icon }}</div>{% endif %}
+        <div class="opt-list-content">
+          <div class="opt-list-label">{{ item.label }}</div>
+          {% if item.desc %}<div class="opt-list-desc">{{ item.desc }}</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {# ── steps type ── #}
+    {% elif optional_block.type == 'steps' %}
+    <div class="opt-steps">
+      {% for item in optional_block['items'] %}
+      <div class="opt-step">
+        <div class="opt-step-left">
+          <div class="opt-step-num">{{ item.num }}</div>
+          <div class="opt-step-line"></div>
+        </div>
+        <div class="opt-step-body">
+          <div class="opt-step-title">{{ item.title }}</div>
+          {% if item.desc %}<div class="opt-step-desc">{{ item.desc }}</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {# ── pills type ── #}
+    {% elif optional_block.type == 'pills' %}
+    <div class="opt-pills">
+      {% for item in optional_block['items'] %}
+      <div class="opt-pill">
+        {% if item.emoji %}<span class="opt-pill-emoji">{{ item.emoji }}</span>{% endif %}
+        <span class="opt-pill-text">{{ item.text }}</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    {# ── compare type ── #}
+    {% elif optional_block.type == 'compare' %}
+    <div class="opt-compare">
+      <div class="opt-compare-col before">
+        <div class="opt-compare-header">{{ optional_block.before_label or '旧认知' }}</div>
+        <div class="opt-compare-items">
+          {% for item in optional_block.before_items %}
+          <div class="opt-compare-item">{{ item }}</div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="opt-compare-col after">
+        <div class="opt-compare-header">{{ optional_block.after_label or '新认知' }}</div>
+        <div class="opt-compare-items">
+          {% for item in optional_block.after_items %}
+          <div class="opt-compare-item">{{ item }}</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endif %}
+
+{# ═══ QUOTES ══════════════════════════════════════════════════════ #}
+{% if quotes %}
+<div class="quotes-wrap">
+  <div class="section-header">
+    <span class="section-label">QUOTES</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="quotes-list">
+    {% for q in quotes %}
+    <div class="quote-item">{{ q }}</div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ═══ FOOTER ══════════════════════════════════════════════════════ #}
+<footer class="footer">
+  {% if book %}
+  <div class="footer-book">
+    <div class="footer-book-icon">📘</div>
+    <div>
+      <div class="footer-book-label">本期推荐</div>
+      <div class="footer-book-title">{{ book }}</div>
+    </div>
+  </div>
+  {% endif %}
+  <div class="footer-bottom">
+    <div class="footer-source">
+      来源：{{ source }}<br>
+      <span>{% for g in guests %}{{ g.name }}{% if not loop.last %} · {% endif %}{% endfor %}{% if ep %} · {{ ep }}{% endif %}</span>
+    </div>
+    <div class="footer-brand">
+      inFlow AI
+      <small>播客精华提炼</small>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

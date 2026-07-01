@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inflow - AI智能图书资产激活系统原型</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 3D 翻牌特效自定义样式 */
+        .perspective { perspective: 1000px; }
+        .card-inner {
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .perspective:hover .card-inner { transform: rotateY(180deg); }
+        .card-front, .card-back {
+            backface-visibility: hidden;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+        }
+        .card-back { transform: rotateY(180deg); }
+        /* 隐藏滚动条但保留功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-[#0b0f19] text-slate-200 font-sans min-h-screen flex overflow-hidden">
+
+    <aside class="w-64 bg-[#111827] border-r border-slate-800 flex flex-col justify-between z-20">
+        <div>
+            <div class="p-6 flex items-center gap-3 border-b border-slate-800">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-brain text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">Inflow AI</h1>
+                    <p class="text-xs text-slate-500">藏书激活管家 v1.0</p>
+                </div>
+            </div>
+            <nav class="p-4 space-y-1.5">
+                <button onclick="switchView('view-home')" id="nav-home" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all font-medium text-sm text-left bg-slate-800/60 text-white">
+                    <i class="fa-solid fa-compass text-base w-5 text-indigo-400"></i> 高燃海报盲盒
+                </button>
+                <button onclick="switchView('view-chat')" id="nav-chat" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all font-medium text-sm text-left">
+                    <i class="fa-solid fa-comment-dots text-base w-5 text-violet-400"></i> AI 阅读管家
+                </button>
+                <button onclick="switchView('view-admin')" id="nav-admin" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all font-medium text-sm text-left">
+                    <i class="fa-solid fa-sliders text-base w-5 text-emerald-400"></i> 本地数据清洗
+                </button>
+            </nav>
+        </div>
+        <div class="p-4 border-t border-slate-800">
+            <div class="flex items-center justify-between p-2 rounded-xl bg-slate-900/80 border border-slate-800">
+                <div class="flex items-center gap-2.5">
+                    <img id="user-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" class="w-8 h-8 rounded-lg object-cover ring-2 ring-indigo-500/20" alt="Avatar">
+                    <div>
+                        <p id="user-name" class="text-xs font-semibold text-slate-300">爸爸的账户</p>
+                        <p id="user-role" class="text-[10px] text-indigo-400 font-medium">管理员权限</p>
+                    </div>
+                </div>
+                <button onclick="toggleAccountModal()" class="text-slate-500 hover:text-slate-300 transition-colors p-1.5">
+                    <i class="fa-solid fa-arrows-rotate text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative overflow-hidden bg-[#0d1321]">
+        
+        <section id="view-home" class="view-pane flex-1 flex flex-col overflow-y-auto p-8 space-y-8 no-scrollbar">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">探索你的十万藏书</h2>
+                    <p class="text-slate-400 text-sm mt-0.5">AI 已为您重组视觉体验，点击卡片探索惊喜</p>
+                </div>
+                <div class="flex gap-2">
+                    <div class="relative">
+                        <input type="text" placeholder="语义搜索，如: 缓解焦虑的硬核科幻" class="w-72 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors text-slate-300 pl-10">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-500 text-xs"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> 今日 AI 盲盒投喂 (悬停卡片揭晓)
+                </h3>
+                <div class="grid grid-cols-3 gap-6">
+                    <div class="perspective h-48 cursor-pointer">
+                        <div class="card-inner w-full h-full relative">
+                            <div class="card-front rounded-2xl bg-gradient-to-br from-indigo-950/40 to-slate-900 border border-indigo-500/30 p-5 flex flex-col justify-between shadow-xl">
+                                <span class="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-md font-semibold self-start">#个人成长</span>
+                                <p class="text-sm font-medium text-slate-200 leading-relaxed italic">“读完这本书，你将获得彻底斩断精神内耗、重塑个人心智认知层级的终极武器……”</p>
+                                <div class="text-xs text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-arrow-pointer animate-pulse"></i> 悬停翻牌查看书名</div>
+                            </div>
+                            <div onclick="openDrawer('认知觉醒', '周岭', '个人成长/认知重塑', '本书通过脑科学、认知科学帮助读者觉醒底层驱动力。', '9787513931656', 'E:/Books/Growth/认知觉醒.epub')" class="card-back rounded-2xl bg-slate-900 border border-slate-800 p-5 flex gap-4 shadow-xl hover:border-slate-700 transition-colors">
+                                <div class="w-24 h-full bg-slate-800 rounded-xl border border-slate-700 flex items-center justify-center text-slate-600 text-xs shadow-inner font-bold">封面占位</div>
+                                <div class="flex-1 flex flex-col justify-between py-1">
+                                    <div>
+                                        <h4 class="font-bold text-white text-base">认知觉醒</h4>
+                                        <p class="text-xs text-slate-400 mt-0.5">作者：周岭</p>
+                                    </div>
+                                    <span class="text-xs text-indigo-400 font-semibold flex items-center gap-1">点击打开大图档案 <i class="fa-solid fa-arrow-right text-[10px]"></i></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="perspective h-48 cursor-pointer">
+                        <div class="card-inner w-full h-full relative">
+                            <div class="card-front rounded-2xl bg-gradient-to-br from-purple-950/40 to-slate-900 border border-purple-500/30 p-5 flex flex-col justify-between shadow-xl">
+                                <span class="text-[10px] bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded-md font-semibold self-start">#科幻经典</span>
+                                <p class="text-sm font-medium text-slate-200 leading-relaxed italic">“如果你在宇宙大爆炸前5分钟感到迷茫，请翻开这一页，它会用最荒诞的幽默解构一切焦虑……”</p>
+                                <div class="text-xs text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-arrow-pointer animate-pulse"></i> 悬停翻牌查看书名</div>
+                            </div>
+                            <div onclick="openDrawer('银河系搭车客指南', '道格拉斯·亚当斯', '科幻/幽默/经典', '宇宙级荒诞幽默神作，带着毛巾去旅行。', '9787532753351', 'F:/Sci-Fi/Galaxy/银河系搭车客指南.epub')" class="card-back rounded-2xl bg-slate-900 border border-slate-800 p-5 flex gap-4 shadow-xl hover:border-slate-700 transition-colors">
+                                <div class="w-24 h-full bg-slate-800 rounded-xl border border-slate-700 flex items-center justify-center text-slate-600 text-xs shadow-inner font-bold">封面占位</div>
+                                <div class="flex-1 flex flex-col justify-between py-1">
+                                    <div>
+                                        <h4 class="font-bold text-white text-base text-ellipsis overflow-hidden whitespace-nowrap">银河系搭车客指南</h4>
+                                        <p class="text-xs text-slate-400 mt-0.5">作者：道格拉斯·亚当斯</p>
+                                    </div>
+                                    <span class="text-xs text-purple-400 font-semibold flex items-center gap-1">点击打开大图档案 <i class="fa-solid fa-arrow-right text-[10px]"></i></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="perspective h-48 cursor-pointer">
+                        <div class="card-inner w-full h-full relative">
+                            <div class="card-front rounded-2xl bg-gradient-to-br from-emerald-950/40 to-slate-900 border border-emerald-500/30 p-5 flex flex-col justify-between shadow-xl">
+                                <span class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md font-semibold self-start">#少儿科普</span>
+                                <p class="text-sm font-medium text-slate-200 leading-relaxed italic">“带上神奇缩小药水，潜入人体微观世界！满足你和孩子对科学的所有惊叹与想象。”</p>
+                                <div class="text-xs text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-arrow-pointer animate-pulse"></i> 悬停翻牌查看书名</div>
+                            </div>
+                            <div onclick="openDrawer('神奇校车·人体微观之旅', '乔安娜·柯尔', '少儿/科普/绘本', '畅销全球的科普绘本，开启趣味人体科学冒险。', '9787556041235', 'D:/Kids/Science/神奇校车.epub')" class="card-back rounded-2xl bg-slate-900 border border-slate-800 p-5 flex gap-4 shadow-xl hover:border-slate-700 transition-colors">
+                                <div class="w-24 h-full bg-slate-800 rounded-xl border border-slate-700 flex items-center justify-center text-slate-600 text-xs shadow-inner font-bold">封面占位</div>
+                                <div class="flex-1 flex flex-col justify-between py-1">
+                                    <div>
+                                        <h4 class="font-bold text-white text-base">神奇校车</h4>
+                                        <p class="text-xs text-slate-400 mt-0.5">作者：乔安娜·柯尔</p>
+                                    </div>
+                                    <span class="text-xs text-emerald-400 font-semibold flex items-center gap-1">点击打开大图档案 <i class="fa-solid fa-arrow-right text-[10px]"></i></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">按硬盘路径/截断标签检索</h3>
+                    <span class="text-xs text-slate-500">已自动从本地文件夹分级提炼</span>
+                </div>
+                <div class="flex flex-col gap-2 p-4 bg-slate-900/40 border border-slate-800 rounded-2xl">
+                    <div class="flex items-center gap-3 text-xs">
+                        <span class="text-slate-500 w-16">硬盘一级:</span>
+                        <div class="flex gap-1.5">
+                            <span class="px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 font-medium cursor-pointer">全部资产</span>
+                            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 border border-transparent cursor-pointer transition-colors">电子书 (42105)</span>
+                            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 border border-transparent cursor-pointer transition-colors">少儿读物 (1240)</span>
+                            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 border border-transparent cursor-pointer transition-colors">硬核技术库 (589)</span>
+                        </div>
+                    </div>
+                    <div class="h-px bg-slate-800/60 my-1"></div>
+                    <div class="flex items-center gap-3 text-xs">
+                        <span class="text-slate-500 w-16">截断二级:</span>
+                        <div class="flex gap-1.5 flex-wrap">
+                            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 cursor-pointer">心理学</span>
+                            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer">个人成长</span>
+                            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer">科幻小说</span>
+                            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer">绘本科普</span>
+                            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer">哲学两性</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-4 flex-1">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">全量图书轻量档案墙</h3>
+                <div id="books-grid" class="grid grid-cols-4 gap-6">
+                    <div onclick="openDrawer('认知觉醒', '周岭', '个人成长/认知重塑', '本书通过脑科学、认知科学帮助读者觉醒底层驱动力。', '9787513931656', 'E:/Books/Growth/认知觉醒.epub', '全年龄')" class="group bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-3 cursor-pointer hover:border-indigo-500/40 hover:bg-slate-900 transition-all duration-300">
+                        <div class="aspect-[3/4] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm font-medium border border-slate-700/50 shadow-inner group-hover:scale-[1.02] transition-transform">书籍封面</div>
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-bold text-sm text-slate-200 group-hover:text-indigo-400 transition-colors">认知觉醒</h4>
+                                <span class="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">全年龄</span>
+                            </div>
+                            <p class="text-xs text-slate-500">周岭 · 9787513931656</p>
+                        </div>
+                    </div>
+                    <div onclick="openDrawer('银河系搭车客指南', '道格拉斯·亚当斯', '科幻/幽默/经典', '宇宙级荒诞幽默神作，带着毛巾去旅行。', '9787532753351', 'F:/Sci-Fi/Galaxy/银河系搭车客指南.epub', '全年龄')" class="group bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-3 cursor-pointer hover:border-indigo-500/40 hover:bg-slate-900 transition-all duration-300">
+                        <div class="aspect-[3/4] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm font-medium border border-slate-700/50 shadow-inner group-hover:scale-[1.02] transition-transform">书籍封面</div>
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-bold text-sm text-slate-200 group-hover:text-indigo-400 transition-colors truncate">银河系搭车客指南</h4>
+                                <span class="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">全年龄</span>
+                            </div>
+                            <p class="text-xs text-slate-500">道格拉斯·亚当斯</p>
+                        </div>
+                    </div>
+                    <div onclick="openDrawer('神奇校车·人体微观之旅', '乔安娜·柯尔', '少儿/科普/绘本', '畅销全球的科普绘本，开启趣味人体科学冒险。', '9787556041235', 'D:/Kids/Science/神奇校车.epub', '儿童推荐')" class="group bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-3 cursor-pointer hover:border-indigo-500/40 hover:bg-slate-900 transition-all duration-300">
+                        <div class="aspect-[3/4] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm font-medium border border-slate-700/50 shadow-inner group-hover:scale-[1.02] transition-transform">书籍封面</div>
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-bold text-sm text-slate-200 group-hover:text-indigo-400 transition-colors">神奇校车</h4>
+                                <span class="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded">儿童推荐</span>
+                            </div>
+                            <p class="text-xs text-slate-500">乔安娜·柯尔</p>
+                        </div>
+                    </div>
+                    <div id="adult-book-card" onclick="openDrawer('查拉图斯特拉如是说', '尼采', '哲学/硬核思辨/重度晦涩', '尼采里程碑神作，探讨超人哲学与永恒轮回。内容过于晦涩深沉，易引发未成年精神内耗。', '9787100019286', 'G:/Philosophy/Nietzsche/查拉图斯特拉如是说.epub', '仅成人阅读')" class="group bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-3 cursor-pointer hover:border-indigo-500/40 hover:bg-slate-900 transition-all duration-300">
+                        <div class="aspect-[3/4] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm font-medium border border-slate-700/50 shadow-inner group-hover:scale-[1.02] transition-transform">书籍封面</div>
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-bold text-sm text-slate-200 group-hover:text-indigo-400 transition-colors truncate">查拉图斯特拉如是说</h4>
+                                <span class="text-[9px] bg-rose-500/10 text-rose-400 border border-rose-500/20 px-1.5 py-0.5 rounded">仅成人阅读</span>
+                            </div>
+                            <p class="text-xs text-slate-500">尼采 · 9787100019286</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-chat" class="view-pane flex-1 hidden flex row overflow-hidden">
+            <div class="w-72 bg-[#111827]/40 border-r border-slate-800 flex flex-col p-4 space-y-4">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">我的智能假期阅读计划</h3>
+                <div class="space-y-2 flex-1 overflow-y-auto no-scrollbar">
+                    <div class="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 cursor-pointer">
+                        <p class="text-sm font-semibold text-white">国庆海边放空脱困计划</p>
+                        <p class="text-[11px] text-indigo-400 mt-1"><i class="fa-solid fa-book-open mr-1"></i> 已锁定 2 本硬核解压书</p>
+                    </div>
+                    <div class="p-3 rounded-xl hover:bg-slate-800/40 border border-transparent cursor-pointer transition-colors">
+                        <p class="text-sm font-semibold text-slate-300">周末亲子星际想象计划</p>
+                        <p class="text-[11px] text-slate-500 mt-1"><i class="fa-solid fa-child mr-1"></i> 针对8岁儿子精选科普</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex-1 flex flex-col justify-between bg-[#0d1321] relative overflow-hidden">
+                <div class="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar pb-32">
+                    <div class="flex gap-4 items-start max-w-3xl">
+                        <div class="w-8 w-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-white shrink-0 shadow-md">
+                            <i class="fa-solid fa-robot text-xs"></i>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="bg-slate-900 border border-slate-800 px-4 py-3 rounded-2xl rounded-tl-none text-sm text-slate-200 leading-relaxed shadow-sm">
+                                您好！我是您的全量藏书激活管家。十一假期快到了，您这次假期有什么特别的心境或者出行场景吗？告诉我，我来帮你从家里硬盘的**十万册书**里定制专属假期盲盒。
+                            </div>
+                            <span class="text-[10px] text-slate-600 pl-1">今天 上午 10:24</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-4 items-start max-w-3xl ml-auto flex-row-reverse">
+                        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" class="w-8 h-8 rounded-lg object-cover shrink-0 ring-2 ring-indigo-500/20">
+                        <div class="space-y-2 text-right">
+                            <div class="bg-indigo-600 text-white px-4 py-3 rounded-2xl rounded-tr-none text-sm text-left leading-relaxed shadow-md">
+                                我打算国庆去海边躺平放空7天。最近项目刚交付，压力非常大，想看点轻松幽默的硬核科幻，或者是能彻底斩断精神内耗、重塑认知的心理学图书。千万不要那种说教的鸡汤。
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-4 items-start max-w-3xl">
+                        <div class="w-8 w-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-white shrink-0 shadow-md">
+                            <i class="fa-solid fa-robot text-xs"></i>
+                        </div>
+                        <div class="space-y-4 flex-1">
+                            <div class="bg-slate-900 border border-slate-800 px-4 py-3 rounded-2xl rounded-tl-none text-sm text-slate-200 leading-relaxed shadow-sm">
+                                收到！已为您穿透索引数据库，为您量身定制【国庆海边放空脱困计划】。我帮您避开了鸡汤文，挑出了两本最对胃口的高燃神作。您看看勾选满意的书籍，点击下方按钮即可一键打包推送至您的 Kindle 之中：
+                            </div>
+                            
+                            <div class="space-y-3">
+                                <div class="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl flex gap-4 items-center justify-between hover:border-indigo-500/40 transition-colors">
+                                    <div class="flex gap-4 items-center">
+                                        <div class="w-14 h-18 bg-slate-800 rounded-lg flex items-center justify-center text-[10px] text-slate-500 border border-slate-700/50">封面</div>
+                                        <div>
+                                            <div class="flex items-center gap-2">
+                                                <h4 class="font-bold text-sm text-white">银河系搭车客指南</h4>
+                                                <span class="text-[9px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-1.5 py-0.5 rounded">科幻经典</span>
+                                            </div>
+                                            <p class="text-xs text-slate-400 mt-1">AI 安利：让你在宏大的宇宙级荒诞幽默中彻底忘掉KPI与内卷。</p>
+                                        </div>
+                                    </div>
+                                    <input type="checkbox" checked class="w-4 h-4 rounded border-slate-800 text-indigo-600 focus:ring-indigo-500 bg-slate-950 accent-indigo-500">
+                                </div>
+                                <div class="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl flex gap-4 items-center justify-between hover:border-indigo-500/40 transition-colors">
+                                    <div class="flex gap-4 items-center">
+                                        <div class="w-14 h-18 bg-slate-800 rounded-lg flex items-center justify-center text-[10px] text-slate-500 border border-slate-700/50">封面</div>
+                                        <div>
+                                            <div class="flex items-center gap-2">
+                                                <h4 class="font-bold text-sm text-white">认知觉醒</h4>
+                                                <span class="text-[9px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.5 rounded">脑科学个人成长</span>
+                                            </div>
+                                            <p class="text-xs text-slate-400 mt-1">AI 安利：用硬核科学拆解情绪内耗，提供极其精准的觉醒行动指南。</p>
+                                        </div>
+                                    </div>
+                                    <input type="checkbox" checked class="w-4 h-4 rounded border-slate-800 text-indigo-600 focus:ring-indigo-500 bg-slate-950 accent-indigo-500">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#0d1321] via-[#0d1321] to-transparent p-6 space-y-4">
+                    <div class="max-w-3xl mx-auto flex items-center justify-between bg-slate-900/90 border border-indigo-500/20 rounded-xl px-5 py-3 shadow-lg backdrop-blur-md">
+                        <div class="flex items-center gap-2.5 text-xs text-slate-300">
+                            <i class="fa-solid fa-circle-check text-indigo-400 text-sm"></i>
+                            <span>已选中 2 本激活资产，对应本地硬盘：<code class="text-indigo-400 font-mono bg-slate-950 px-1.5 py-0.5 rounded">F:/Sci-Fi/...</code> 等</span>
+                        </div>
+                        <button onclick="triggerKindleBatchSend(this)" class="bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white font-semibold text-xs px-4 py-2 rounded-lg transition-all shadow-md shadow-indigo-500/20 flex items-center gap-2">
+                            <i class="fa-solid fa-paper-plane"></i> 确认生成计划，打包发至 Kindle
+                        </button>
+                    </div>
+                    <div class="max-w-3xl mx-auto relative flex items-center">
+                        <input type="text" placeholder="继续和阅读管家聊聊你想看什么书..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-300 pr-24">
+                        <button class="absolute right-2 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">发送</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-admin" class="view-pane flex-1 hidden flex flex-col overflow-y-auto p-8 space-y-8 no-scrollbar">
+            <div>
+                <h2 class="text-2xl font-bold text-white tracking-tight">本地控制台 & 数据前置清洗</h2>
+                <p class="text-slate-400 text-sm mt-0.5">针对十万册原始大体积电子书资产的底层 SQLite 清洗核心流水线</p>
+            </div>
+
+            <div class="grid grid-cols-4 gap-6">
+                <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 space-y-2">
+                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">硬盘总资产书目</p>
+                    <p class="text-3xl font-bold text-white font-mono">104,258 <span class="text-xs text-slate-500 font-normal">册</span></p>
+                </div>
+                <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 space-y-2">
+                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">有效识别唯一书号 (ISBN)</p>
+                    <p class="text-3xl font-bold text-emerald-400 font-mono">82,140 <span class="text-xs text-slate-500 font-normal">个</span></p>
+                </div>
+                <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 space-y-2">
+                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">多格式重复叠加图书</p>
+                    <p class="text-3xl font-bold text-amber-500 font-mono">22,118 <span class="text-xs text-slate-500 font-normal">册</span></p>
+                </div>
+                <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-5 space-y-2">
+                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">AI 高燃卡片档案覆设率</p>
+                    <p class="text-3xl font-bold text-indigo-400 font-mono">68.4 <span class="text-xs text-slate-500 font-normal">%</span></p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">流水线核心操作（点按执行）</h3>
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6 hover:border-slate-700 transition-colors">
+                        <div class="flex gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xl"><i class="fa-solid fa-copy"></i></div>
+                            <div class="space-y-1">
+                                <h4 class="font-bold text-white text-base">1. 智能去重与大体积文件优选</h4>
+                                <p class="text-slate-400 text-xs leading-relaxed">穿透同一ISBN书号，比对多种重叠电子书格式（mobi/epub/pdf）。强制剔除无书号残缺本，自动锁留保留Size文件大小最大的一版实体书。</p>
+                            </div>
+                        </div>
+                        <button onclick="triggerActionLoading(this, '去重完成：系统已清洗多余错字版，优化留存82,140册最完整大体积实体本！预计释放硬盘空间72GB。')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs py-2.5 rounded-xl transition-colors">执行查重优选</button>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6 hover:border-slate-700 transition-colors">
+                        <div class="flex gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl"><i class="fa-solid fa-folder-tree"></i></div>
+                            <div class="space-y-1">
+                                <h4 class="font-bold text-white text-base">2. 文件夹相对路径截断转分类标签</h4>
+                                <p class="text-slate-400 text-xs leading-relaxed">自动抓取你原本在多级硬盘文件夹中沉淀的资产分类（如 心理学/认知偏差），智能通过截断算法批量补充进 Calibre 系统的分类字典中。</p>
+                            </div>
+                        </div>
+                        <button onclick="triggerActionLoading(this, '路径标签化完成：已将2,400条不同的物理文件夹相对路径自动逆向映射为Calibre标准分类标签体系。')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs py-2.5 rounded-xl transition-colors">执行路径提取标签</button>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6 hover:border-slate-700 transition-colors">
+                        <div class="flex gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xl"><i class="fa-solid fa-brain"></i></div>
+                            <div class="space-y-1">
+                                <h4 class="font-bold text-white text-base">3. 触发 AI 批量高燃档案生成与合规年龄分级</h4>
+                                <p class="text-slate-400 text-xs leading-relaxed">抽取图书简介进行大规模语义过筛。自动提取【3行看点】与【30秒金句悬念】。针对含有惊悚、暴力、重度晦涩或成人两性主题一票否决赋予“仅成人阅读”防误触物理隔离标签。</p>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="mb-3 space-y-1.5 hidden" id="ai-progress-bar">
+                                <div class="flex justify-between text-[11px] font-mono">
+                                    <span class="text-indigo-400 animate-pulse"><i class="fa-solid fa-spinner class animate-spin mr-1"></i> 正在深度解析：《查拉图斯特拉如是说》...</span>
+                                    <span class="text-slate-400">68.4% (71316/104258)</span>
+                                </div>
+                                <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+                                    <div class="bg-gradient-to-r from-indigo-500 to-violet-500 h-full w-[68.4%]"></div>
+                                </div>
+                            </div>
+                            <button onclick="triggerAIProgress(this)" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs py-2.5 rounded-xl transition-colors shadow-md shadow-indigo-600/10">启动断点续传AI批量清洗</button>
+                        </div>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6 hover:border-slate-700 transition-colors">
+                        <div class="flex gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 text-xl"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                            <div class="space-y-1">
+                                <h4 class="font-bold text-white text-base">4. 一键轻量化数据库打包同步至云端</h4>
+                                <p class="text-slate-400 text-xs leading-relaxed">完美剥离本地TB级原书大实体。系统仅将几百MB内嵌了AI高燃推荐列的 `metadata.db` 数据库与图书压缩封面秒级推送到云端服务器，实现冷热分离。</p>
+                            </div>
+                        </div>
+                        <button onclick="triggerActionLoading(this, '同步成功：轻量级全量虚拟书库已推送到您到云服务器，在外面可以用手机随时无开销刷书了！')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs py-2.5 rounded-xl transition-colors">打包推送轻量库</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="book-drawer" class="fixed top-0 right-0 bottom-0 w-[450px] bg-[#111827] border-l border-slate-800 shadow-2xl z-30 translate-x-full transition-transform duration-300 flex flex-col justify-between p-6 overflow-y-auto no-scrollbar">
+        <div class="space-y-6">
+            <div class="flex justify-between items-center">
+                <span class="text-xs font-bold text-indigo-400 tracking-wider uppercase"><i class="fa-solid fa-file-invoice mr-1"></i> AI 智能图书资产档案卡</span>
+                <button onclick="closeDrawer()" class="text-slate-500 hover:text-slate-300 p-1.5"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="w-full aspect-[3/4] bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-700 text-slate-600 font-bold shadow-2xl shadow-black/40">高保真海报大图预览占位</div>
+            <div class="space-y-2">
+                <div class="flex items-baseline justify-between">
+                    <h3 id="drawer-title" class="text-xl font-bold text-white">认知觉醒</h3>
+                    <span id="drawer-age" class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-semibold">全年龄</span>
+                </div>
+                <p id="drawer-author" class="text-xs text-slate-400">作者：周岭</p>
+                <div class="flex gap-1.5 flex-wrap pt-1" id="drawer-tags">
+                    </div>
+            </div>
+            <div class="h-px bg-slate-800"></div>
+            <div class="space-y-4">
+                <div class="space-y-1.5">
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">AI 30秒高燃悬念安利语</p>
+                    <p id="drawer-hook" class="text-sm font-medium text-slate-200 bg-slate-900/50 border border-slate-800 p-3 rounded-xl italic leading-relaxed">“读完这本书，你将获得彻底斩断精神内耗、重塑个人心智认知层级的终极武器……”</p>
+                </div>
+                <div class="space-y-2">
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">AI 精选本书核心痛点硬核看点</p>
+                    <ul class="text-xs text-slate-400 space-y-2 list-none pl-0" id="drawer-summary-list">
+                        <li class="flex items-start gap-2"><i class="fa-solid fa-circle-nodes text-indigo-400 mt-0.5 shrink-0"></i> <span>脑科学解构：为什么人类天生自控力差、喜欢即时满足？</span></li>
+                        <li class="flex items-start gap-2"><i class="fa-solid fa-circle-nodes text-indigo-400 mt-0.5 shrink-0"></i> <span>认知重塑：如何让模糊的潜意识清晰化，看清内耗本质。</span></li>
+                        <li class="flex items-start gap-2"><i class="fa-solid fa-circle-nodes text-indigo-400 mt-0.5 shrink-0"></i> <span>行动闭环：提供每天都可以无痛践行的极简认知练习框架。</span></li>
+                    </ul>
+                </div>
+                <div class="h-px bg-slate-800/60"></div>
+                <div class="space-y-1 bg-slate-950 p-3 rounded-xl font-mono text-[11px] border border-slate-900">
+                    <p class="text-slate-500">ISBN唯一书号：<span id="drawer-isbn" class="text-slate-300">9787513931656</span></p>
+                    <p class="text-slate-500 truncate">本地硬盘路径：<span id="drawer-path" class="text-indigo-400/80">E:/Books/Growth/认知觉醒.epub</span></p>
+                </div>
+            </div>
+        </div>
+        <div class="pt-6 border-t border-slate-800 bg-[#111827]">
+            <button onclick="triggerKindleSingleSend(this)" class="w-full bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white font-bold text-sm py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/10">
+                <i class="fa-solid fa-paper-plane"></i> 一键从本地调取资产发送至我的 Kindle
+            </button>
+        </div>
+    </div>
+
+    <div id="account-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+        <div class="bg-[#111827] border border-slate-800 rounded-3xl p-8 w-[480px] space-y-6 shadow-2xl">
+            <div class="text-center space-y-1">
+                <h3 class="text-xl font-bold text-white tracking-tight">内容合规隔离 · 账户身份切换</h3>
+                <p class="text-slate-400 text-xs">不同角色账户登录后将物理降维隐藏对应级别藏书资产</p>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div onclick="selectUser('adult')" class="bg-slate-900 border-2 border-indigo-500 p-5 rounded-2xl text-center space-y-3 cursor-pointer hover:bg-slate-800/50 transition-all group">
+                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" class="w-16 h-16 rounded-2xl mx-auto object-cover ring-4 ring-indigo-500/20 group-hover:scale-105 transition-transform">
+                    <div>
+                        <p class="text-sm font-bold text-white">爸爸的账户</p>
+                        <p class="text-[10px] text-indigo-400 mt-0.5">全量资产解禁模式</p>
+                    </div>
+                </div>
+                <div onclick="selectUser('child')" class="bg-slate-900 border-2 border-transparent p-5 rounded-2xl text-center space-y-3 cursor-pointer hover:bg-slate-800/50 hover:border-slate-700 transition-all group">
+                    <img src="https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=100&q=80" class="w-16 h-16 rounded-2xl mx-auto object-cover ring-4 ring-slate-800 group-hover:scale-105 transition-transform">
+                    <div>
+                        <p class="text-sm font-bold text-slate-300 group-hover:text-white">宝贝的账户</p>
+                        <p class="text-[10px] text-emerald-400 mt-0.5">儿童推荐合规降维模式</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-slate-950 p-3 rounded-xl border border-slate-900 text-[11px] text-slate-500 leading-relaxed">
+                <i class="fa-solid fa-lightbulb text-indigo-400 mr-1"></i> 原型点击小技巧：切到“宝贝的账户”后，主页中被 AI 标记为 <span class="text-rose-400 font-semibold">[仅成人阅读]</span> 的重度内耗、敏感哲学书籍在前端将被彻底隐形封死。
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 核心页面视图平滑切换逻辑
+        function switchView(viewId) {
+            document.querySelectorAll('.view-pane').forEach(pane => pane.classList.add('hidden'));
+            document.getElementById(viewId).classList.remove('hidden');
+            
+            // 联动左侧常驻导航菜单的高亮状态
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-slate-800/60', 'text-white');
+                btn.classList.add('text-slate-400');
+            });
+            const activeId = viewId.replace('view-', 'nav-');
+            document.getElementById(activeId).classList.add('bg-slate-800/60', 'text-white');
+        }
+
+        // 图书详情右侧滑窗抽屉控制
+        function openDrawer(title, author, categories, description, isbn, path, ageRating) {
+            document.getElementById('drawer-title').innerText = title;
+            document.getElementById('drawer-author').innerText = '作者：' + author;
+            document.getElementById('drawer-hook').innerText = document.getElementById('view-home').querySelector('.italic').innerText; // 原型简化处理安利语
+            document.getElementById('drawer-isbn').innerText = isbn;
+            document.getElementById('drawer-path').innerText = path;
+            document.getElementById('drawer-age').innerText = ageRating || '全年龄';
+
+            // 根据不同的合规标记动态渲染滑窗里的标签徽章颜色
+            const ageBadge = document.getElementById('drawer-age');
+            ageBadge.className = "text-[10px] px-2 py-0.5 rounded font-semibold";
+            if(ageRating === '仅成人阅读') {
+                ageBadge.classList.add('bg-rose-500/10', 'text-rose-400', 'border', 'border-rose-500/20');
+            } else if(ageRating === '儿童推荐') {
+                ageBadge.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border', 'border-emerald-500/20');
+            } else {
+                ageBadge.classList.add('bg-slate-800', 'text-slate-400');
+            }
+
+            // 动态分割标签流
+            const tagsContainer = document.getElementById('drawer-tags');
+            tagsContainer.innerHTML = '';
+            categories.split('/').forEach(cat => {
+                tagsContainer.innerHTML += `<span class="px-2 py-0.5 bg-slate-800 text-slate-300 rounded text-[10px]">${cat}</span>`;
+            });
+
+            document.getElementById('book-drawer').classList.remove('translate-x-full');
+        }
+
+        function closeDrawer() {
+            document.getElementById('book-drawer').classList.add('translate-x-full');
+        }
+
+        // 全局模态账户隔离切换器控制器
+        function toggleAccountModal() {
+            const modal = document.getElementById('account-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        // 核心交互：点击角色身份进行高隔离度年龄过滤模拟
+        function selectUser(role) {
+            const avatar = document.getElementById('user-avatar');
+            const name = document.getElementById('user-name');
+            const roleTxt = document.getElementById('user-role');
+            const adultCard = document.getElementById('adult-book-card');
+
+            if (role === 'child') {
+                avatar.src = "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=100&q=80";
+                name.innerText = "宝贝的账户";
+                roleTxt.innerText = "少儿合规安全视图";
+                roleTxt.className = "text-[10px] text-emerald-400 font-medium";
+                // 核心安全防护模拟：对小朋友账号强制抹除成人读物
+                if(adultCard) adultCard.classList.add('hidden');
+                alert('已切换为儿童视图！系统已帮宝贝屏蔽了涉及重度精神内耗与成人极度晦涩的藏书档案。');
+            } else {
+                avatar.src = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80";
+                name.innerText = "爸爸的账户";
+                roleTxt.innerText = "管理员权限";
+                roleTxt.className = "text-[10px] text-indigo-400 font-medium";
+                if(adultCard) adultCard.classList.remove('hidden');
+            }
+            toggleAccountModal();
+        }
+
+        // 模拟一键下发 Kindle 的串行并发 Loading 动画状态交互
+        function triggerKindleSingleSend(btn) {
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-spinner class animate-spin mr-1"></i> 正在向本地服务器发送WebHook物理召唤实体书...`;
+            
+            setTimeout(() => {
+                btn.innerHTML = `<i class="fa-solid fa-envelope-open-text text-amber-400"></i> 本地电脑已接单，实体书大文件提取打包中...`;
+                setTimeout(() => {
+                    btn.className = "w-full bg-emerald-600 text-white font-bold text-sm py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10";
+                    btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> 成功飞向您的 Kindle！请连网查收`;
+                    setTimeout(() => {
+                        btn.className = "w-full bg-gradient-to-r from-indigo-500 to-violet-500 text-white font-bold text-sm py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/10";
+                        btn.innerHTML = originalHtml;
+                        btn.disabled = false;
+                    }, 3000);
+                }, 2000);
+            }, 1500);
+        }
+
+        function triggerKindleBatchSend(btn) {
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-spinner class animate-spin mr-1"></i> AI 正在发起批量 Webhook 任务分发...`;
+            setTimeout(() => {
+                btn.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> 假期计划锁定的 2 本好书已通知本地电脑排队发信！`;
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                }, 3500);
+            }, 2000);
+        }
+
+        // 模拟控制台各动作异步卡片的 Loading
+        function triggerActionLoading(btn, completeMsg) {
+            const originalTxt = btn.innerText;
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin mr-2"></i> 底层 SQLite 数据库大容量表扫描合并中...`;
+            setTimeout(() => {
+                alert(completeMsg);
+                btn.innerText = originalTxt;
+                btn.disabled = false;
+            }, 2000);
+        }
+
+        // 模拟本地断点续传大数量级批量 AI 覆设动画
+        function triggerAIProgress(btn) {
+            const progressSection = document.getElementById('ai-progress-bar');
+            progressSection.classList.remove('hidden');
+            btn.disabled = true;
+            btn.innerText = "批量清洗解析引擎高速运转中...";
+            setTimeout(() => {
+                alert('AI 批量档案扫描清洗完成！合规分级标签已写回 SQLite custom_column_x 表字段中。');
+                progressSection.classList.add('hidden');
+                btn.innerText = "启动断点续传AI批量清洗";
+                btn.disabled = false;
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

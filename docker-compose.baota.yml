@@ -1,0 +1,10 @@
+# 宝塔面板部署覆盖配置
+# 用法: docker compose -f docker-compose.yml -f docker-compose.baota.yml up -d
+#
+# 将容器 Nginx 绑定到本机 127.0.0.1:8080，避免与宝塔面板 Nginx（占用 80/443）冲突。
+# 对外 HTTPS 由宝塔「网站 → 反向代理」转发到 127.0.0.1:8080。
+
+services:
+  nginx:
+    ports:
+      - "127.0.0.1:8080:80"
