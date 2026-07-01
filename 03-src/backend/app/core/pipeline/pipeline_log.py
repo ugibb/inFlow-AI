@@ -164,7 +164,11 @@ class PhaseLogger:
 
     def start(self, **_details: Any) -> None:
         self._started = True
-        logger.info(self._line(f"▶ 任务开始：{self.task_name}"))
+        backend = _details.get("backend")
+        if backend:
+            logger.info(self._line(f"▶ 任务开始：{self.task_name} | 引擎={sanitize_log_text(backend)}"))
+        else:
+            logger.info(self._line(f"▶ 任务开始：{self.task_name}"))
 
     def detail(self, message: str) -> None:
         logger.info(self._line(sanitize_log_text(message)))

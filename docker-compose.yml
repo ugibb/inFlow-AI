@@ -45,6 +45,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       SILICONFLOW_API_KEY: ${SILICONFLOW_API_KEY:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
       # Used by wechat-bot integration if enabled
       SERVICE_TOKENS: ${SERVICE_TOKENS:-}

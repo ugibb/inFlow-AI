@@ -507,10 +507,14 @@ class WhisperTranscriber:
 
         model = self._load_local_model()
         size_mb = audio_path.stat().st_size / (1024 * 1024)
-        logger.info(
-            "使用 faster-whisper 本地转录：%s（%.1f MB，模型：%s）",
-            audio_path.name, size_mb, self._local_model_path,
+        start_msg = (
+            f"使用 faster-whisper 本地转录：{audio_path.name}"
+            f"（{size_mb:.1f} MB，模型：{self._local_model_path}）"
         )
+        if self._emit_log:
+            self._emit_log(start_msg)
+        else:
+            logger.info(start_msg)
 
         try:
             segments_iter, info = model.transcribe(
@@ -535,9 +539,13 @@ class WhisperTranscriber:
                 segment_count += 1
                 now = time.monotonic()
                 if now - last_log >= _LOCAL_PROGRESS_INTERVAL_SEC:
-                    logger.info(
-                        "转录进行中… 已识别 %d 段，进度至 %.0f 秒", segment_count, seg.end
+                    progress_msg = (
+                        f"转录进行中… 已识别 {segment_count} 段，进度至 {seg.end:.0f} 秒"
                     )
+                    if self._emit_log:
+                        self._emit_log(progress_msg)
+                    else:
+                        logger.info(progress_msg)
                     last_log = now
             text = " ".join(text_parts).strip()
         except Exception as exc:
@@ -576,6 +584,8 @@ class WhisperTranscriber:
             )
 
         logger.info("加载本地 Whisper 模型：%s", self._local_model_path)
+        if self._emit_log:
+            self._emit_log(f"加载本地 Whisper 模型：{self._local_model_path}")
         try:
             self._fw_model = WhisperModel(
                 self._local_model_path, device="auto", compute_type="auto"
