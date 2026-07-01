@@ -12,13 +12,15 @@ import logging
 from pathlib import Path
 from typing import Iterable
 
+from app.core.paths import get_project_root
+
 _LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 _DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 _ROOT_LOGGER_NAME = "trove"
 _NAME_PREFIX = f"{_ROOT_LOGGER_NAME}."
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[5]
+_PROJECT_ROOT = get_project_root()
 
 _LEVEL_MAP: dict[str, int] = {
     "DEBUG": logging.DEBUG,

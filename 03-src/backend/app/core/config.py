@@ -3,9 +3,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 from typing import List
 
-# Project root .env: g_20260615_trove-ai/.env  (4 levels above this file)
-_PROJECT_ROOT = Path(__file__).resolve().parents[4]
-_ENV_FILE = _PROJECT_ROOT / ".env"
+from app.core.paths import get_env_file, get_project_root
+
+_PROJECT_ROOT = get_project_root()
+_ENV_FILE = get_env_file()
 
 
 class Settings(BaseSettings):
@@ -15,7 +16,7 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=str(_ENV_FILE),
+        env_file=str(_ENV_FILE) if _ENV_FILE else None,
         env_file_encoding="utf-8",
         extra="ignore",
     )

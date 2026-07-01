@@ -22,15 +22,17 @@ import httpx
 
 from app.core.config import get_settings
 
+from app.core.paths import get_env_file, get_project_root
+
 logger = logging.getLogger(__name__)
 
 CONFIG_FILE = Path(__file__).parent.parent / "config_store.json"
-PROJECT_ROOT = Path(__file__).resolve().parents[4]   # .../g_20260615_trove-ai
+PROJECT_ROOT = get_project_root()
 
 # 本地开发时从项目根目录加载 .env（确保 DEEPSEEK_API_KEY 等进入 os.environ）
 def _ensure_dotenv_loaded() -> None:
-    env_file = PROJECT_ROOT / ".env"
-    if not env_file.exists():
+    env_file = get_env_file()
+    if not env_file:
         return
     try:
         from dotenv import load_dotenv
