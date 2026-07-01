@@ -3,8 +3,31 @@
 #
 # 将容器 Nginx 绑定到本机 127.0.0.1:8080，避免与宝塔面板 Nginx（占用 80/443）冲突。
 # 对外 HTTPS 由宝塔「网站 → 反向代理」转发到 127.0.0.1:8080。
+# wechat-bot：微信绑定后的消息长轮询服务（deploy-baota.sh 会自动配置 SERVICE_TOKEN_WECHAT_BOT）。
 
 services:
   nginx:
     ports:
       - "127.0.0.1:8080:80"
+
+  wechat-bot:
+    image: trove-backend:latest
+    container_name: trove-wechat-bot
+    command: python -m app.extensions.wechat.bot
+    environment:
+      DATABASE_URL: postgresql+asyncpg://trove:${POSTGRES_PASSWORD}@postgres:5432/trove
+      DATABASE_URL_SYNC: postgresql://trove:${POSTGRES_PASSWORD}@postgres:5432/trove
+      TROVE_BASE: http://backend:8000
+      TROVE_TOKEN: ${SERVICE_TOKEN_WECHAT_BOT:?set SERVICE_TOKEN_WECHAT_BOT in .env}
+      TROVE_PUBLIC_BASE: ${TROVE_PUBLIC_BASE:-http://127.0.0.1:8080}
+      TROVE_ENV: production
+      LOG_DIR: log
+      LOG_TO_STDOUT: "1"
+      SERVICE_TOKEN_WECHAT_BOT: ${SERVICE_TOKEN_WECHAT_BOT:-}
+      WECHAT_BOT_ACT_AS_USER: ${WECHAT_BOT_ACT_AS_USER:-weaiw}
+    depends_on:
+      - backend
+      - postgres
+    volumes:
+      - ./03-src/backend/app/config_store.json:/app/app/config_store.json
+    restart: unless-stopped

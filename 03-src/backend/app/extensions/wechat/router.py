@@ -294,7 +294,7 @@ async def get_status(
         hint = (
             "已绑定，但消息服务未在运行（或刚启动尚未就绪）。"
             "本地开发请执行 ./start-local.sh，日志见 04-log/backend/日期.log；"
-            "Docker 需在 docker-compose.yml 启用 wechat-bot 服务。"
+            "Docker 需在 docker-compose.baota.yml 启用 wechat-bot 服务（宝塔部署运行 ./deploy-baota.sh 会自动启动）。"
         )
 
     return WechatStatusResponse(

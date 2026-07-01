@@ -48,6 +48,9 @@ services:
       EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
       # Used by wechat-bot integration if enabled
       SERVICE_TOKENS: ${SERVICE_TOKENS:-}
+      SERVICE_TOKEN_WECHAT_BOT: ${SERVICE_TOKEN_WECHAT_BOT:-}
+      TROVE_PUBLIC_BASE: ${TROVE_PUBLIC_BASE:-}
+      WECHAT_BOT_ACT_AS_USER: ${WECHAT_BOT_ACT_AS_USER:-weaiw}
       TROVE_ENV: production
     depends_on:
       - postgres

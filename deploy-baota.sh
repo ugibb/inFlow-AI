@@ -54,6 +54,38 @@ if [ ! -f "$CONFIG_STORE" ] && [ -f "$CONFIG_EXAMPLE" ]; then
   cp "$CONFIG_EXAMPLE" "$CONFIG_STORE"
 fi
 
+# 微信 bot 需要独立 worker + service token（绑定只存凭证，不处理消息）
+ensure_wechat_bot_config() {
+  local token="${SERVICE_TOKEN_WECHAT_BOT:-}"
+  if [ -z "$token" ] && grep -q '^SERVICE_TOKEN_WECHAT_BOT=.' .env 2>/dev/null; then
+    token="$(grep '^SERVICE_TOKEN_WECHAT_BOT=' .env | head -1 | cut -d= -f2- | tr -d '"')"
+  fi
+  if [ -z "$token" ]; then
+    token="$(openssl rand -hex 24)"
+    warn "未配置 SERVICE_TOKEN_WECHAT_BOT，已自动生成并写入 .env"
+    if grep -q '^SERVICE_TOKEN_WECHAT_BOT=' .env 2>/dev/null; then
+      sed -i "s|^SERVICE_TOKEN_WECHAT_BOT=.*|SERVICE_TOKEN_WECHAT_BOT=${token}|" .env
+    else
+      printf '\nSERVICE_TOKEN_WECHAT_BOT=%s\n' "$token" >> .env
+    fi
+  fi
+
+  local mapped="${token}:weaiw"
+  if ! grep -q '^SERVICE_TOKENS=.' .env 2>/dev/null; then
+    if grep -q '^SERVICE_TOKENS=' .env 2>/dev/null; then
+      sed -i "s|^SERVICE_TOKENS=.*|SERVICE_TOKENS=${mapped}|" .env
+    else
+      printf 'SERVICE_TOKENS=%s\n' "$mapped" >> .env
+    fi
+  fi
+
+  if ! grep -q '^TROVE_PUBLIC_BASE=.' .env 2>/dev/null; then
+    warn "建议在 .env 设置 TROVE_PUBLIC_BASE=https://你的域名（微信精华卡外链）"
+  fi
+}
+
+ensure_wechat_bot_config
+
 info "构建并启动 inFlow AI（宝塔模式，监听 127.0.0.1:8080）..."
 docker compose "${COMPOSE_FILES[@]}" down 2>/dev/null || true
 if ! docker compose "${COMPOSE_FILES[@]}" build; then
@@ -70,7 +102,7 @@ docker compose "${COMPOSE_FILES[@]}" up -d
 # 确保 nginx 端口映射为 127.0.0.1:8080（避免与宝塔 80 端口冲突的旧容器残留）
 docker compose "${COMPOSE_FILES[@]}" up -d --force-recreate nginx
 
-REQUIRED_SERVICES=(nginx backend frontend postgres redis)
+REQUIRED_SERVICES=(nginx backend frontend postgres redis wechat-bot)
 missing=()
 for svc in "${REQUIRED_SERVICES[@]}"; do
   if ! docker compose "${COMPOSE_FILES[@]}" ps --status running --services | grep -qx "$svc"; then
@@ -89,6 +121,12 @@ if [ "${#missing[@]}" -gt 0 ]; then
     echo "  常见原因: nginx:alpine 未拉取、8080 被占用、03-src/nginx/nginx.conf 缺失"
     echo "  尝试: docker pull nginx:alpine"
     echo "        docker compose ${COMPOSE_FILES[*]} up -d nginx"
+  fi
+  if printf '%s\n' "${missing[@]}" | grep -qx wechat-bot; then
+    echo ""
+    echo "  微信 bot 未运行：检查 .env 中 SERVICE_TOKEN_WECHAT_BOT 是否已设置"
+    echo "  尝试: docker compose ${COMPOSE_FILES[*]} logs wechat-bot --tail 40"
+    echo "        docker compose ${COMPOSE_FILES[*]} up -d wechat-bot"
   fi
   exit 1
 fi
@@ -128,5 +166,6 @@ echo "  docker compose ${COMPOSE_FILES[*]} exec postgres psql -U trove -d trove 
 echo ""
 info "常用命令:"
 echo "  查看日志: docker compose ${COMPOSE_FILES[*]} logs -f"
+echo "  微信 bot: docker compose ${COMPOSE_FILES[*]} logs wechat-bot --tail 50"
 echo "  停止服务: docker compose ${COMPOSE_FILES[*]} down"
 echo "  更新部署: git pull && docker compose ${COMPOSE_FILES[*]} build && docker compose ${COMPOSE_FILES[*]} up -d"
