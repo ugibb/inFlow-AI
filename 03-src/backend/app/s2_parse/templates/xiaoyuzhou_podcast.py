@@ -15,7 +15,7 @@ from app.s2_parse.schema import ParsedArticle
 from app.s2_parse.templates.base import AbstractTemplate
 from app.prompts import load_prompt
 
-logger = logging.getLogger("trove.parse.templates.xiaoyuzhou_podcast")
+logger = logging.getLogger("inFlow.parse.templates.xiaoyuzhou_podcast")
 
 _TRANSCRIPT_MIN_CHARS = 500
 

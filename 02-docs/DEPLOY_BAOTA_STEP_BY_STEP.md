@@ -23,7 +23,7 @@
 12. [宝塔添加网站与反向代理](#第-12-步宝塔添加网站与反向代理)
 13. [申请 SSL 证书并开启 HTTPS](#第-13-步申请-ssl-证书并开启-https)
 14. [浏览器首次登录与配置](#第-14-步浏览器首次登录与配置)
-15. [日常运维命令速查](#第-15-步日常运维命令速查)
+15. [日常运维命令速查](#第-15-步日常运维命令速查)（详见 [DOCKER_OPS_GUIDE.md](./DOCKER_OPS_GUIDE.md)）
 16. [故障排查](#第-16-步故障排查)
 
 ---
@@ -296,7 +296,7 @@ ls -la 03-src/backend/Dockerfile 03-src/frontend/Dockerfile
 
 ```bash
 # 进入本地项目目录
-cd /Users/你的用户名/Documents/01-CC/98-Content/g_20260615_trove-ai
+cd /Users/你的用户名/Documents/01-CC/98-Content/g_20260615_ inFlow-ai
 
 # 打包（排除大目录与本地数据）
 tar czf /tmp/inflow-ai.tar.gz \
@@ -379,7 +379,7 @@ ACCESS_TOKEN_EXPIRE_DAYS=30
 若有域名且已确定，可加（微信 Bot 用，暂时不用可不加）：
 
 ```env
-TROVE_PUBLIC_BASE=https://你的域名.com
+inFlow_PUBLIC_BASE=https://你的域名.com
 ```
 
 保存退出。
@@ -453,11 +453,11 @@ docker compose -f docker-compose.yml -f docker-compose.baota.yml ps
 
 ```
 NAME             STATUS
-trove-nginx      Up
-trove-backend    Up
-trove-frontend   Up
-trove-db         Up
-trove-redis      Up
+inFlow-nginx      Up
+inFlow-backend    Up
+inFlow-frontend   Up
+inFlow-db         Up
+inFlow-redis      Up
 ```
 
 ```bash
@@ -484,7 +484,7 @@ asyncio.run(init_db())
 "
 
 docker compose -f docker-compose.yml -f docker-compose.baota.yml exec postgres \
-  psql -U trove -d trove -c "SELECT username, is_super_admin, is_active FROM users;"
+  psql -U inFlow -d inFlow -c "SELECT username, is_super_admin, is_active FROM users;"
 ```
 
 ---
@@ -659,6 +659,37 @@ https://你的域名.com
 
 ## 第 15 步：日常运维命令速查
 
+> **完整运维手册**（改 Key、同步 Docker、验证、实时日志等 15 个独立场景）：见 **[DOCKER_OPS_GUIDE.md](./DOCKER_OPS_GUIDE.md)**
+
+### 运维脚本速查
+
+| 场景 | 命令 |
+|------|------|
+| 改 `.env` → 同步 Docker → 验证 Key | `./sync-env-docker.sh` |
+| 仅验证 Key 是否生效 | `./verify-docker-keys.sh` |
+| 实时查看运行日志 | `./logs-docker.sh` |
+| 启动 / 更新部署 | `./start-docker.sh` |
+| 停止全部容器 | `./stop-docker.sh` |
+
+改 Key 标准流程：
+
+```bash
+cd /www/wwwroot/inflow-ai
+vi .env && ./sync-env-docker.sh
+```
+
+两个 SSH 窗口（改配置 + 盯日志）：
+
+```bash
+# 窗口 1
+vi .env && ./sync-env-docker.sh
+
+# 窗口 2
+./logs-docker.sh
+```
+
+### 设置别名（可选）
+
 建议先设置别名，以后操作更方便。在 SSH 执行：
 
 ```bash
@@ -678,20 +709,39 @@ docker compose -f docker-compose.yml -f docker-compose.baota.yml ps
 ### 查看日志
 
 ```bash
-# 所有服务
-docker compose -f docker-compose.yml -f docker-compose.baota.yml logs -f
+# 推荐：项目脚本（默认 backend + wechat-bot 实时滚动）
+./logs-docker.sh
 
 # 仅后端
-docker compose -f docker-compose.yml -f docker-compose.baota.yml logs -f backend
+./logs-docker.sh backend
 
-# 仅前端
-docker compose -f docker-compose.yml -f docker-compose.baota.yml logs -f frontend
+# 全部容器
+./logs-docker.sh --all
 ```
+
+等价于：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.baota.yml logs -f backend
+```
+
+更多过滤、按容器查看见 [DOCKER_OPS_GUIDE.md 场景 10](./DOCKER_OPS_GUIDE.md#场景-10实时查看运行日志)。
+
+### 改 `.env` 后同步配置
+
+```bash
+./sync-env-docker.sh
+```
+
+会自动重建 backend/wechat-bot 并验证 LLM / Embedding / GROQ Key。
 
 ### 重启服务
 
 ```bash
-# 重启后端
+# 改 .env / Key 后（推荐）
+./sync-env-docker.sh
+
+# 仅重启 backend（不涉及 .env 变更时）
 docker compose -f docker-compose.yml -f docker-compose.baota.yml restart backend
 
 # 重启全部
@@ -701,11 +751,8 @@ docker compose -f docker-compose.yml -f docker-compose.baota.yml restart
 ### 停止 / 启动
 
 ```bash
-# 停止
-docker compose -f docker-compose.yml -f docker-compose.baota.yml down
-
-# 启动
-docker compose -f docker-compose.yml -f docker-compose.baota.yml up -d
+./stop-docker.sh
+./start-docker.sh --detach
 ```
 
 ### 更新版本
@@ -723,7 +770,7 @@ docker compose -f docker-compose.yml -f docker-compose.baota.yml up -d
 mkdir -p /www/backup
 cd /www/wwwroot/inflow-ai
 docker compose -f docker-compose.yml -f docker-compose.baota.yml exec -T postgres \
-  pg_dump -U trove trove > /www/backup/inflow_$(date +%Y%m%d).sql
+  pg_dump -U inflow inflow > /www/backup/inflow_$(date +%Y%m%d).sql
 ls -lh /www/backup/
 ```
 
@@ -739,7 +786,7 @@ ls -lh /www/backup/
 mkdir -p /www/backup
 cd /www/wwwroot/inflow-ai
 docker compose -f docker-compose.yml -f docker-compose.baota.yml exec -T postgres \
-  pg_dump -U trove trove > /www/backup/inflow_$(date +\%Y\%m\%d).sql
+  pg_dump -U inflow inflow > /www/backup/inflow_$(date +\%Y\%m\%d).sql
 find /www/backup -name "inflow_*.sql" -mtime +7 -delete
 ```
 
@@ -752,11 +799,11 @@ find /www/backup -name "inflow_*.sql" -mtime +7 -delete
 ### 问题：502 Bad Gateway
 
 ```bash
-# 0. 确认 nginx 容器在运行（应有 5 个容器，含 trove-nginx）
+# 0. 确认 nginx 容器在运行（应有 5 个容器，含 inFlow-nginx）
 cd /www/wwwroot/inflow-ai
 docker compose -f docker-compose.yml -f docker-compose.baota.yml ps -a
 
-# 若 trove-nginx 为 Exited 或未列出：
+# 若 inFlow-nginx 为 Exited 或未列出：
 docker pull nginx:alpine
 ls -la 03-src/nginx/nginx.conf
 docker compose -f docker-compose.yml -f docker-compose.baota.yml up -d nginx

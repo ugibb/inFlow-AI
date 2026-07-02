@@ -21,7 +21,7 @@ from app.core.shared.storage.conventions import (
     parse_json_path,
 )
 
-logger = logging.getLogger("trove.storage.local")
+logger = logging.getLogger("inFlow.storage.local")
 
 
 class LocalStorage(AbstractStorage):

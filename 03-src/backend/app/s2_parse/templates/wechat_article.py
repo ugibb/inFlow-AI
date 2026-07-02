@@ -13,7 +13,7 @@ from app.s1_ingest.schema import RawCapture
 from app.s2_parse.schema import ParsedArticle
 from app.s2_parse.templates.base import AbstractTemplate
 
-logger = logging.getLogger("trove.parse.templates.wechat_article")
+logger = logging.getLogger("inFlow.parse.templates.wechat_article")
 
 
 class WechatArticleTemplate(AbstractTemplate):

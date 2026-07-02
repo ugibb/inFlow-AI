@@ -1,6 +1,7 @@
 """Article management API routes."""
 import asyncio
 import os
+from urllib.parse import urlparse, urlunparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, BackgroundTasks, Body
 from fastapi.responses import HTMLResponse, Response
@@ -32,7 +33,14 @@ router = APIRouter(prefix="/api/articles", tags=["articles"])
 
 
 PROACTIVE_DISTANCE_THRESHOLD = 0.45  # bge-small-zh cosine distance (<=>); lower = closer match
-PROACTIVE_PUBLIC_BASE = os.getenv("TROVE_PUBLIC_BASE", "http://localhost")
+PROACTIVE_PUBLIC_BASE = os.getenv("inFlow_PUBLIC_BASE", "http://localhost")
+
+
+def _canonical_url(url: str) -> str:
+    """Normalize URL for dedup: strip query/fragment and trailing slash."""
+    p = urlparse(url.strip())
+    normalized_path = (p.path or "/").rstrip("/") or "/"
+    return urlunparse((p.scheme, p.netloc.lower(), normalized_path, "", "", ""))
 
 
 async def _maybe_push_proactive_relation(db, article_id):
@@ -98,7 +106,7 @@ async def _maybe_push_proactive_relation(db, article_id):
 async def _run_asr_and_update(article_id: UUID, audio_url: str):
     """Background task: run ASR on audio URL and update article."""
     import logging
-    logger = logging.getLogger("trove.asr")
+    logger = logging.getLogger("inFlow.asr")
     from app.core.database import async_session
     from app.s2_parse.audio.service import transcription_service
 
@@ -125,7 +133,7 @@ async def _run_asr_and_update(article_id: UUID, audio_url: str):
 async def process_article_background(article_id: UUID, raw_content: str, raw_html: str, url: str, db_session_factory):
     """Background task: AI process a newly added article."""
     import logging
-    logger = logging.getLogger("trove.background")
+    logger = logging.getLogger("inFlow.background")
     from app.core.database import async_session
     
     async with async_session() as db:
@@ -231,10 +239,14 @@ async def create_article(
     clean_url = extract_url_from_text(data.url) or data.url.strip()
     if not clean_url.startswith(('http://', 'https://')):
         raise HTTPException(status_code=400, detail="Could not find a valid URL in input")
+    canonical = _canonical_url(clean_url)
+    url_variants = list({clean_url, canonical})
 
     # Check if this URL already exists in the user's library
     existing = await db.execute(
-        select(Article).where(Article.user_id == current_user.id, Article.url == clean_url).limit(1)
+        select(Article)
+        .where(Article.user_id == current_user.id, Article.url.in_(url_variants))
+        .limit(1)
     )
     existing_article = existing.scalar_one_or_none()
     if existing_article:
@@ -245,7 +257,7 @@ async def create_article(
             "message": "这篇文章已经在你的库里了",
         }
 
-    job_id = await ingest_url(db, background_tasks, url=clean_url, user_id=current_user.id)
+    job_id = await ingest_url(db, background_tasks, url=canonical, user_id=current_user.id)
     await db.commit()
     return {"job_id": str(job_id), "status": "capturing"}
 
@@ -260,12 +272,21 @@ async def batch_create_articles(
     """Batch add articles by URLs. Returns list of queued job IDs."""
     jobs = []
     for raw in data.urls:
-        url = extract_url_from_text(raw) or raw.strip()
-        if not url.startswith(('http://', 'https://')):
+        raw_url = extract_url_from_text(raw) or raw.strip()
+        if not raw_url.startswith(('http://', 'https://')):
+            continue
+        canonical = _canonical_url(raw_url)
+        variants = list({raw_url, canonical})
+        existing = await db.execute(
+            select(Article)
+            .where(Article.user_id == current_user.id, Article.url.in_(variants))
+            .limit(1)
+        )
+        if existing.scalar_one_or_none():
             continue
         try:
-            job_id = await ingest_url(db, background_tasks, url=url, user_id=current_user.id)
-            jobs.append({"job_id": str(job_id), "url": url})
+            job_id = await ingest_url(db, background_tasks, url=canonical, user_id=current_user.id)
+            jobs.append({"job_id": str(job_id), "url": canonical})
         except Exception:
             continue
 
@@ -811,7 +832,7 @@ async def _run_regenerate_ai(
 ) -> None:
     import logging as _log
     import time as _time
-    _logger = _log.getLogger("trove.articles.regenerate")
+    _logger = _log.getLogger("inFlow.articles.regenerate")
     from app.core.shared.progress import set_progress, clear_progress
 
     key = str(article_id)

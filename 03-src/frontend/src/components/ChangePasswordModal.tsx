@@ -91,7 +91,7 @@ export default function ChangePasswordModal({ open, onClose }: ChangePasswordMod
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token || localStorage.getItem('trove_token') || ''}`,
+          'Authorization': `Bearer ${token || localStorage.getItem('inFlow_token') || ''}`,
         },
         body: JSON.stringify({
           old_password: oldPassword,

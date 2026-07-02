@@ -953,7 +953,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
         <p className="text-[#6e6e73] mb-2">{error}</p>
         <div className="flex gap-3 justify-center mt-8">
           <button
-            onClick={fetchArticle}
+            onClick={() => void fetchArticle()}
             className="px-6 py-2.5 rounded-xl bg-[#007aff] text-white font-medium text-sm hover:bg-[#0066d6] active:scale-[0.98] transition-all duration-200 shadow-sm"
           >
             重试

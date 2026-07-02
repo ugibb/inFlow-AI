@@ -25,7 +25,7 @@ from app.s2_parse.parser import (
     _rel_path,
 )
 
-logger = logging.getLogger("trove.pipeline.chapters")
+logger = logging.getLogger("inFlow.pipeline.chapters")
 
 _SEGMENT_CHARS = 2000
 

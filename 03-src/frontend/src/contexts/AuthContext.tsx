@@ -15,7 +15,7 @@ interface AuthContextType {
   logout: () => void;
 }
 
-const TOKEN_KEY = 'trove_token';
+const TOKEN_KEY = 'inFlow_token';
 const ME_VALIDATE_RETRIES = 5;
 const ME_VALIDATE_RETRY_MS = 1500;
 

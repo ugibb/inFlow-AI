@@ -160,7 +160,7 @@ export function DeepReadPanel({ articleId, html }: DeepReadPanelProps) {
         serializeIframeHtml(doc),
       );
       const link = document.createElement('a');
-      link.download = `trove-card-${currentTheme}.png`;
+      link.download = `inFlow-card-${currentTheme}.png`;
       link.href = URL.createObjectURL(blob);
       link.click();
       URL.revokeObjectURL(link.href);

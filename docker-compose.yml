@@ -1,7 +1,7 @@
 services:
   nginx:
     image: nginx:alpine
-    container_name: trove-nginx
+    container_name: inflow-nginx
     volumes:
       - ./03-src/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -11,10 +11,12 @@ services:
 
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: trove-db
+    container_name: inflow-db
     environment:
-      POSTGRES_DB: trove
-      POSTGRES_USER: trove
+      # Keep database/user lowercase to match backend DSN and avoid
+      # InvalidCatalogNameError (database "inflow" does not exist) on fresh volumes.
+      POSTGRES_DB: inflow
+      POSTGRES_USER: inflow
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -23,58 +25,63 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: trove-redis
+    container_name: inflow-redis
     restart: unless-stopped
 
   backend:
     build:
       context: ./03-src/backend
       dockerfile: Dockerfile
-    container_name: trove-backend
-    image: trove-backend:latest
+    container_name: inflow-backend
+    image: inflow-backend:latest
     env_file:
       - .env
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
     environment:
       # 仅保留 compose 拼装项；API Key 等一律由 env_file: .env 注入（避免 ${VAR:-} 空值覆盖 env_file）
-      DATABASE_URL: postgresql+asyncpg://trove:${POSTGRES_PASSWORD}@postgres:5432/trove
-      DATABASE_URL_SYNC: postgresql://trove:${POSTGRES_PASSWORD}@postgres:5432/trove
+      DATABASE_URL: postgresql+asyncpg://inflow:${POSTGRES_PASSWORD}@postgres:5432/inflow
+      DATABASE_URL_SYNC: postgresql://inflow:${POSTGRES_PASSWORD}@postgres:5432/inflow
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
       LOG_DIR: log
       LOG_TO_STDOUT: "1"
-      TROVE_ENV: production
+      inFlow_ENV: production
     depends_on:
       - postgres
       - redis
     volumes:
       # Persist user-configured LLM/embedding settings across container restarts
       - ./03-src/backend/app/config_store.json:/app/app/config_store.json
+      # Pipeline artifacts — host path from INFLOW_PIPELINE_DATA_DIR (see .env.example)
+      - ${INFLOW_PIPELINE_DATA_DIR:-./03-src/backend/data}:/app/data
     restart: unless-stopped
 
   # OPTIONAL: WeChat bot worker — uncomment if you have wechat bot credentials set up.
   # Requires SERVICE_TOKEN_WECHAT_BOT in .env and wechat_accounts seeded via the API.
   # wechat-bot:
-  #   image: trove-backend:latest
-  #   container_name: trove-wechat-bot
+  #   image: inflow-backend:latest
+  #   container_name: inflow-wechat-bot
   #   command: python -m app.extensions.wechat.bot
   #   environment:
-  #     DATABASE_URL: postgresql+asyncpg://trove:${POSTGRES_PASSWORD}@postgres:5432/trove
-  #     TROVE_BASE: http://backend:8000
-  #     TROVE_TOKEN: ${SERVICE_TOKEN_WECHAT_BOT:-}
+  #     DATABASE_URL: postgresql+asyncpg://inflow:${POSTGRES_PASSWORD}@postgres:5432/inflow
+  #     inFlow_BASE: http://backend:8000
+  #     inFlow_TOKEN: ${SERVICE_TOKEN_WECHAT_BOT:-}
   #   depends_on:
   #     - backend
   #     - postgres
+  #   volumes:
+  #     - ./03-src/backend/app/config_store.json:/app/app/config_store.json
+  #     - ${INFLOW_PIPELINE_DATA_DIR:-./03-src/backend/data}:/app/data
   #   restart: unless-stopped
 
   frontend:
     build:
       context: ./03-src/frontend
       dockerfile: Dockerfile
-    container_name: trove-frontend
+    container_name: inflow-frontend
     environment:
       NEXT_PUBLIC_API_URL: /api
-      TROVE_ENV: production
+      inFlow_ENV: production
     depends_on:
       - backend
     restart: unless-stopped

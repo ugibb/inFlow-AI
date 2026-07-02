@@ -24,14 +24,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import async_session
 from app.core.models import Article, ReviewSchedule, User, WechatAccount
 
-logger = logging.getLogger("trove.review")
+logger = logging.getLogger("inFlow.review")
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 SCAN_INTERVAL_S = 60  # cron tick rate
 
 ILINK_APP_ID = "bot"
 ILINK_APP_CLIENT_VERSION = "132099"
-BOT_AGENT_PUSH = "TroveReview/0.1"
+BOT_AGENT_PUSH = "inFlowReview/0.1"
 
 # Per-message char cap to avoid WeChat truncation
 WECHAT_MSG_MAX = 1800
@@ -59,7 +59,7 @@ def _base_info() -> dict:
 
 
 def _client_id() -> str:
-    return f"trove-review:{int(time.time() * 1000)}-{secrets.token_hex(4)}"
+    return f"inFlow-review:{int(time.time() * 1000)}-{secrets.token_hex(4)}"
 
 
 async def send_wechat(client: httpx.AsyncClient, acct: WechatAccount, text: str) -> bool:

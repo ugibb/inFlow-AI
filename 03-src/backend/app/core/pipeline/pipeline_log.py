@@ -18,7 +18,7 @@ logger = get_logger("pipeline")
 # 任务开始日志：▶ 任务开始：{任务名}
 _AUDIO_PHASES: dict[str, tuple[str, str]] = {
     "capturing": ("01-采集", "原始信息采集，xxx.json + 音频文件"),
-    "transcribing": ("02-转录", "音频Groq Whisper ASR 转录，音频文件 --> _asr_verbose.json + _asr.json + _asr.txt"),
+    "transcribing": ("02-转录", "音频 ASR 转录（听悟/Groq），音频文件 --> _asr_verbose.json + _asr.json + _asr.txt + _tingwu.json"),
     "chapters": ("03-章节", "章节生成，_asr_verbose.json --> _chapters.json"),
     "parsing": ("04-解析", "AI 内容解析，_asr.txt --> xxx.json"),
     "composing": ("05-卡片", "精华卡片合成，_asr.json --> html + png"),
@@ -39,7 +39,7 @@ _ARTICLE_PHASES: dict[str, tuple[str, str]] = {
 _VIDEO_PHASES: dict[str, tuple[str, str]] = {
     "capturing": ("01-采集", "原始信息采集，xxx.json + 视频文件"),
     "preprocessing": ("02-抽离", "音视频抽离，视频文件 --> 音频文件 + 视频截图"),
-    "transcribing": ("03-转录", "音频Groq Whisper ASR 转录，音频文件 --> _asr_verbose.json + _asr.json + _asr.txt"),
+    "transcribing": ("03-转录", "音频 ASR 转录（听悟/Groq），音频文件 --> _asr_verbose.json + _asr.json + _asr.txt + _tingwu.json"),
     "chapters": ("04-章节", "章节生成，_asr_verbose.json --> _chapters.json"),
     "parsing": ("05-解析", "AI 内容解析，_asr.txt --> xxx.json"),
     "composing": ("06-卡片", "精华卡片合成，_asr.json --> html + png"),
@@ -166,7 +166,7 @@ class PhaseLogger:
         self._started = True
         backend = _details.get("backend")
         if backend:
-            logger.info(self._line(f"▶ 任务开始：{self.task_name} | 引擎={sanitize_log_text(backend)}"))
+            logger.info(self._line(f"▶ 任务开始：{self.task_name} "))
         else:
             logger.info(self._line(f"▶ 任务开始：{self.task_name}"))
 

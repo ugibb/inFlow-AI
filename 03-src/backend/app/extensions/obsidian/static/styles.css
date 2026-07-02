@@ -1,14 +1,14 @@
 /* inFlow AI Sync — minimal styles */
-.trove-status-bar {
+.inFlow-status-bar {
   font-size: 12px;
   opacity: 0.8;
 }
-.trove-token-warning {
+.inFlow-token-warning {
   color: var(--text-error);
   font-size: 0.85em;
   margin-top: 4px;
 }
-.trove-stat-row {
+.inFlow-stat-row {
   display: flex;
   gap: 16px;
   font-size: 0.85em;

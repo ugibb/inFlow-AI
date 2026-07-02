@@ -1,6 +1,6 @@
 <div align="center">
 
-# inFlow AI — 拾遗
+# inFlow AI — 入流
 
 **为中文互联网打造的稍后阅读 + AI 知识库。**
 
@@ -11,7 +11,7 @@
 [![全端兼容: PC · Pad · 移动端](https://img.shields.io/badge/全端兼容-PC%20·%20Pad%20·%20移动端-007aff)]()
 [![Status: active](https://img.shields.io/badge/状态-持续更新-success.svg)]()
 
-[English README](README.md) · [自部署指南](docs/SELF_HOST.md) · [Obsidian 插件](https://github.com/weaiw/trove-sync-obsidian)
+[English README](README.md) · [自部署指南](docs/SELF_HOST.md) · [Obsidian 插件](https://github.com/weaiw/inFlow-sync-obsidian)
 
 </div>
 
@@ -81,7 +81,7 @@
 <td width="50%" valign="top">
 
 #### 📝 一次性快照同步 Obsidian
-配套插件把你所有文章导出成本地 Markdown,**永不覆盖你的本地编辑**。哪天 Trove 没了,你硬盘里的数据还在。
+配套插件把你所有文章导出成本地 Markdown,**永不覆盖你的本地编辑**。哪天 inFlow 没了,你硬盘里的数据还在。
 
 </td>
 <td width="50%" valign="top">
@@ -202,8 +202,8 @@ inFlow AI 是**唯一**同时拥有这些能力的产品:深度中文平台支�
 
 ```bash
 # 1. 克隆
-git clone https://github.com/weaiw/trove-ai.git
-cd trove-ai
+git clone https://github.com/weaiw/ inFlow-ai.git
+cd  inFlow-ai
 
 # 2. 配置密钥
 cp .env.example .env
@@ -333,7 +333,7 @@ HTTPS 自己用 **Caddy / Traefik / Nginx** 反代,或者直接挂 Cloudflare Tu
 
 ### 登录与会话
 
-- 登录采用**无状态 JWT**，保存在浏览器 `localStorage`（键名 `trove_token`）。
+- 登录采用**无状态 JWT**，保存在浏览器 `localStorage`（键名 `inFlow_token`）。
 - **重启后端/前端不会使 Token 失效** — 只要 `.env` 中 `SECRET_KEY` 不变且 Token 未过期即可。
 - 页面加载时会请求 `/api/auth/me` 校验 Token；若后端尚在启动中，前端会**最多重试 5 次**并保留 Token，避免重启期间刷新页面被误登出。
 - 修改 `ACCESS_TOKEN_EXPIRE_DAYS` 后需**重启后端**并**重新登录一次**，新签发的 Token 才会使用新有效期。
@@ -369,15 +369,15 @@ HTTPS 自己用 **Caddy / Traefik / Nginx** 反代,或者直接挂 Cloudflare Tu
 
 ## Obsidian 同步插件
 
-插件仓库:**[weaiw/trove-sync-obsidian](https://github.com/weaiw/trove-sync-obsidian)**(MIT)
+插件仓库:**[weaiw/inFlow-sync-obsidian](https://github.com/weaiw/inFlow-sync-obsidian)**(MIT)
 
 **一次性快照到本地 vault。** 永不覆盖你的本地修改。哪天产品没了,你的数据还在。
 
 使用流程:
 
 1. 网页 → **个人设置 → Obsidian 备份 → 生成本地同步 Token**
-2. 从 [Releases](https://github.com/weaiw/trove-sync-obsidian/releases/latest) 下载插件
-3. 解压到 `<your-vault>/.obsidian/plugins/trove-sync/`
+2. 从 [Releases](https://github.com/weaiw/inFlow-sync-obsidian/releases/latest) 下载插件
+3. 解压到 `<your-vault>/.obsidian/plugins/inFlow-sync/`
 4. Obsidian → 社区插件 → 启用 **inFlow AI Sync**
 5. 粘贴 Token + 服务器地址 → 点 **Sync Now**
 
@@ -529,7 +529,7 @@ Obsidian 插件**绝不**传播删除——你硬盘上的文件不会因为线�
 ## License
 
 主仓:**[AGPL-3.0](LICENSE)**。
-Obsidian 插件:[MIT](https://github.com/weaiw/trove-sync-obsidian/blob/main/LICENSE)。
+Obsidian 插件:[MIT](https://github.com/weaiw/inFlow-sync-obsidian/blob/main/LICENSE)。
 
 闭源 SaaS 商业部署,联系维护者获取商业授权。
 

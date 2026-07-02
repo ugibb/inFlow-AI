@@ -18,7 +18,7 @@ import httpx
 
 from app.core.shared.utils.retry import async_retry
 
-logger = logging.getLogger("trove.services.audio_downloader")
+logger = logging.getLogger("inFlow.services.audio_downloader")
 
 _HEADERS = {
     "User-Agent": (
@@ -99,7 +99,11 @@ class AudioDownloader:
         logger.debug("音频下载完成：%s", dest)
         return dest
 
-    @async_retry(max_attempts=5, delay=5.0, exceptions=(httpx.RequestError, httpx.HTTPStatusError))
+    @async_retry(
+        max_attempts=5,
+        delay=5.0,
+        exceptions=(httpx.RequestError, httpx.HTTPStatusError, RuntimeError),
+    )
     async def _download_with_retry(
         self,
         url: str,
@@ -118,12 +122,18 @@ class AudioDownloader:
             async with client.stream("GET", url, headers=headers) as resp:
                 if resp.status_code == 416:
                     if part_file.is_file() and part_file.stat().st_size > 0:
-                        logger.debug("断点文件已完整，跳过下载")
+                        if progress_cb:
+                            progress_cb("断点文件已完整，跳过下载")
+                        else:
+                            logger.debug("断点文件已完整，跳过下载")
                         return
-                    raise RuntimeError(f"音频下载失败（HTTP 416）：{url}")
+                    raise RuntimeError(f"音频下载失败（HTTP 416）")
 
                 if resume_from > 0 and resp.status_code == 200:
-                    logger.warning("服务器不支持断点续传，重新下载")
+                    if progress_cb:
+                        progress_cb("服务器不支持断点续传，重新下载")
+                    else:
+                        logger.warning("服务器不支持断点续传，重新下载")
                     part_file.unlink(missing_ok=True)
                     resume_from = 0
 
@@ -155,7 +165,7 @@ class AudioDownloader:
 
                 if total > 0 and downloaded < total:
                     raise RuntimeError(
-                        f"下载不完整：{downloaded}/{total} bytes — {url}"
+                        f"下载不完整：{downloaded}/{total} bytes"
                     )
 
     @staticmethod

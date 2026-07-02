@@ -14,7 +14,7 @@ Flow:
 
 Stateless: bind sessions live entirely in a JWT-signed token (qrcode + base_url
 + exp) so this works across uvicorn workers without Redis or sticky sessions.
-See memory: trove_wechat_bot, reference_openclaw_weixin.
+See memory: inFlow_wechat_bot, reference_openclaw_weixin.
 """
 import base64
 import io
@@ -292,9 +292,10 @@ async def get_status(
     hint = None
     if not worker_active:
         hint = (
-            "已绑定，但消息服务未在运行（或刚启动尚未就绪）。"
-            "本地开发请执行 ./start-local.sh，日志见 04-log/backend/日期.log；"
-            "Docker 需在 docker-compose.baota.yml 启用 wechat-bot 服务（宝塔部署运行 ./deploy-baota.sh 会自动启动）。"
+            "已绑定，但消息服务尚未就绪。"
+            "若已执行 ./start-local.sh 仍如此，请查看 04-log/backend/日期.log："
+            "若出现 session timeout，请在下方解绑后重新扫码绑定；"
+            "Docker 部署需在 docker-compose 启用 wechat-bot（宝塔运行 ./deploy-baota.sh 会自动启动）。"
         )
 
     return WechatStatusResponse(

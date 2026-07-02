@@ -21,7 +21,7 @@ from typing import Optional
 from app.s1_ingest.schema import RawCapture
 from app.s2_parse.schema import Chapter, ParsedArticle
 
-logger = logging.getLogger("trove.parse.templates.base")
+logger = logging.getLogger("inFlow.parse.templates.base")
 
 
 class AbstractTemplate(abc.ABC):

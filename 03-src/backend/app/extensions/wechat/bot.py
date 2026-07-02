@@ -8,10 +8,10 @@ to be mapped to a superadmin user).
 Run inside the same Docker image as the backend (which gives us DB access and
 parser_service):
 
-    TROVE_BASE=http://backend:8000 TROVE_TOKEN=<superadmin-token> \
+    inFlow_BASE=http://backend:8000 inFlow_TOKEN=<superadmin-token> \
     python -m app.extensions.wechat.bot
 
-See memory: trove_wechat_bot, reference_openclaw_weixin.
+See memory: inFlow_wechat_bot, reference_openclaw_weixin.
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ logger = get_logger("wexinBot")
 # ── ilinkai wire constants ─────────────────────────────────────────────
 ILINK_APP_ID = "bot"
 ILINK_APP_CLIENT_VERSION = "132099"
-BOT_AGENT = "TroveBot/0.2-multi"
+BOT_AGENT = "inFlowBot/0.2-multi"
 LONGPOLL_TIMEOUT_S = 35
 
 URL_RE = re.compile(
@@ -96,7 +96,7 @@ def _base_info() -> dict:
 
 
 def _client_id() -> str:
-    return f"trove-bot:{int(time.time() * 1000)}-{secrets.token_hex(4)}"
+    return f"inFlow-bot:{int(time.time() * 1000)}-{secrets.token_hex(4)}"
 
 
 def _extract_url(text: str) -> Optional[str]:
@@ -118,7 +118,7 @@ def _reply_with_title(base: str, title: Optional[str]) -> str:
 
 
 # ── inFlow AI backend calls (per-user via X-Act-As-User) ────────────────
-class TroveClient:
+class inFlowClient:
     def __init__(self, base_url: str, service_token: str):
         self.base_url = base_url.rstrip("/")
         self.token = service_token
@@ -166,14 +166,14 @@ class TroveClient:
             title = body.get("title")
             if api_status == "already_exists":
                 return True, _reply_with_title(
-                    "📚 这篇文章已在你的 Trove 库里了", title
+                    "📚 这篇文章已在你的 inFlow 库里了", title
                 ), job_id, api_status
             if api_status == "already_processing":
                 return True, _reply_with_title(
-                    "⏳ 这篇文章正在处理中，稍后即可在 Trove 阅读", title
+                    "⏳ 这篇文章正在处理中，稍后即可在 inFlow 阅读", title
                 ), job_id, api_status
             return True, _reply_with_title(
-                "✅ 已加入队列，解析完成后即可在 Trove 阅读", title
+                "✅ 已加入队列，解析完成后即可在 inFlow 阅读", title
             ), job_id, api_status
         if r.status_code == 401:
             return False, (
@@ -268,7 +268,7 @@ class TroveClient:
 
 # ── Per-account long-poll loop ─────────────────────────────────────────
 class AccountWorker:
-    def __init__(self, account_id: UUID, lm: TroveClient):
+    def __init__(self, account_id: UUID, lm: inFlowClient):
         self.account_id = account_id
         self.lm = lm
         self._stop = asyncio.Event()
@@ -744,13 +744,32 @@ class AccountWorker:
                 if not job.raw_file_path:
                     raise ValueError(f"No raw_file_path for job {job_id}")
 
+                push_label = resolve_phase_label("wechat_push", content_type)
                 png_path = display_card_png_path(job.raw_file_path, job_id)
                 if not Path(png_path).is_file() or Path(png_path).stat().st_size == 0:
-                    raise ValueError(
-                        f"Card PNG not found for job {job_id} — pipeline must render before push"
-                    )
+                    # Fallback: jobs from mixed versions / path drifts may miss the
+                    # expected 03_display PNG; try a one-shot re-render before failing.
+                    from app.s4_compose.card_renderer import render_card_png_for_job
 
-                push_label = resolve_phase_label("wechat_push", content_type)
+                    log_job_event(job_id, push_label, "卡片缺失", "尝试即时补渲染")
+                    try:
+                        rendered_png = await render_card_png_for_job(
+                            str(job_id),
+                            asr_file_path=job.asr_file_path,
+                            parsed_file_path=job.parsed_file_path,
+                            source_platform=job.source_platform,
+                            progress_cb=lambda m: log_job_event(job_id, push_label, f"补渲染: {m}"),
+                        )
+                    except Exception as exc:
+                        raise ValueError(
+                            f"Card PNG rerender failed for job {job_id}: {exc}"
+                        ) from exc
+                    png_path = rendered_png
+                    if not Path(png_path).is_file() or Path(png_path).stat().st_size == 0:
+                        raise ValueError(
+                            f"Card PNG not found for job {job_id} after rerender"
+                        )
+
                 size_kb = Path(png_path).stat().st_size // 1024
                 push_task = resolve_phase_task_name("wechat_push", content_type)
                 log_job_event(
@@ -855,7 +874,7 @@ class AccountWorker:
             preview = first_para[:180] + ("…" if len(first_para) > 180 else "")
 
         # deep link to /read
-        public_base = os.environ.get("TROVE_PUBLIC_BASE", "http://localhost")
+        public_base = os.environ.get("inFlow_PUBLIC_BASE", "http://localhost")
         link = f"{public_base}/read/{article_id}" if article_id else ""
 
         msg = f"✅ 已生成《{title[:50]}》"
@@ -1012,7 +1031,7 @@ class AccountWorker:
 class BotSupervisor:
     REFRESH_INTERVAL_S = 30
 
-    def __init__(self, lm: TroveClient):
+    def __init__(self, lm: inFlowClient):
         self.lm = lm
         self.workers: Dict[UUID, AccountWorker] = {}
         self._stop = asyncio.Event()
@@ -1056,13 +1075,13 @@ class BotSupervisor:
 
 
 async def _async_main():
-    base = os.environ.get("TROVE_BASE", "http://localhost:8000")
-    token = os.environ.get("TROVE_TOKEN", "")
+    base = os.environ.get("inFlow_BASE", "http://localhost:8000")
+    token = os.environ.get("inFlow_TOKEN", "")
     if not token:
-        logger.error("Missing TROVE_TOKEN env (superadmin service token)")
+        logger.error("Missing inFlow_TOKEN env (superadmin service token)")
         sys.exit(2)
 
-    sup = BotSupervisor(TroveClient(base, token))
+    sup = BotSupervisor(inFlowClient(base, token))
     loop = asyncio.get_event_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, lambda: asyncio.create_task(sup.stop()))

@@ -18,7 +18,7 @@ from app.core.models.user import User
 # ── Crypto ──────────────────────────────────────────────────
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-SECRET_KEY = os.getenv("SECRET_KEY", "trove-secret-change-in-production")
+SECRET_KEY = os.getenv("SECRET_KEY", "inFlow-secret-change-in-production")
 ALGORITHM = "HS256"
 
 
@@ -30,7 +30,7 @@ _SERVICE_TOKENS: dict[str, str] = {
     for pair in os.getenv("SERVICE_TOKENS", "").split(",")
     if ":" in pair
 }
-# docker-compose / start-local.sh set TROVE_TOKEN from this var; map to superadmin for X-Act-As-User.
+# docker-compose / start-local.sh set inFlow_TOKEN from this var; map to superadmin for X-Act-As-User.
 _wechat_bot_token = os.getenv("SERVICE_TOKEN_WECHAT_BOT", "").strip()
 if _wechat_bot_token and _wechat_bot_token not in _SERVICE_TOKENS:
     _SERVICE_TOKENS[_wechat_bot_token] = os.getenv("WECHAT_BOT_ACT_AS_USER", "weaiw").strip() or "weaiw"

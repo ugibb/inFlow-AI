@@ -14,7 +14,7 @@ from uuid import UUID
 from app.s1_ingest.adapters.base import AbstractAdapter, AdapterError
 from app.s1_ingest.schema import RawCapture, RawMeta, RawContent
 
-logger = logging.getLogger("trove.ingest.adapters.youtube")
+logger = logging.getLogger("inFlow.ingest.adapters.youtube")
 
 _YOUTUBE_URL_RE = re.compile(
     r"https?://(?:www\.youtube\.com|youtu\.be)/",

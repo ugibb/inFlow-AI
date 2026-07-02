@@ -15,7 +15,7 @@ BEGIN
       AND attname = 'embedding'
       AND NOT attisdropped;
 
-    IF cur_type IS DISTINCT FROM 'vector(512)' THEN
+    IF cur_type IS NOT NULL AND cur_type IS DISTINCT FROM 'vector(512)' THEN
         DROP INDEX IF EXISTS idx_articles_embedding;
         ALTER TABLE articles ALTER COLUMN embedding TYPE vector(512) USING NULL;
         CREATE INDEX idx_articles_embedding ON articles

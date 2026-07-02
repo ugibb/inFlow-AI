@@ -12,7 +12,7 @@ from app.s1_ingest.schema import RawCapture
 from app.s2_parse.schema import ParsedArticle
 from app.s2_parse.templates.base import AbstractTemplate
 
-logger = logging.getLogger("trove.parse.templates.generic")
+logger = logging.getLogger("inFlow.parse.templates.generic")
 
 _SCHEMA_HINT = """{
   "title": "文章标题",

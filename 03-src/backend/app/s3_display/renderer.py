@@ -23,7 +23,7 @@ from app.core.models.article import Article
 from app.s2_parse.schema import ParsedContent
 from app.core.shared.storage import default_storage
 
-logger = logging.getLogger("trove.display.renderer")
+logger = logging.getLogger("inFlow.display.renderer")
 
 
 async def render_job(

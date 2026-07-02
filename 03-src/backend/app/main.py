@@ -202,7 +202,7 @@ async def lifespan(app: FastAPI):
     import os
     import concurrent.futures
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    if os.environ.get("TROVE_ENV", "").lower() != "production":
+    if os.environ.get("inFlow_ENV", "").lower() != "production":
         from app.s2_parse.audio.service import preload_whisper
         asyncio.get_running_loop().run_in_executor(executor, preload_whisper)
 

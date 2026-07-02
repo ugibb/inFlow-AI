@@ -3,8 +3,8 @@
 Endpoints:
 - POST /api/sync/issue-token    (JWT auth) — mint a long-lived (1y) JWT
 - POST /api/sync/revoke-all-tokens (JWT auth) — invalidate all sync tokens
-- GET  /api/sync/articles       (JWT auth) — Trove → Obsidian: pull articles
-- POST /api/sync/articles       (JWT auth) — Obsidian → Trove: push articles
+- GET  /api/sync/articles       (JWT auth) — inFlow → Obsidian: pull articles
+- POST /api/sync/articles       (JWT auth) — Obsidian → inFlow: push articles
 - GET  /api/sync/stats          (JWT auth) — sync statistics
 - GET  /api/sync/plugin-download (public) — download the Obsidian plugin
 
@@ -263,7 +263,7 @@ async def list_sync_articles(
 
 
 # Plugin artifacts live under extensions/obsidian/static/ — they're the
-# build output of the trove-sync-obsidian repo, copied into the backend image
+# build output of the inFlow-sync-obsidian repo, copied into the backend image
 # at build time so the running backend can serve them.
 PLUGIN_DIR = os.path.join(os.path.dirname(__file__), "static")
 PLUGIN_FILES = ["main.js", "manifest.json", "styles.css"]
@@ -283,14 +283,14 @@ async def download_plugin():
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for name in PLUGIN_FILES:
             src = os.path.join(PLUGIN_DIR, name)
-            # Nest one folder deep so unzipping creates a `trove-sync/` dir
-            z.write(src, arcname=f"trove-sync/{name}")
+            # Nest one folder deep so unzipping creates a `inFlow-sync/` dir
+            z.write(src, arcname=f"inFlow-sync/{name}")
     buf.seek(0)
     return StreamingResponse(
         buf,
         media_type="application/zip",
         headers={
-            "Content-Disposition": 'attachment; filename="trove-sync-obsidian-plugin.zip"'
+            "Content-Disposition": 'attachment; filename="inFlow-sync-obsidian-plugin.zip"'
         },
     )
 
@@ -320,7 +320,7 @@ async def sync_stats(
 
 
 # ============================================================
-#  Obsidian → Trove: push articles from local vault
+#  Obsidian → inFlow: push articles from local vault
 # ============================================================
 
 class PushArticleRequest(BaseModel):
@@ -328,7 +328,7 @@ class PushArticleRequest(BaseModel):
     title: str
     content: str = Field(..., description="Full markdown body")
     tags: List[str] = Field(default_factory=list)
-    folder: Optional[str] = Field(None, description="Folder name in Trove")
+    folder: Optional[str] = Field(None, description="Folder name in inFlow")
     source_url: Optional[str] = None
 
 
@@ -345,7 +345,7 @@ async def push_article(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Push an article from Obsidian into Trove.
+    """Push an article from Obsidian into inFlow.
 
     Matches by obsidian_path — if an article with the same path exists
     for this user, it's updated in-place. Otherwise a new article is created.

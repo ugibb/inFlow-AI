@@ -7,12 +7,16 @@ RUN sed -i 's|deb.debian.org|mirrors.tencent.com|g; s|security.debian.org|mirror
 
 ENV PIP_INDEX_URL=https://mirrors.tencent.com/pypi/simple/ \
     PIP_TRUSTED_HOST=mirrors.tencent.com \
+    PIP_DEFAULT_TIMEOUT=300 \
+    PIP_RETRIES=12 \
     PLAYWRIGHT_DOWNLOAD_HOST=https://registry.npmmirror.com/-/binary/playwright
 
 RUN apt-get update && apt-get install -y --no-install-recommends     build-essential libpq-dev curl libcurl4-openssl-dev     libnss3 libnspr4 libatk-bridge2.0-0 libdrm2 libdbus-1-3     libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3     libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2     libatspi2.0-0 libcups2 nodejs ffmpeg &&     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt || \
+    PIP_INDEX_URL=https://pypi.org/simple PIP_TRUSTED_HOST="pypi.org files.pythonhosted.org" \
+    pip install --no-cache-dir -r requirements.txt
 
 RUN python3 -m playwright install --with-deps chromium
 

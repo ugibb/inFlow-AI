@@ -45,11 +45,15 @@ BACKEND_LOG_DIR="${LOG_DIR}/backend"
 WECHAT_BOT_LOG_DIR="${LOG_DIR}/wechat-bot"
 
 # 本地数据库默认连接（与 backend/app/config.py 一致）
-DB_USER="trove"
-DB_PASS="trove"
-DB_NAME="trove"
+DB_USER="inFlow"
+DB_PASS="inFlow"
+DB_NAME="inFlow"
 DB_HOST="localhost"
 DB_PORT="5432"
+# PostgreSQL 未加引号的标识符会折叠为小写（inFlow → inflow）
+pg_ident() { echo "$1" | tr '[:upper:]' '[:lower:]'; }
+DB_USER_PG="$(pg_ident "$DB_USER")"
+DB_NAME_PG="$(pg_ident "$DB_NAME")"
 
 info()  { echo "[INFO]  $*"; }
 warn()  { echo "[WARN]  $*"; }
@@ -121,7 +125,8 @@ wechat_bot_daily_log() {
 
 stop_wechat_bot() {
   local pids
-  pids=$(pgrep -f 'python -m app\.extensions\.wechat\.bot' 2>/dev/null || true)
+  # macOS 进程名为 Python（大写），勿只用 'python -m'
+  pids=$(pgrep -f 'app\.extensions\.wechat\.bot' 2>/dev/null || true)
   if [ -z "$pids" ]; then
     return 0
   fi
@@ -201,8 +206,8 @@ ensure_pgvector() {
 
 # 初始化本地数据库（永不 DROP；重置请用 ./reset-local-db.sh --confirm）
 setup_database() {
-  if [ "${TROVE_FRESH_DB:-}" = "1" ]; then
-    warn "TROVE_FRESH_DB 已弃用，启动脚本不会删除数据库。"
+  if [ "${inFlow_FRESH_DB:-}" = "1" ]; then
+    warn "inFlow_FRESH_DB 已弃用，启动脚本不会删除数据库。"
     warn "如需重置，请先 ./stop-local.sh，再执行 ./reset-local-db.sh --confirm"
   fi
 
@@ -224,26 +229,26 @@ setup_database() {
 
   local psql_admin=(psql -h "$DB_HOST" -p "$DB_PORT" -U "$(whoami)" -d postgres -v ON_ERROR_STOP=1)
 
-  if ! "${psql_admin[@]}" -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1; then
+  if ! "${psql_admin[@]}" -tc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER_PG}'" | grep -q 1; then
     info "创建数据库用户 ${DB_USER}"
-    "${psql_admin[@]}" -c "CREATE ROLE ${DB_USER} WITH LOGIN PASSWORD '${DB_PASS}' CREATEDB;"
+    "${psql_admin[@]}" -c "CREATE ROLE ${DB_USER_PG} WITH LOGIN PASSWORD '${DB_PASS}' CREATEDB;"
   fi
 
   mkdir -p "$LOG_DIR"
 
-  if ! "${psql_admin[@]}" -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
+  if ! "${psql_admin[@]}" -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME_PG}'" | grep -q 1; then
     info "创建数据库 ${DB_NAME}"
-    "${psql_admin[@]}" -c "CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};"
+    "${psql_admin[@]}" -c "CREATE DATABASE ${DB_NAME_PG} OWNER ${DB_USER_PG};"
   fi
 
-  psql -h "$DB_HOST" -p "$DB_PORT" -U "$(whoami)" -d "$DB_NAME" -v ON_ERROR_STOP=1 -c \
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$(whoami)" -d "$DB_NAME_PG" -v ON_ERROR_STOP=1 -c \
     "CREATE EXTENSION IF NOT EXISTS vector; CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";" &>/dev/null
 
   # 像 Docker entrypoint 一样先跑 SQL 迁移（幂等，每次启动都执行）
   info "执行数据库迁移..."
   local sql_file
   for sql_file in "${BACKEND_DIR}"/app/migrations/*.sql; do
-    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+    PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER_PG" -d "$DB_NAME_PG" \
       -v ON_ERROR_STOP=0 -f "$sql_file" &>/dev/null || true
   done
 
@@ -305,8 +310,8 @@ load_env() {
   fi
   load_env_file "${SCRIPT_DIR}/.env"
   export SECRET_KEY="${SECRET_KEY:-dev-local-secret-change-me-at-least-32-chars}"
-  export DATABASE_URL="postgresql+asyncpg://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
-  export DATABASE_URL_SYNC="postgresql://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+  export DATABASE_URL="postgresql+asyncpg://${DB_USER_PG}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME_PG}"
+  export DATABASE_URL_SYNC="postgresql://${DB_USER_PG}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME_PG}"
 }
 
 # 读取 config.py 中的布尔配置（与 Python 默认值保持一致）
@@ -497,8 +502,8 @@ start_wechat_bot() {
     export no_proxy='localhost,127.0.0.1' && \
     export DATABASE_URL='${DATABASE_URL}' && \
     export DATABASE_URL_SYNC='${DATABASE_URL_SYNC}' && \
-    export TROVE_BASE='http://localhost:${BACKEND_PORT}' && \
-    export TROVE_TOKEN='${SERVICE_TOKEN_WECHAT_BOT}' && \
+    export inFlow_BASE='http://localhost:${BACKEND_PORT}' && \
+    export inFlow_TOKEN='${SERVICE_TOKEN_WECHAT_BOT}' && \
     exec python -m app.extensions.wechat.bot
   " >> "$daily_log" 2>&1 &
   disown
@@ -550,9 +555,24 @@ follow_logs() {
 # ── 主流程 ──────────────────────────────────────────────
 print_log_section "▶ 系统启动日志" "数据库 / 依赖 / 服务拉起"
 
+if ! command -v psql &>/dev/null; then
+  if command -v docker &>/dev/null && docker compose version &>/dev/null; then
+    error "未找到 psql。本脚本仅用于 Mac 本地开发（本机 PostgreSQL + Node）。"
+    echo ""
+    echo "  服务器 / Docker 部署请改用："
+    echo "    ./deploy-baota.sh          # 宝塔生产环境（推荐）"
+    echo "    ./start.sh                 # 通用 Docker 启动"
+    echo ""
+    echo "  若坚持本机直跑（不推荐服务器），需先安装 PostgreSQL 客户端："
+    echo "    OpenCloudOS: dnf install -y postgresql"
+    exit 1
+  fi
+  error "未找到 psql，请先安装 PostgreSQL 客户端（Mac: brew install postgresql@16）"
+  exit 1
+fi
+
 require_cmd node
 require_cmd npm
-require_cmd psql
 
 load_env
 stop_previous

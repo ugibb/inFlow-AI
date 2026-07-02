@@ -377,7 +377,7 @@ _TOOLBAR_JS_TEMPLATE = """
         windowHeight: document.body.scrollHeight,
       }).then(function(canvas) {
         var link = document.createElement('a');
-        link.download = 'trove-card-' + _currentTheme + '.png';
+        link.download = 'inFlow-card-' + _currentTheme + '.png';
         link.href = canvas.toDataURL('image/png');
         link.click();
       }).finally(function() {

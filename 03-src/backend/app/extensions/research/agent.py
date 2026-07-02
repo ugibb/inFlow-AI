@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.shared.ai_service import llm_service, _parse_llm_json
 
-logger = logging.getLogger("trove.research")
+logger = logging.getLogger("inFlow.research")
 
 # Tunables — keep modest so research finishes in ~20-30s for typical query
 RETRIEVE_TOP_K = 3                # per sub-question

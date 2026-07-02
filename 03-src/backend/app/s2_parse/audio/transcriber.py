@@ -6,11 +6,11 @@ Changes from the original:
   - Uses standard logging and plain RuntimeError / ValueError.
   - transcribe() is synchronous (faster-whisper is sync); callers in async
     context should wrap with asyncio.get_event_loop().run_in_executor().
-  - _save_response_files() / _merge_groq_responses() preserved verbatim.
+  - save_asr_response_files() / _merge_groq_responses() preserved verbatim.
 
-Priority:
-  1. Groq API  (GROQ_API_KEY set, file ≤ 25 MB — chunked for larger files)
-  2. faster-whisper local model  (fallback)
+Backend:
+  Groq Whisper ASR (ASR_PROVIDER=groq; GROQ_API_KEY required; large files chunked automatically).
+  听悟请使用 TingwuTranscriber（ASR_PROVIDER=tingwu，默认）。
 """
 
 from __future__ import annotations
@@ -22,13 +22,13 @@ import subprocess
 import tempfile
 import threading
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 import av
 
 from app.core.utils.logger import get_logger
+from app.s2_parse.audio.asr_common import TranscriptionResult, save_asr_response_files
 
 logger = get_logger("parse.transcriber")
 
@@ -99,18 +99,10 @@ def _start_groq_heartbeat(
     return stop, thread
 
 
-@dataclass
-class TranscriptionResult:
-    text: str
-    language: str
-
-
 class WhisperTranscriber:
     """Whisper transcription wrapper.
 
-    Priority:
-      1. Groq API (groq_api_key set; large files chunked automatically)
-      2. faster-whisper local inference (fallback)
+    Groq Whisper ASR only — requires GROQ_API_KEY; large files chunked automatically.
 
     Ported verbatim from 06-src/transcriber/whisper_transcriber.py.
     """
@@ -139,10 +131,10 @@ class WhisperTranscriber:
     def backend_label(self) -> str:
         """Human-readable ASR backend for logs."""
         if self._groq_api_key and _GROQ_AVAILABLE:
-            return "Groq Whisper 转录 (whisper-large-v3-turbo)"
+            return "Groq Whisper ASR (whisper-large-v3-turbo)"
         if self._groq_api_key and not _GROQ_AVAILABLE:
-            return "faster-whisper 本地（groq 包未安装）"
-        return f"faster-whisper 本地 ({self._local_model_path})"
+            return "Groq Whisper ASR（groq 包未安装）"
+        return "Groq Whisper ASR（未配置 GROQ_API_KEY）"
 
     # ------------------------------------------------------------------
     # Public API
@@ -168,63 +160,64 @@ class WhisperTranscriber:
         file_size = audio_path.stat().st_size
         mb = file_size / (1024 * 1024)
 
-        if self._groq_api_key and _GROQ_AVAILABLE:
-            duration_sec = self._get_audio_duration_sec(audio_path)
-            needs_chunk = file_size > _GROQ_MAX_BYTES or duration_sec > _GROQ_CHUNK_IF_LONGER_SEC
+        if not self._groq_api_key:
+            raise RuntimeError(
+                "未配置 GROQ_API_KEY，音频转录仅支持 Groq Whisper ASR。"
+                "请在 .env 中设置 GROQ_API_KEY。"
+            )
+        if not _GROQ_AVAILABLE:
+            raise RuntimeError(
+                "已配置 GROQ_API_KEY 但 groq 包未安装。"
+                "请确认 backend 镜像已安装 groq 依赖。"
+            )
 
-            if not needs_chunk:
-                dur_min = duration_sec / 60
-                if self._emit_log:
-                    self._emit_log(
-                        f"单文件直传 Groq Whisper {mb:.1f} MB / {dur_min:.1f} min（≤ 25 MB 且 ≤ 5 min）"
-                    )
-                last_exc: Optional[Exception] = None
-                for attempt in range(1, _GROQ_SEGMENT_MAX_ATTEMPTS + 1):
-                    try:
-                        return self._transcribe_groq(
-                            audio_path,
-                            json_save_path=json_save_path,
-                            attempt=attempt,
-                            max_attempts=_GROQ_SEGMENT_MAX_ATTEMPTS,
-                        )
-                    except (RuntimeError, ValueError) as exc:
-                        last_exc = exc
-                        if attempt < _GROQ_SEGMENT_MAX_ATTEMPTS:
-                            retry_msg = (
-                                f"单文件转录第 {attempt} 次失败，"
-                                f"{int(_GROQ_SEGMENT_RETRY_DELAY_SEC)}s 后重试：{exc}"
-                            )
-                            if self._emit_log:
-                                self._emit_log(retry_msg)
-                            else:
-                                logger.warning(
-                                    "单文件转录第 %d 次失败（%s），%ds 后重试",
-                                    attempt, exc, int(_GROQ_SEGMENT_RETRY_DELAY_SEC),
-                                )
-                            time.sleep(_GROQ_SEGMENT_RETRY_DELAY_SEC)
-                raise last_exc  # type: ignore[misc]
+        duration_sec = self._get_audio_duration_sec(audio_path)
+        needs_chunk = file_size > _GROQ_MAX_BYTES or duration_sec > _GROQ_CHUNK_IF_LONGER_SEC
 
+        if not needs_chunk:
             dur_min = duration_sec / 60
-            reason = f"{mb:.1f} MB > 25 MB" if file_size > _GROQ_MAX_BYTES else f"{dur_min:.1f} min > 5 min"
-            if not self._emit_log:
-                logger.info(
-                    "Groq Whisper 分段转录：%s（%s）",
-                    audio_path.name, reason,
+            if self._emit_log:
+                self._emit_log(
+                    f"单文件直传 Groq Whisper {mb:.1f} MB / {dur_min:.1f} min（≤ 25 MB 且 ≤ 5 min）"
                 )
-            try:
-                return self._transcribe_groq_chunked(
-                    audio_path,
-                    json_save_path=json_save_path,
-                    chunk_reason=reason,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "文件 %.1f MB，Groq 分段转录失败（%s），回退到本地 faster-whisper", mb, exc
-                )
-        elif self._groq_api_key and not _GROQ_AVAILABLE:
-            logger.warning("已配置 GROQ_API_KEY 但 groq 包未安装，回退到本地 faster-whisper")
+            last_exc: Optional[Exception] = None
+            for attempt in range(1, _GROQ_SEGMENT_MAX_ATTEMPTS + 1):
+                try:
+                    return self._transcribe_groq(
+                        audio_path,
+                        json_save_path=json_save_path,
+                        attempt=attempt,
+                        max_attempts=_GROQ_SEGMENT_MAX_ATTEMPTS,
+                    )
+                except (RuntimeError, ValueError) as exc:
+                    last_exc = exc
+                    if attempt < _GROQ_SEGMENT_MAX_ATTEMPTS:
+                        retry_msg = (
+                            f"单文件转录第 {attempt} 次失败，"
+                            f"{int(_GROQ_SEGMENT_RETRY_DELAY_SEC)}s 后重试：{exc}"
+                        )
+                        if self._emit_log:
+                            self._emit_log(retry_msg)
+                        else:
+                            logger.warning(
+                                "单文件转录第 %d 次失败（%s），%ds 后重试",
+                                attempt, exc, int(_GROQ_SEGMENT_RETRY_DELAY_SEC),
+                            )
+                        time.sleep(_GROQ_SEGMENT_RETRY_DELAY_SEC)
+            raise last_exc  # type: ignore[misc]
 
-        return self._transcribe_local(audio_path, json_save_path=json_save_path)
+        dur_min = duration_sec / 60
+        reason = f"{mb:.1f} MB > 25 MB" if file_size > _GROQ_MAX_BYTES else f"{dur_min:.1f} min > 5 min"
+        if not self._emit_log:
+            logger.info(
+                "Groq Whisper 分段转录：%s（%s）",
+                audio_path.name, reason,
+            )
+        return self._transcribe_groq_chunked(
+            audio_path,
+            json_save_path=json_save_path,
+            chunk_reason=reason,
+        )
 
     # ------------------------------------------------------------------
     # Groq backend  (ported verbatim from 06-src)
@@ -284,7 +277,7 @@ class WhisperTranscriber:
             collect_response.append(response)
 
         if json_save_path is not None and segment_idx is None:
-            _save_response_files(response, json_save_path)
+            save_asr_response_files(response, json_save_path)
 
         elapsed = time.monotonic() - started
         seg_count = len(getattr(response, "segments", None) or [])
@@ -321,7 +314,7 @@ class WhisperTranscriber:
                 _GROQ_MP3_CHUNK_DURATION_SEC,
             )
 
-        with tempfile.TemporaryDirectory(prefix="trove_chunks_") as tmp:
+        with tempfile.TemporaryDirectory(prefix="inFlow_chunks_") as tmp:
             split_started = time.monotonic()
             chunk_pairs = self._split_audio_chunks(
                 audio_path, _GROQ_MP3_CHUNK_DURATION_SEC, Path(tmp)
@@ -362,7 +355,7 @@ class WhisperTranscriber:
 
         if json_save_path is not None and raw_responses:
             merged = _merge_groq_responses(raw_responses, offsets=chunk_offsets)
-            _save_response_files(merged, json_save_path)
+            save_asr_response_files(merged, json_save_path)
 
         return TranscriptionResult(text=text, language=language)
 
@@ -565,7 +558,7 @@ class WhisperTranscriber:
                 "duration": segment_dicts[-1]["end"] if segment_dicts else None,
                 "segments": segment_dicts,
             }
-            _save_response_files(verbose_response, json_save_path)
+            save_asr_response_files(verbose_response, json_save_path)
 
         return TranscriptionResult(text=text, language=language)
 
@@ -689,33 +682,3 @@ def _merge_groq_responses(
     }
 
 
-def _save_response_files(response: Any, base_json_path: Path) -> None:
-    """Save Groq response in three formats beside *base_json_path*.
-
-    Mirrors 06-src behaviour:
-      {stem}.txt           — plain text
-      {stem}.json          — compact JSON
-      {stem}_verbose.json  — full verbose_json with segments
-    """
-    base_json_path.parent.mkdir(parents=True, exist_ok=True)
-
-    raw = _response_to_dict(response)
-    text = (raw.get("text") or "").strip()
-    language = raw.get("language") or ""
-
-    txt_path     = base_json_path.with_suffix(".txt")
-    json_path    = base_json_path
-    verbose_path = base_json_path.parent / (base_json_path.stem + "_verbose.json")
-
-    txt_path.write_text(text, encoding="utf-8")
-
-    simple = {
-        "text": text,
-        "language": language,
-        "task": raw.get("task", "transcribe"),
-        "duration": raw.get("duration"),
-    }
-    json_path.write_text(json.dumps(simple, ensure_ascii=False, indent=2), encoding="utf-8")
-    verbose_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    logger.debug("转录响应文件已保存至 %s", base_json_path.parent)

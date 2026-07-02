@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Search, X, LayoutGrid, Filter, Check, FolderOpen, ChevronRight,
@@ -116,6 +116,29 @@ const TAG_COLORS = [
   '#007aff', '#5856d6', '#ff9500', '#34c759', '#ff3b30',
   '#af52de', '#ff2d55', '#00c7be', '#007aff', '#ffcc00',
 ];
+
+function normalizedArticleUrl(raw?: string | null): string {
+  if (!raw) return '';
+  try {
+    const u = new URL(raw);
+    const host = u.host.toLowerCase();
+    const path = u.pathname.replace(/\/+$/, '') || '/';
+    return `${u.protocol}//${host}${path}`;
+  } catch {
+    return raw.trim();
+  }
+}
+
+function articleQualityScore(a: Article): number {
+  let score = 0;
+  if (a.cover_image) score += 4;
+  if (a.summary) score += 4;
+  if ((a.key_points?.length || 0) > 0) score += 2;
+  if (a.fetch_status === 'completed') score += 2;
+  if (a.fetch_status === 'failed') score -= 2;
+  if (a.fetch_status === 'ingesting' || a.fetch_status === 'pending_agent') score -= 1;
+  return score;
+}
 
 export default function LibraryPage() {
   const searchParams = useSearchParams();
@@ -395,6 +418,43 @@ export default function LibraryPage() {
   ];
 
   const selectedFolderName = folders.find(f => f.id === folderFilter)?.name;
+
+  // Deduplicate historical duplicates by canonical URL, keeping the richer card.
+  const dedupedArticles = useMemo(() => {
+    const bestByUrl = new Map<string, Article>();
+    for (const article of articles) {
+      const key = normalizedArticleUrl(article.url);
+      if (!key) {
+        // Keep non-URL content (notes/manual text/upload) unchanged.
+        bestByUrl.set(`__no_url__${article.id}`, article);
+        continue;
+      }
+      const existing = bestByUrl.get(key);
+      if (!existing) {
+        bestByUrl.set(key, article);
+        continue;
+      }
+      const scoreExisting = articleQualityScore(existing);
+      const scoreCurrent = articleQualityScore(article);
+      if (scoreCurrent > scoreExisting) {
+        bestByUrl.set(key, article);
+      } else if (scoreCurrent === scoreExisting) {
+        // Tie-breaker: keep the latest updated record.
+        const tExisting = new Date(existing.updated_at || existing.created_at || 0).getTime();
+        const tCurrent = new Date(article.updated_at || article.created_at || 0).getTime();
+        if (tCurrent > tExisting) bestByUrl.set(key, article);
+      }
+    }
+    return Array.from(bestByUrl.values());
+  }, [articles]);
+
+  // 处理中同一集会同时产生 job 卡 + article stub 卡；保留 article 卡（信息更完整），
+  // 仅当 job 尚未绑定 article（stub 还没生成的一瞬间）才用 ProcessingJobCard 兜底展示进度。
+  const articleIds = useMemo(() => new Set(dedupedArticles.map(a => a.id)), [dedupedArticles]);
+  const visibleJobs = useMemo(
+    () => activeJobs.filter(j => !j.article_id || !articleIds.has(j.article_id)),
+    [activeJobs, articleIds]
+  );
 
   return (
     <>
@@ -803,7 +863,7 @@ export default function LibraryPage() {
             <p className="text-[#ff3b30] mb-4">{error}</p>
             <button onClick={fetchArticles} className="px-6 py-2 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)]">重试</button>
           </div>
-        ) : articles.length === 0 && activeJobs.length === 0 ? (
+        ) : articles.length === 0 && visibleJobs.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-[var(--bg-secondary)] flex items-center justify-center">
               <LayoutGrid size={32} className="text-[var(--text-tertiary)]" />
@@ -814,12 +874,12 @@ export default function LibraryPage() {
         ) : (
           <>
             <div className="columns-1 sm:columns-2 lg:columns-3 gap-4">
-              {activeJobs.map(job => (
+              {visibleJobs.map(job => (
                 <div key={job.job_id} className="break-inside-avoid mb-4">
                   <ProcessingJobCard job={job} />
                 </div>
               ))}
-              {articles.map(article => (
+              {dedupedArticles.map(article => (
                 <div key={article.id} className="break-inside-avoid mb-4 relative group">
                   <div className="absolute top-3 left-3 z-10">
                     <button onClick={(e) => { e.preventDefault(); toggleSelect(article.id); }}

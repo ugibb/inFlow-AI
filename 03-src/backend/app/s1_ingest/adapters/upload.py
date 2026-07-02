@@ -23,7 +23,7 @@ from uuid import UUID
 from app.s1_ingest.adapters.base import AbstractAdapter, AdapterError
 from app.s1_ingest.schema import RawCapture, RawMeta, RawContent
 
-logger = logging.getLogger("trove.ingest.adapters.upload")
+logger = logging.getLogger("inFlow.ingest.adapters.upload")
 
 _SUPPORTED_EXTENSIONS = {
     ".pdf", ".docx", ".doc", ".pptx", ".ppt",

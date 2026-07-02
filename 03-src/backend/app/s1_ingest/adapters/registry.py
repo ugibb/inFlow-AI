@@ -23,7 +23,7 @@ from typing import Optional
 
 from app.s1_ingest.adapters.base import AbstractAdapter, AdapterError
 
-logger = logging.getLogger("trove.ingest.registry")
+logger = logging.getLogger("inFlow.ingest.registry")
 
 
 class AdapterRegistry:

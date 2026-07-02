@@ -1,8 +1,4 @@
-"""Audio/video transcription via SiliconFlow SenseVoice or local faster-whisper.
-
-Prefers SiliconFlow when SILICONFLOW_API_KEY is set.
-Falls back to local faster-whisper (tiny model) otherwise.
-"""
+"""Audio/video transcription via configurable ASR provider (听悟 / Groq)."""
 import logging
 import os
 import tempfile
@@ -84,11 +80,8 @@ class TranscriptionService:
         *,
         progress_cb: Optional[Callable[[str], None]] = None,
     ) -> Optional[str]:
-        """Transcribe a local audio file; prefers SiliconFlow when API key is set."""
-        path = Path(path)
-        if self.has_siliconflow:
-            return await self._transcribe_siliconflow(path, progress_cb=progress_cb)
-        return await self._transcribe_whisper(path)
+        """Transcribe a local audio file via configured ASR provider."""
+        return await self._transcribe_groq(path, progress_cb=progress_cb)
 
     async def transcribe_url(
         self,
@@ -150,11 +143,30 @@ class TranscriptionService:
             return False
 
     async def _transcribe_local(self, path: Path) -> Optional[str]:
-        # Prefer SiliconFlow if key is set
-        if self.api_key:
-            return await self._transcribe_siliconflow(path)
-        # Fallback to local faster-whisper
-        return await self._transcribe_whisper(path)
+        return await self._transcribe_groq(path)
+
+    async def _transcribe_groq(
+        self,
+        path: Path,
+        *,
+        progress_cb: Optional[Callable[[str], None]] = None,
+    ) -> Optional[str]:
+        """Run ASR in a thread pool (听悟 or Groq per ASR_PROVIDER)."""
+        import asyncio
+        from app.s2_parse.audio.transcriber_factory import build_transcriber
+
+        path = Path(path)
+        transcriber = build_transcriber()
+        loop = asyncio.get_running_loop()
+        try:
+            result = await loop.run_in_executor(
+                None,
+                lambda: transcriber.transcribe(path, emit_log=progress_cb),
+            )
+            return result.text
+        except Exception as e:
+            logger.warning(f"ASR transcribe failed: {e}")
+            return None
 
     async def _transcribe_siliconflow(
         self,

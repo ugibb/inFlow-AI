@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.shared.ai_service import llm_service
 
-logger = logging.getLogger("trove.tool-agent")
+logger = logging.getLogger("inFlow.tool-agent")
 
 MAX_STEPS = 8                  # hard cap on tool-loop iterations
 MAX_TOOL_RESULT_CHARS = 4000   # truncate large tool outputs before feeding back to LLM

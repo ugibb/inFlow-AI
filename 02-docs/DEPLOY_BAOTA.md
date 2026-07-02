@@ -145,7 +145,7 @@ SECRET_KEY=你生成的JWT密钥
 ACCESS_TOKEN_EXPIRE_DAYS=30
 
 # 可选：公网访问地址（微信 Bot 深链接用）
-TROVE_PUBLIC_BASE=https://你的域名.com
+inFlow_PUBLIC_BASE=https://你的域名.com
 ```
 
 可选：预填 LLM 配置
@@ -270,10 +270,10 @@ $COMPOSE build
 $COMPOSE up -d
 
 # 备份数据库
-$COMPOSE exec postgres pg_dump -U trove trove > backup_$(date +%Y%m%d).sql
+$COMPOSE exec postgres pg_dump -U inflow inflow > backup_$(date +%Y%m%d).sql
 
 # 恢复数据库
-$COMPOSE exec -T postgres psql -U trove trove < backup_20260701.sql
+$COMPOSE exec -T postgres psql -U inflow inflow < backup_20260701.sql
 
 # 停止服务
 $COMPOSE down
@@ -286,7 +286,7 @@ $COMPOSE down
 ```bash
 cd /www/wwwroot/inflow-ai
 docker compose -f docker-compose.yml -f docker-compose.baota.yml exec -T postgres \
-  pg_dump -U trove trove > /www/backup/inflow_$(date +\%Y\%m\%d).sql
+  pg_dump -U inflow inflow > /www/backup/inflow_$(date +\%Y\%m\%d).sql
 ```
 
 ---
@@ -346,7 +346,7 @@ ss -tlnp | grep 8080 || echo "8080 可用"
 
 ## 十一、微信 Bot（可选）
 
-1. 在 `.env` 设置 `SERVICE_TOKEN_WECHAT_BOT` 和 `TROVE_PUBLIC_BASE`
+1. 在 `.env` 设置 `SERVICE_TOKEN_WECHAT_BOT` 和 `inFlow_PUBLIC_BASE`
 2. 编辑 `docker-compose.yml`，取消 `wechat-bot` 服务注释
 3. `$COMPOSE up -d wechat-bot`
 

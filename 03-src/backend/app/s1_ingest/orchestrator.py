@@ -45,7 +45,7 @@ from app.core.pipeline.steps import (
 from app.core.pipeline.pipeline_log import PhaseLogger, log_task_start, sanitize_log_text
 from app.core.shared.storage import default_storage
 
-logger = logging.getLogger("trove.ingest.orchestrator")
+logger = logging.getLogger("inFlow.ingest.orchestrator")
 
 # Platforms inferred as audio before capture begins
 _AUDIO_PLATFORMS = frozenset({"xiaoyuzhou", "bilibili"})

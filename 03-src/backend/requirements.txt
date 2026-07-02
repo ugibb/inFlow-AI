@@ -27,9 +27,11 @@ douyin-tiktok-scraper>=1.2.0
 bilibili-api-python>=17.0.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-bcrypt==4.2.1
+bcrypt==4.0.1  # passlib 1.7.4 不兼容 bcrypt>=4.1（缺少 __about__）
 json-repair>=0.30.0
 qrcode[pil]>=7.4.0
 faster-whisper>=1.0.0
 yt-dlp>=2024.0.0
 groq
+aliyun-python-sdk-core>=2.14.0
+oss2>=2.18.0

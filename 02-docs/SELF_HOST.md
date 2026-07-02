@@ -14,8 +14,8 @@ That's it. No Python or Node required on the host — everything builds inside c
 ## 1. Clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/trove-ai.git
-cd trove-ai
+git clone https://github.com/YOUR_USERNAME/ inFlow-ai.git
+cd  inFlow-ai
 ```
 
 ## 2. Configure environment
@@ -79,10 +79,10 @@ The bundled nginx serves port 80. To expose on the public internet:
 - Front it with **Caddy / Traefik / Cloudflare Tunnel** for automatic TLS
 - Or use a managed PaaS that handles TLS termination
 
-If you change the public URL, set `TROVE_PUBLIC_BASE` in `.env`:
+If you change the public URL, set `inFlow_PUBLIC_BASE` in `.env`:
 
 ```env
-TROVE_PUBLIC_BASE=https://trove.yourdomain.com
+inFlow_PUBLIC_BASE=https://inFlow.yourdomain.com
 ```
 
 (Used by the WeChat bot — if you don't use it, ignore.)
@@ -103,10 +103,10 @@ docker compose build
 docker compose up -d
 
 # Backup the DB
-docker compose exec postgres pg_dump -U trove trove > backup.sql
+docker compose exec postgres pg_dump -U inflow inflow > backup.sql
 
 # Restore
-docker compose exec -T postgres psql -U trove trove < backup.sql
+docker compose exec -T postgres psql -U inflow inflow < backup.sql
 ```
 
 ## 8. Configuring LLM / embedding

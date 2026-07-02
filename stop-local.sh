@@ -24,7 +24,8 @@ kill_port() {
 
 stop_wechat_bot() {
   local pids
-  pids=$(pgrep -f 'python -m app\.extensions\.wechat\.bot' 2>/dev/null || true)
+  # macOS 进程名为 Python（大写），勿只用 'python -m'
+  pids=$(pgrep -f 'app\.extensions\.wechat\.bot' 2>/dev/null || true)
   if [ -z "$pids" ]; then
     return 0
   fi

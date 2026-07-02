@@ -171,7 +171,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-xs text-[var(--text-tertiary)] mt-6">
-          inFlow AI · AI 驱动的知识库
+          inFlow AI · AI 驱动的个人知识管理平台
         </p>
       </div>
     </div>

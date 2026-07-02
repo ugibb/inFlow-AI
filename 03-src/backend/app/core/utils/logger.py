@@ -19,7 +19,7 @@ from app.core.paths import get_project_root
 _LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 _DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-_ROOT_LOGGER_NAME = "trove"
+_ROOT_LOGGER_NAME = "inFlow"
 _NAME_PREFIX = f"{_ROOT_LOGGER_NAME}."
 
 _PROJECT_ROOT = get_project_root()
@@ -33,17 +33,37 @@ _LEVEL_MAP: dict[str, int] = {
 }
 
 _configured = False
+_warnings_configured = False
+
+
+def configure_python_warnings() -> None:
+    """屏蔽阿里云 vendored urllib3 的 SNIMissingWarning（听悟 HTTPS 调用，可安全忽略）。"""
+    global _warnings_configured
+    if _warnings_configured:
+        return
+    import warnings
+
+    warnings.filterwarnings(
+        "ignore",
+        message=r".*SNI \(Server Name Indication\).*",
+    )
+    warnings.filterwarnings(
+        "ignore",
+        message=r".*SNI.*",
+        category=UserWarning,
+    )
+    _warnings_configured = True
 
 
 def _use_stdout_logging() -> bool:
     flag = os.environ.get("LOG_TO_STDOUT", "").strip().lower()
     if flag in ("1", "true", "yes", "on"):
         return True
-    return os.environ.get("TROVE_ENV", "").strip().lower() == "production"
+    return os.environ.get("inFlow_ENV", "").strip().lower() == "production"
 
 
-class _TroveFormatter(logging.Formatter):
-    """输出时去掉 logger 名中的 trove. 前缀。"""
+class _inFlowFormatter(logging.Formatter):
+    """输出时去掉 logger 名中的 inFlow. 前缀。"""
 
     def format(self, record: logging.LogRecord) -> str:
         name = record.name
@@ -92,6 +112,8 @@ def setup_logging(
     """
     global _configured
 
+    configure_python_warnings()
+
     if log_dir is None:
         from app.core.config import get_settings
 
@@ -110,7 +132,7 @@ def setup_logging(
     if logger.handlers:
         logger.handlers.clear()
 
-    formatter = _TroveFormatter(_LOG_FORMAT, datefmt=_DATE_FORMAT)
+    formatter = _inFlowFormatter(_LOG_FORMAT, datefmt=_DATE_FORMAT)
 
     handlers: list[logging.Handler] = []
     try:
@@ -137,25 +159,25 @@ def setup_logging(
 
 
 def get_logger(module_name: str) -> logging.Logger:
-    """获取子模块 logger，命名格式：trove.<module_name>"""
+    """获取子模块 logger，命名格式：inFlow.<module_name>"""
     return logging.getLogger(f"{_ROOT_LOGGER_NAME}.{module_name}")
 
 
 def configure_quiet_module_loggers() -> None:
     """压低已由 PhaseLogger 覆盖的子模块 DEBUG/INFO，避免 pipeline 日志被刷屏。"""
     for name in (
-        "trove.ingest.adapters",
-        "trove.storage.local",
-        "trove.services.audio_downloader",
-        "trove.pipeline.state_machine",
-        "trove.parse.templates.registry",
-        "trove.parse.parser",
-        "trove.display.renderer",
-        "trove.parse.wiki_indexer",
-        "trove.parse.transcriber",
-        "trove.s4.card_renderer",
-        "trove.pipeline.steps",
-        "trove.core.shared.ai_service",
+        "inFlow.ingest.adapters",
+        "inFlow.storage.local",
+        "inFlow.services.audio_downloader",
+        "inFlow.pipeline.state_machine",
+        "inFlow.parse.templates.registry",
+        "inFlow.parse.parser",
+        "inFlow.display.renderer",
+        "inFlow.parse.wiki_indexer",
+        "inFlow.parse.transcriber",
+        "inFlow.s4.card_renderer",
+        "inFlow.pipeline.steps",
+        "inFlow.core.shared.ai_service",
     ):
         logging.getLogger(name).setLevel(logging.WARNING)
 
@@ -186,17 +208,17 @@ def configure_third_party_loggers(
         access_logger.setLevel(logging.WARNING)
         access_logger.disabled = True
 
-    _attach_trove_handlers_to(("uvicorn", "uvicorn.error"))
+    _attach_inFlow_handlers_to(("uvicorn", "uvicorn.error"))
 
 
-def _attach_trove_handlers_to(logger_names: Iterable[str]) -> None:
-    """让第三方 logger 复用 trove 的 handler，统一时间戳格式。"""
-    trove = logging.getLogger(_ROOT_LOGGER_NAME)
-    if not trove.handlers:
+def _attach_inFlow_handlers_to(logger_names: Iterable[str]) -> None:
+    """让第三方 logger 复用 inFlow 的 handler，统一时间戳格式。"""
+    inFlow = logging.getLogger(_ROOT_LOGGER_NAME)
+    if not inFlow.handlers:
         return
     for name in logger_names:
         ext = logging.getLogger(name)
         ext.handlers.clear()
-        for handler in trove.handlers:
+        for handler in inFlow.handlers:
             ext.addHandler(handler)
         ext.propagate = False

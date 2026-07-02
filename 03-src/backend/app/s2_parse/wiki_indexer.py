@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.article import Article, KnowledgeEdge
 
-logger = logging.getLogger("trove.parse.wiki_indexer")
+logger = logging.getLogger("inFlow.parse.wiki_indexer")
 
 # Cosine distance threshold below which we create a knowledge edge.
 # pgvector <=> operator: 0 = identical, 2 = maximally dissimilar.

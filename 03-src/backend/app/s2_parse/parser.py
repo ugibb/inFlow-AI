@@ -33,7 +33,7 @@ from app.s2_parse.templates.registry import template_registry
 from app.core.shared.storage import default_storage
 from app.core.shared.storage.conventions import ingest_media_path, parse_transcript_base, parse_chapters_path
 
-logger = logging.getLogger("trove.parse.parser")
+logger = logging.getLogger("inFlow.parse.parser")
 
 
 async def parse_job(
@@ -271,16 +271,10 @@ def _inject_transcript_from_file(raw: RawCapture, asr_verbose_path: str) -> RawC
 
 
 def _build_transcriber():
-    """Instantiate WhisperTranscriber from Settings (loaded from .env)."""
-    from app.core.config import get_settings
-    from app.s2_parse.audio.transcriber import WhisperTranscriber
+    """Instantiate ASR transcriber from Settings (Groq / 听悟)."""
+    from app.s2_parse.audio.transcriber_factory import build_transcriber
 
-    s = get_settings()
-    return WhisperTranscriber(
-        model_name=s.whisper_model,
-        checkpoint_path=s.whisper_model_path or None,
-        groq_api_key=s.groq_api_key or None,
-    )
+    return build_transcriber()
 
 
 def _ext_from_url(url: str) -> str:

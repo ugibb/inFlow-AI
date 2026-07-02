@@ -16,7 +16,7 @@ from uuid import UUID
 from app.s1_ingest.adapters.base import AbstractAdapter, AdapterError
 from app.s1_ingest.schema import RawCapture, RawMeta, RawContent
 
-logger = logging.getLogger("trove.ingest.adapters.generic")
+logger = logging.getLogger("inFlow.ingest.adapters.generic")
 
 
 class GenericAdapter(AbstractAdapter):

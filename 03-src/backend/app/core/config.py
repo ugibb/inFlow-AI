@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     debug: bool = True
 
     # Database — override via DATABASE_URL env in docker-compose (set from .env)
-    database_url: str = "postgresql+asyncpg://trove:trove@localhost:5432/trove"
-    database_url_sync: str = "postgresql://trove:trove@localhost:5432/trove"
+    database_url: str = "postgresql+asyncpg://inflow:inFlow@localhost:5432/inflow"
+    database_url_sync: str = "postgresql://inflow:inFlow@localhost:5432/inflow"
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
@@ -53,10 +53,21 @@ class Settings(BaseSettings):
     card_screenshot_scale: int = 2
 
     # ── Transcription ────────────────────────────────────────
+    # ASR_PROVIDER: tingwu（默认，国内）| groq（海外/本地开发）
+    asr_provider: str = "tingwu"
     groq_api_key: str = ""
     whisper_model: str = "large-v3"
     whisper_model_path: str = ""
     transcribe_timeout_sec: int = 300
+    # 通义听悟（ASR_PROVIDER=tingwu 时必填）
+    tingwu_app_key: str = ""
+    alibaba_cloud_access_key_id: str = ""
+    alibaba_cloud_access_key_secret: str = ""
+    tingwu_oss_bucket: str = ""
+    tingwu_oss_endpoint: str = "oss-cn-beijing.aliyuncs.com"
+    tingwu_source_language: str = "cn"
+    tingwu_poll_interval_sec: int = 30
+    tingwu_max_wait_sec: int = 10800
 
     # ── Embedding（语义搜索向量化，非敏感）──────────────────
     embedding_provider: str = "siliconflow"

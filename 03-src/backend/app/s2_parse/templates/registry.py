@@ -19,7 +19,7 @@ from typing import Optional
 
 from app.s2_parse.templates.base import AbstractTemplate
 
-logger = logging.getLogger("trove.parse.templates.registry")
+logger = logging.getLogger("inFlow.parse.templates.registry")
 
 
 class TemplateRegistry:

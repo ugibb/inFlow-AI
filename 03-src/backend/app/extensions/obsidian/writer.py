@@ -7,7 +7,7 @@ Model: ONE-SHOT SNAPSHOT.
     the .md in Obsidian without fear of being overwritten.
 
 "Already synced" detection is dual-OR:
-  - id in sync_state.json   OR   a .md file in the vault has `trove_id: <id>`
+  - id in sync_state.json   OR   a .md file in the vault has `inFlow_id: <id>`
 Either signal alone is enough; together they survive both Obsidian-side
 deletions AND accidental sync_state.json loss.
 
@@ -27,7 +27,7 @@ from typing import Dict, Iterable, Optional, Set
 
 import httpx
 
-logger = logging.getLogger("trove.obsidian")
+logger = logging.getLogger("inFlow.obsidian")
 
 # Subfolder names by source_platform (uniform with frontend platform labels)
 PLATFORM_FOLDER: Dict[str, str] = {
@@ -52,7 +52,7 @@ PLATFORM_FOLDER: Dict[str, str] = {
     "upload": "上传",
 }
 DEFAULT_FOLDER = "其他"
-SUBROOT = "Trove"  # under the user-provided vault root
+SUBROOT = "inFlow"  # under the user-provided vault root
 
 
 def _slugify_for_filename(s: str, maxlen: int = 120) -> str:
@@ -128,11 +128,11 @@ class SyncState:
 #  Frontmatter scan — rebuild "synced" set from existing vault files
 # ============================================================
 
-_FRONTMATTER_ID_RE = re.compile(r"^trove_id:\s*([0-9a-fA-F-]{20,})\s*$", re.MULTILINE)
+_FRONTMATTER_ID_RE = re.compile(r"^inFlow_id:\s*([0-9a-fA-F-]{20,})\s*$", re.MULTILINE)
 
 
 def scan_existing_ids(root: Path) -> Set[str]:
-    """Walk vault root, return set of trove_id values found in .md frontmatter.
+    """Walk vault root, return set of inFlow_id values found in .md frontmatter.
     Used as a fallback when sync_state.json is missing or corrupted."""
     found: Set[str] = set()
     if not root.is_dir():
@@ -167,7 +167,7 @@ def _compute_filename(article: dict) -> str:
     if title:
         return f"{title}.md"
     id8 = str(article["id"]).replace("-", "")[:8]
-    return f"trove-{id8}.md"
+    return f"inFlow-{id8}.md"
 
 
 def _related_wikilinks(related_ids: list[str], id_to_filename: Dict[str, str]) -> list[str]:
@@ -183,7 +183,7 @@ def _related_wikilinks(related_ids: list[str], id_to_filename: Dict[str, str]) -
             link = fname[:-3] if fname.endswith(".md") else fname
         else:
             # Unresolved link — use raw id (will resolve when synced later)
-            link = f"trove-{rid[:8]}"
+            link = f"inFlow-{rid[:8]}"
         lines.append(f"- [[{link}]]")
     return lines
 
@@ -207,7 +207,7 @@ def render_article_md(article: dict, id_to_filename: Dict[str, str]) -> str:
     # --- Frontmatter ---
     fm_lines = [
         "---",
-        f'trove_id: {article["id"]}',
+        f'inFlow_id: {article["id"]}',
         f'title: "{_yaml_escape(title)}"',
     ]
     if source_url:

@@ -20,7 +20,8 @@ Directory structure under DATA_ROOT:
     │               ├── {job_id}.json          ← ParsedContent
     │               ├── {job_id}_asr.txt       ← ASR transcript plain text (if any)
     │               ├── {job_id}_asr.json      ← ASR compact JSON
-    │               └── {job_id}_asr_verbose.json
+    │               ├── {job_id}_asr_verbose.json
+    │               └── {job_id}_tingwu.json   ← 听悟原始转写 JSON（ASR_PROVIDER=tingwu）
     │
     └── 03_display/
         └── {platform}/
@@ -155,6 +156,12 @@ def parse_asr_verbose_path(raw_file_path: str, job_id: UUID) -> str:
     stem = os.path.splitext(os.path.basename(base))[0]
     folder = os.path.dirname(base)
     return os.path.join(folder, f"{stem}_verbose.json")
+
+
+def parse_tingwu_json_path(raw_file_path: str, job_id: UUID) -> str:
+    """Raw Tingwu API transcription JSON (offline task result)."""
+    folder = _swap_step(os.path.dirname(raw_file_path), "01_ingest", "02_parse")
+    return os.path.join(folder, f"{job_id}_tingwu.json")
 
 
 def parse_chunks_path(raw_file_path: str, job_id: UUID) -> str:

@@ -18,7 +18,7 @@ from uuid import UUID
 from app.s1_ingest.adapters.base import AbstractAdapter, AdapterError
 from app.s1_ingest.schema import RawCapture, RawMeta, RawContent
 
-logger = logging.getLogger("trove.ingest.adapters.wechat")
+logger = logging.getLogger("inFlow.ingest.adapters.wechat")
 
 _WECHAT_URL_RE = re.compile(
     r"https?://(?:mp\.weixin\.qq\.com|weixin\.qq\.com)/",

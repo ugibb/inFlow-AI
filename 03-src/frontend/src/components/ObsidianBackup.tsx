@@ -23,7 +23,7 @@ export default function ObsidianBackup() {
   const [revokeMsg, setRevokeMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const authHeader = (): Record<string, string> => {
-    const t = typeof window !== 'undefined' ? localStorage.getItem('trove_token') : null;
+    const t = typeof window !== 'undefined' ? localStorage.getItem('inFlow_token') : null;
     return t ? { Authorization: `Bearer ${t}` } : {};
   };
 
@@ -115,7 +115,7 @@ export default function ObsidianBackup() {
   const handleDownloadPlugin = () => {
     const a = document.createElement('a');
     a.href = '/api/sync/plugin-download';
-    a.download = 'trove-sync-obsidian-plugin.zip';
+    a.download = 'inFlow-sync-obsidian-plugin.zip';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -156,11 +156,11 @@ export default function ObsidianBackup() {
             <Download size={14} />
             下载插件
           </button>
-          <span className="ml-2 text-xs text-[var(--text-tertiary)]">trove-sync-obsidian-plugin.zip</span>
+          <span className="ml-2 text-xs text-[var(--text-tertiary)]">inFlow-sync-obsidian-plugin.zip</span>
         </li>
         <li className="leading-7">
           把 zip 解压到你的 Obsidian vault 目录下的&nbsp;
-          <code className="px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-xs">.obsidian/plugins/trove-sync/</code>
+          <code className="px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-xs">.obsidian/plugins/inFlow-sync/</code>
         </li>
         <li className="leading-7">
           打开 Obsidian → 设置 → 第三方插件 → 启用 <strong>inFlow AI Sync</strong>

@@ -31,7 +31,7 @@ from app.s1_ingest.adapters.base import AbstractAdapter, AdapterError
 from app.s1_ingest.schema import RawCapture, RawMeta, RawContent
 from app.core.shared.utils.retry import async_retry
 
-logger = logging.getLogger("trove.ingest.adapters.xiaoyuzhou")
+logger = logging.getLogger("inFlow.ingest.adapters.xiaoyuzhou")
 
 # 域名匹配（xiaoyuzhoufm.com 和旧域名 xiaoyuzhou.fm 均支持）
 _XYZ_URL_RE = re.compile(

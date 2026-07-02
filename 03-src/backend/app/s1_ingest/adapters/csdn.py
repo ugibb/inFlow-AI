@@ -14,7 +14,7 @@ from uuid import UUID
 from app.s1_ingest.adapters.base import AbstractAdapter, AdapterError
 from app.s1_ingest.schema import RawCapture, RawMeta, RawContent
 
-logger = logging.getLogger("trove.ingest.adapters.csdn")
+logger = logging.getLogger("inFlow.ingest.adapters.csdn")
 
 _CSDN_URL_RE = re.compile(
     r"https?://(?:[a-z0-9-]+\.)?csdn\.net/",

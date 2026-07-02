@@ -28,7 +28,7 @@ All notable changes to inFlow AI are documented here. This project adheres to [S
 
 ## [1.0.0] — 2026-05-23
 
-Initial open-source release of inFlow AI (拾遗 AI) — a self-hostable, AI-powered second brain for turning saved links into structured, searchable knowledge.
+Initial open-source release of inFlow AI (入流 AI) — a self-hostable, AI-powered second brain for turning saved links into structured, searchable knowledge.
 
 ### Added
 - Multi-platform article capture with platform-specific parsers (WeChat 公众号, Bilibili, Toutiao, Douyin, Xiaohongshu) plus a generic-web fallback.

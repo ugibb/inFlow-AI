@@ -6,6 +6,10 @@
 #   ./start-docker.sh --detach     仅后台启动
 #   ./start-docker.sh --logs       只跟踪日志（服务已在跑）
 #   ./start-docker.sh --restart    改 .env 后重建 backend + wechat-bot
+#   ./start-docker.sh --verify     启动/重启后自动验证 Key（常与 --restart 合用）
+#   ./sync-env-docker.sh           改 .env 后：同步 Docker + 验证 Key（推荐）
+#   ./verify-docker-keys.sh        仅验证 Key，不重启
+#   ./logs-docker.sh               实时查看 Docker 运行日志
 #   ./stop-docker.sh               停止全部容器
 #
 # 首次运行会自动：复制 .env.example、生成密码/密钥、配置微信 bot token。
@@ -22,12 +26,14 @@ CONFIG_EXAMPLE="03-src/backend/app/config_store.example.json"
 FOLLOW_LOGS=true
 LOGS_ONLY=false
 FORCE_RECREATE=false
+VERIFY_KEYS=false
 
 for arg in "$@"; do
   case "$arg" in
     --detach|-d) FOLLOW_LOGS=false ;;
     --logs) LOGS_ONLY=true; FOLLOW_LOGS=true ;;
     --restart) FORCE_RECREATE=true ;;
+    --verify) VERIFY_KEYS=true ;;
     -h|--help)
       sed -n '2,12p' "$0" | sed 's/^# \?//'
       exit 0
@@ -96,17 +102,13 @@ bootstrap_env() {
   [ -n "$act_as" ] || act_as="weaiw"
   env_set SERVICE_TOKENS "${token}:${act_as}"
 
-  if ! grep -q '^TROVE_PUBLIC_BASE=.' .env 2>/dev/null; then
-    warn "可选：在 .env 设置 TROVE_PUBLIC_BASE=https://你的域名"
+  if ! grep -q '^inFlow_PUBLIC_BASE=.' .env 2>/dev/null; then
+    warn "可选：在 .env 设置 inFlow_PUBLIC_BASE=https://你的域名"
   fi
 }
 
 follow_logs() {
-  echo ""
-  info "▶ 跟踪运行日志（backend + wechat-bot，Ctrl+C 退出，容器继续运行）"
-  echo "    等价于本地: tail -F 04-log/backend/日期.log"
-  echo ""
-  "${COMPOSE[@]}" logs -f --tail 80 backend wechat-bot
+  exec "$SCRIPT_DIR/logs-docker.sh" "$@"
 }
 
 if [ "$LOGS_ONLY" = true ]; then
@@ -150,10 +152,15 @@ echo "  本机: http://127.0.0.1:8080"
 echo "  公网: 宝塔反向代理 → 127.0.0.1:8080"
 echo "  默认账号: weaiw / Aa41312432（登录后请改密）"
 echo ""
-echo "  改 .env 后: ./start-docker.sh --restart"
+echo "  改 .env 后: ./sync-env-docker.sh"
+echo "  或:         ./start-docker.sh --restart --verify"
 echo "  只看日志:   ./start-docker.sh --logs"
 echo "  停止:       ./stop-docker.sh"
 echo ""
+
+if [ "$VERIFY_KEYS" = true ]; then
+  "$SCRIPT_DIR/verify-docker-keys.sh"
+fi
 
 if [ "$FOLLOW_LOGS" = true ]; then
   follow_logs

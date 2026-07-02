@@ -116,7 +116,7 @@ export default function AIAssistant() {
       endpoint: string,
       msgIdx: number,
     ): Promise<void> => {
-      const token = typeof window !== "undefined" ? localStorage.getItem("trove_token") : null;
+      const token = typeof window !== "undefined" ? localStorage.getItem("inFlow_token") : null;
       const res = await fetch(endpoint, {
         method: "POST",
         headers: {
@@ -187,7 +187,7 @@ export default function AIAssistant() {
 
   // ── Single-shot RAG (/api/assistant/ask) ──
   const runFastRAG = useCallback(async (q: string, msgIdx: number, articleId?: string | null) => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("trove_token") : null;
+    const token = typeof window !== "undefined" ? localStorage.getItem("inFlow_token") : null;
     const res = await fetch("/api/assistant/ask", {
       method: "POST",
       headers: {
@@ -215,7 +215,7 @@ export default function AIAssistant() {
 
   // ── Spark: one-shot full article generation (/api/articles/spark) ──
   const runSpark = useCallback(async (topic: string, msgIdx: number) => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("trove_token") : null;
+    const token = typeof window !== "undefined" ? localStorage.getItem("inFlow_token") : null;
     const res = await fetch("/api/articles/spark", {
       method: "POST",
       headers: {

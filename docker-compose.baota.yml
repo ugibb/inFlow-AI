@@ -11,23 +11,25 @@ services:
       - "127.0.0.1:8080:80"
 
   wechat-bot:
-    image: trove-backend:latest
-    container_name: trove-wechat-bot
+    image: inflow-backend:latest
+    container_name: inflow-wechat-bot
     command: python -m app.extensions.wechat.bot
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://trove:${POSTGRES_PASSWORD}@postgres:5432/trove
-      DATABASE_URL_SYNC: postgresql://trove:${POSTGRES_PASSWORD}@postgres:5432/trove
-      TROVE_BASE: http://backend:8000
-      TROVE_TOKEN: ${SERVICE_TOKEN_WECHAT_BOT:?set SERVICE_TOKEN_WECHAT_BOT in .env}
-      TROVE_PUBLIC_BASE: ${TROVE_PUBLIC_BASE:-http://127.0.0.1:8080}
+      DATABASE_URL: postgresql+asyncpg://inflow:${POSTGRES_PASSWORD}@postgres:5432/inflow
+      DATABASE_URL_SYNC: postgresql://inflow:${POSTGRES_PASSWORD}@postgres:5432/inflow
+      inFlow_BASE: http://backend:8000
+      inFlow_TOKEN: ${SERVICE_TOKEN_WECHAT_BOT:?set SERVICE_TOKEN_WECHAT_BOT in .env}
+      inFlow_PUBLIC_BASE: ${inFlow_PUBLIC_BASE:-http://127.0.0.1:8080}
       LOG_DIR: log
       LOG_TO_STDOUT: "1"
-      TROVE_ENV: production
+      inFlow_ENV: production
     depends_on:
       - backend
       - postgres
     volumes:
       - ./03-src/backend/app/config_store.json:/app/app/config_store.json
+      # Must match backend — shared pipeline data on host
+      - ${INFLOW_PIPELINE_DATA_DIR:-./03-src/backend/data}:/app/data
     restart: unless-stopped

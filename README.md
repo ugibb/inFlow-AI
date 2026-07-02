@@ -1,6 +1,6 @@
 <div align="center">
 
-# inFlow AI — 拾遗
+# inFlow AI — 入流
 
 **Read-later + AI knowledge base, built for the Chinese internet.**
 
@@ -11,9 +11,9 @@
 [![Responsive: PC · Pad · Mobile](https://img.shields.io/badge/Responsive-PC%20·%20Pad%20·%20Mobile-007aff)]()
 [![Status: active](https://img.shields.io/badge/status-active-success.svg)]()
 
-> 🔥 **这是 Simonlin 优化版** ([simonlin000/trove-ai](https://github.com/simonlin000/trove-ai)) — 在原版 [weaiw/trove-ai](https://github.com/weaiw/trove-ai) 基础上增加了 B 站/YouTube 视频 ASR 语音转录、DeepSeek V4-Pro 驱动、UI 配置化等关键能力。详见下方 [Simon Fork 变更](#simon-fork-变更-v11)。
+> 🔥 **这是 Simonlin 优化版** ([simonlin000/ inFlow-ai](https://github.com/simonlin000/ inFlow-ai)) — 在原版 [weaiw/ inFlow-ai](https://github.com/weaiw/ inFlow-ai) 基础上增加了 B 站/YouTube 视频 ASR 语音转录、DeepSeek V4-Pro 驱动、UI 配置化等关键能力。详见下方 [Simon Fork 变更](#simon-fork-变更-v11)。
 
-[中文 README](README.zh.md) · [Self-host guide](docs/SELF_HOST.md) · [Obsidian plugin](https://github.com/weaiw/trove-sync-obsidian)
+[中文 README](README.zh.md) · [Self-host guide](docs/SELF_HOST.md) · [Obsidian plugin](https://github.com/weaiw/inFlow-sync-obsidian)
 
 </div>
 
@@ -84,7 +84,7 @@ Forward an article URL to your bot → it's in your library 5 seconds later, wit
 <td width="50%" valign="top">
 
 #### 📝 One-way Obsidian sync
-Companion plugin writes a Markdown snapshot to your vault. Never overwrites your local edits. Your data survives any future Trove shutdown.
+Companion plugin writes a Markdown snapshot to your vault. Never overwrites your local edits. Your data survives any future inFlow shutdown.
 
 </td>
 <td width="50%" valign="top">
@@ -112,7 +112,7 @@ Web links · clipboard paste · PDF · Word · Excel · PPT · EPUB · CSV · pl
 <td width="50%" valign="top">
 
 #### 📱 Full-device responsive
-**PC · iPad · mobile** all work natively. Touch-optimized reader, gesture-friendly knowledge graph, mobile-first layouts. Use Trove from any device, anywhere.
+**PC · iPad · mobile** all work natively. Touch-optimized reader, gesture-friendly knowledge graph, mobile-first layouts. Use inFlow from any device, anywhere.
 
 </td>
 <td width="50%" valign="top">
@@ -183,11 +183,11 @@ That's it. No Python or Node required on the host.
 
 ```bash
 # 1. Clone (Simon 优化版，含视频 ASR + YouTube + DeepSeek)
-git clone https://github.com/simonlin000/trove-ai.git
-cd trove-ai
+git clone https://github.com/simonlin000/ inFlow-ai.git
+cd  inFlow-ai
 
 # 或原版
-# git clone https://github.com/weaiw/trove-ai.git
+# git clone https://github.com/weaiw/ inFlow-ai.git
 
 # 2. Configure secrets
 cp .env.example .env
@@ -304,7 +304,7 @@ See `.env.example` for the complete template with comments.
 
 ### Login session
 
-- Login uses a **stateless JWT** stored in the browser (`localStorage` key `trove_token`).
+- Login uses a **stateless JWT** stored in the browser (`localStorage` key `inFlow_token`).
 - **Restarting backend/frontend does not invalidate the token** — as long as `SECRET_KEY` in `.env` stays the same and the token has not expired.
 - On page load the frontend validates the token via `/api/auth/me`. If the backend is still starting up, it **retries up to 5 times** and keeps the token instead of logging you out.
 - After changing `ACCESS_TOKEN_EXPIRE_DAYS`, **restart the backend** and **log in again** — only newly issued tokens pick up the new lifetime.
@@ -340,15 +340,15 @@ Full OpenAPI spec at `http://localhost/api/docs` once running.
 
 ## Obsidian Sync — companion plugin
 
-Plugin repo: **[weaiw/trove-sync-obsidian](https://github.com/weaiw/trove-sync-obsidian)** (MIT)
+Plugin repo: **[weaiw/inFlow-sync-obsidian](https://github.com/weaiw/inFlow-sync-obsidian)** (MIT)
 
 **One-shot snapshot to your local vault.** Never overwrites your edits. Your data survives any future shutdown.
 
 Setup:
 
 1. Web app → **Personal Settings → Obsidian Backup → Generate Sync Token**
-2. Download plugin from [Releases](https://github.com/weaiw/trove-sync-obsidian/releases/latest)
-3. Drop into `<your-vault>/.obsidian/plugins/trove-sync/`
+2. Download plugin from [Releases](https://github.com/weaiw/inFlow-sync-obsidian/releases/latest)
+3. Drop into `<your-vault>/.obsidian/plugins/inFlow-sync/`
 4. In Obsidian → Community plugins → enable **inFlow AI Sync**
 5. Paste token + server URL → click **Sync Now**
 
@@ -367,7 +367,7 @@ The plugin auto-detects already-synced articles via dual-OR (sync_state.json ∪
 
 ## Simon Fork 变更 (v1.1)
 
-本仓库 ([simonlin000/trove-ai](https://github.com/simonlin000/trove-ai)) 在原版 [weaiw/trove-ai](https://github.com/weaiw/trove-ai) 基础上增加了以下能力：
+本仓库 ([simonlin000/ inFlow-ai](https://github.com/simonlin000/ inFlow-ai)) 在原版 [weaiw/ inFlow-ai](https://github.com/weaiw/ inFlow-ai) 基础上增加了以下能力：
 
 ### 🎬 视频 ASR 语音转录
 
@@ -400,7 +400,7 @@ The plugin auto-detects already-synced articles via dual-OR (sync_state.json ∪
 
 ### 🔄 Obsidian 双向同步
 
-除原版 Trove → Obsidian 拉取外，新增 `POST /api/sync/articles` 端点：Obsidian vault 里的 Markdown 文件可推送回 Trove。按 obsidian_path 去重，支持更新。
+除原版 inFlow → Obsidian 拉取外，新增 `POST /api/sync/articles` 端点：Obsidian vault 里的 Markdown 文件可推送回 inFlow。按 obsidian_path 去重，支持更新。
 
 ### 🐛 关键修复
 
@@ -412,8 +412,8 @@ The plugin auto-detects already-synced articles via dual-OR (sync_state.json ∪
 ### 从本仓库部署
 
 ```bash
-git clone https://github.com/simonlin000/trove-ai.git
-cd trove-ai
+git clone https://github.com/simonlin000/ inFlow-ai.git
+cd  inFlow-ai
 cp .env.example .env
 # 编辑 .env，至少填 DEEPSEEK_API_KEY 和 SECRET_KEY
 docker compose up -d
@@ -564,7 +564,7 @@ Especially welcome:
 ## License
 
 Core: **[AGPL-3.0](LICENSE)**.
-Obsidian plugin: [MIT](https://github.com/weaiw/trove-sync-obsidian/blob/main/LICENSE).
+Obsidian plugin: [MIT](https://github.com/weaiw/inFlow-sync-obsidian/blob/main/LICENSE).
 
 For commercial closed-source SaaS deployment, contact the maintainer for a separate commercial license.
 

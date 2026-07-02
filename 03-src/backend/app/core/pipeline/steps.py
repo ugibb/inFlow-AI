@@ -23,7 +23,7 @@ from app.core.shared.storage.conventions import (
     parse_asr_txt_path,
 )
 
-logger = logging.getLogger("trove.pipeline.steps")
+logger = logging.getLogger("inFlow.pipeline.steps")
 
 
 async def _notify_wechat_callback(

@@ -37,7 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models.ingest_job import IngestJob
 
-logger = logging.getLogger("trove.pipeline.state_machine")
+logger = logging.getLogger("inFlow.pipeline.state_machine")
 
 MAX_RETRIES = 3
 

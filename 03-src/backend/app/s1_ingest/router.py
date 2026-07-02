@@ -30,7 +30,7 @@ from app.core.pipeline.pipeline_steps import compute_pipeline_steps
 from app.s1_ingest.orchestrator import ingest_url, ingest_upload, ingest_text, resume_job
 
 router = APIRouter(prefix="/api/ingest", tags=["ingest"])
-logger = logging.getLogger("trove.ingest.router")
+logger = logging.getLogger("inFlow.ingest.router")
 
 
 def _canonical_url(url: str) -> str:

@@ -11,7 +11,7 @@ const API_BASE = '';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('trove_token');
+  return localStorage.getItem('inFlow_token');
 }
 
 class ApiClient {
