@@ -20,9 +20,11 @@ for arg in "$@"; do
     -h|--help)
       echo "用法: ./start-local.sh [--detach]"
       echo ""
-      echo "  默认    启动后自动跟踪业务日志（04-log/backend/YYYY-MM-DD.log）"
+      echo "  默认    启动后自动跟踪后端日志（04-log/backend/YYYY-MM-DD.log）"
       echo "  --detach / -d  仅后台启动，不跟踪日志"
       echo "  --logs         同默认（兼容旧参数）"
+      echo ""
+      echo "  微信 bot 日志单独写入 04-log/wechat-bot/YYYY-MM-DD.log"
       echo ""
       echo "  Ctrl+C 退出日志跟踪时，后台服务继续运行；停止服务请用 ./stop-local.sh"
       exit 0
@@ -42,6 +44,7 @@ BACKEND_PORT=8000
 FRONTEND_PORT=3000
 LOG_DIR="${SCRIPT_DIR}/04-log"
 BACKEND_LOG_DIR="${LOG_DIR}/backend"
+FRONTEND_LOG_DIR="${LOG_DIR}/frontend"
 WECHAT_BOT_LOG_DIR="${LOG_DIR}/wechat-bot"
 
 # 本地数据库默认连接（与 backend/app/config.py 一致）
@@ -117,6 +120,10 @@ kill_port() {
 
 backend_daily_log() {
   echo "${BACKEND_LOG_DIR}/$(date +%Y-%m-%d).log"
+}
+
+frontend_daily_log() {
+  echo "${FRONTEND_LOG_DIR}/$(date +%Y-%m-%d).log"
 }
 
 wechat_bot_daily_log() {
@@ -480,21 +487,26 @@ start_services() {
   disown
 
   info "启动前端 (端口 ${FRONTEND_PORT})..."
+  local fe_daily
+  fe_daily=$(frontend_daily_log)
+  mkdir -p "$FRONTEND_LOG_DIR"
+  touch "$fe_daily"
+  printf '\n=== %s frontend start ===\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$fe_daily"
   nohup bash -c "
     cd '${FRONTEND_DIR}' && \
     exec npm run dev -- -p '${FRONTEND_PORT}'
-  " > /dev/null 2>&1 &
+  " >> "$fe_daily" 2>&1 &
   disown
 }
 
 start_wechat_bot() {
   local daily_log
-  daily_log=$(backend_daily_log)
-  mkdir -p "$BACKEND_LOG_DIR"
+  daily_log=$(wechat_bot_daily_log)
+  mkdir -p "$WECHAT_BOT_LOG_DIR"
   touch "$daily_log"
   printf '\n=== %s wechat-bot start ===\n' "$(date '+%Y-%m-%d %H:%M:%S')" >> "$daily_log"
 
-  info "启动微信 bot 消息服务..."
+  info "启动微信 bot 消息服务（日志: ${daily_log}）..."
   nohup bash -c "
     cd '${BACKEND_DIR}' && \
     source .venv/bin/activate && \
@@ -510,8 +522,9 @@ start_wechat_bot() {
 }
 
 wait_for_services() {
-  local daily_log
+  local daily_log fe_daily
   daily_log=$(backend_daily_log)
+  fe_daily=$(frontend_daily_log)
   info "等待服务就绪..."
   for i in $(seq 1 60); do
     local backend_ok=false
@@ -523,14 +536,42 @@ wait_for_services() {
     fi
     if [ $((i % 5)) -eq 0 ]; then
       warn "仍在等待... 后端:${backend_ok} 前端:${frontend_ok} (${i}/60)"
-      if [ "$backend_ok" = false ] && grep -q "address already in use" "$daily_log" 2>/dev/null; then
-        error "后端端口 ${BACKEND_PORT} 被占用，请执行: lsof -ti :${BACKEND_PORT} | xargs kill -9"
-        exit 1
+      if [ "$backend_ok" = false ]; then
+        echo "    后端日志: tail -F ${daily_log}"
+        if grep -q "address already in use" "$daily_log" 2>/dev/null; then
+          error "后端端口 ${BACKEND_PORT} 被占用，请执行: lsof -ti :${BACKEND_PORT} | xargs kill -9"
+          exit 1
+        fi
+      fi
+      if [ "$frontend_ok" = false ]; then
+        echo "    前端日志: tail -F ${fe_daily}"
       fi
     fi
     if [ "$i" -eq 60 ]; then
-      warn "服务启动超时，请查看日志:"
-      echo "  tail -F ${daily_log}"
+      warn "服务启动超时（120s），请查看日志:"
+      echo "  后端日志: tail -F ${daily_log}"
+      echo "  前端日志: tail -F ${fe_daily}"
+      echo ""
+      echo "  ── 常见失败原因诊断 ──"
+      if [ "$backend_ok" = false ]; then
+        if grep -q "address already in use" "$daily_log" 2>/dev/null; then
+          echo "  [后端] 端口 ${BACKEND_PORT} 被占用，可执行: lsof -ti :${BACKEND_PORT} | xargs kill -9"
+        elif grep -qiE "ModuleNotFoundError|ImportError" "$daily_log" 2>/dev/null; then
+          echo "  [后端] 缺少 Python 依赖，可执行: cd 03-src/backend && source .venv/bin/activate && pip install -r requirements.txt"
+        else
+          echo "  [后端] 未知原因，请查看上面后端日志尾部"
+        fi
+      fi
+      if [ "$frontend_ok" = false ]; then
+        if grep -q "address already in use" "$fe_daily" 2>/dev/null; then
+          echo "  [前端] 端口 ${FRONTEND_PORT} 被占用，可执行: lsof -ti :${FRONTEND_PORT} | xargs kill -9"
+        elif [ ! -d "${FRONTEND_DIR}/node_modules" ]; then
+          echo "  [前端] 依赖未安装，可执行: cd 03-src/frontend && npm install --legacy-peer-deps"
+        else
+          echo "  [前端] 未知原因，请查看上面前端日志尾部"
+        fi
+      fi
+      echo ""
       exit 1
     fi
     sleep 2
@@ -539,14 +580,24 @@ wait_for_services() {
 
 follow_logs() {
   local backend_daily
+  local wechat_daily
   backend_daily=$(backend_daily_log)
+  wechat_daily=$(wechat_bot_daily_log)
 
   mkdir -p "$BACKEND_LOG_DIR"
   touch "$backend_daily"
 
+  echo ""
+  info "查看微信 bot 日志（另开终端复制执行）:"
+  echo "  tail -F ${wechat_daily}"
+  echo ""
+  info "查看前端日志（另开终端复制执行）:"
+  echo "  tail -F $(frontend_daily_log)"
+  echo ""
+
   # 仅打印到终端；勿写入日志文件，否则 tail -F 会再显示一遍
   print_log_section \
-    "▶ 系统运行日志（后端 pipeline + 微信 bot + 精华卡）" \
+    "▶ 后端运行日志（pipeline / 精华卡）" \
     "${backend_daily}  |  Ctrl+C 退出跟踪，服务继续后台运行"
 
   tail -F "$backend_daily"
@@ -585,20 +636,38 @@ wait_for_services
 start_wechat_bot
 
 BACKEND_DAILY_LOG=$(backend_daily_log)
+WECHAT_BOT_DAILY_LOG=$(wechat_bot_daily_log)
 
 print_log_section "■ 系统启动完成" \
-  "前端 http://localhost:${FRONTEND_PORT}  |  后端 http://localhost:${BACKEND_PORT}/api/docs"
+  "前端 http://localhost:${FRONTEND_PORT}  |  后端 http://localhost:${BACKEND_PORT}/api/docs" \
+  "$BACKEND_DAILY_LOG"
+
+# 成功启动信息同时写入后端日志，便于 tail -F 日志也能看到访问地址
+{
+  echo "默认账号: weaiw"
+  echo "默认密码: Aa41312432"
+  echo ""
+  echo "后端日志: ${BACKEND_DAILY_LOG}"
+  echo "前端日志: $(frontend_daily_log)"
+  echo "微信 bot 日志: ${WECHAT_BOT_DAILY_LOG}"
+  echo ""
+} >> "$BACKEND_DAILY_LOG"
 
 echo ""
 info "默认账号: weaiw"
 info "默认密码: Aa41312432"
 echo ""
-info "统一日志: ${BACKEND_DAILY_LOG}（含 pipeline / 微信 bot / 精华卡渲染）"
+info "后端日志: ${BACKEND_DAILY_LOG}"
+info "前端日志: $(frontend_daily_log)"
+info "微信 bot 日志: ${WECHAT_BOT_DAILY_LOG}"
 echo ""
 info "停止服务: ./stop-local.sh"
 
 if [ "$FOLLOW_LOGS" = true ]; then
   follow_logs
 else
-  info "跟踪日志: tail -F ${BACKEND_DAILY_LOG}"
+  info "跟踪后端日志: tail -F ${BACKEND_DAILY_LOG}"
+  echo ""
+  info "查看微信 bot 日志（复制执行）:"
+  echo "  tail -F ${WECHAT_BOT_DAILY_LOG}"
 fi

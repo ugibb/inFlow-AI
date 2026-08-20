@@ -20,7 +20,7 @@ import json as _json
 from datetime import datetime, timezone
 from uuid import UUID as _UUID
 
-from sqlalchemy import Column, String, Text, SmallInteger, DateTime, ForeignKey, text
+from sqlalchemy import Boolean, Column, String, Text, SmallInteger, DateTime, ForeignKey, text
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 import uuid
@@ -72,6 +72,14 @@ class IngestJob(Base):
     # | failed | cancelled
 
     retry_count = Column(SmallInteger, nullable=False, default=0)
+
+    # ── 本地 worker 分流（外部处理）────────────────────────────
+    # external_processing=True  → 由本地 worker 承接，云端不跑 capture/pipeline
+    # processing_host           → 最近认领主机（hostname-pid），审计 + 重启自回收
+    # claimed_at                → 租约时间戳；NULL=可认领，超时被重新认领
+    external_processing = Column(Boolean, nullable=False, default=False, index=True)
+    processing_host = Column(String(64), nullable=True)
+    claimed_at = Column(DateTime(timezone=True), nullable=True)
 
     # Error diagnostics
     error_stage = Column(String(30), nullable=True)

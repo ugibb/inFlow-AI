@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { ArticleDetail, Folder as FolderType, Tag as TagType, RelatedArticlesResponse, JobTranscript, ArticleChaptersResponse, IngestJob } from '@/lib/types';
+import { useAuth } from '@/contexts/AuthContext';
 import { PipelineBar } from '@/components/PipelineBar';
 import { DeepReadPanel } from '@/components/deep-read-panel';
 import { format, parseISO } from 'date-fns';
@@ -231,6 +232,7 @@ function ReaderSkeleton() {
 export default function ReaderPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { loading: authLoading, token } = useAuth();
   const jobId = searchParams.get('job');
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -304,6 +306,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
   const [resolvedJobId, setResolvedJobId] = useState<string | null>(null);
   // Incrementing this restarts the polling interval (e.g. after a manual retry).
   const [pollTrigger, setPollTrigger] = useState(0);
+  const fetchAttemptRef = useRef(0);
 
   // ── Custom audio player handlers ────────────────────────────────────────
   const togglePlay = useCallback(() => {
@@ -390,6 +393,12 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     setDeepReadHtml(null);
     setDeepReadLoading(false);
+  }, [params.id]);
+
+  useEffect(() => {
+    fetchAttemptRef.current = 0;
+    setNotFound(false);
+    setError(null);
   }, [params.id]);
 
   useEffect(() => () => {
@@ -595,16 +604,15 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
     }
     try {
       const data = (await api.getArticle(params.id)) as ArticleDetail;
+      fetchAttemptRef.current = 0;
       setArticle(data);
       setFavorited(data.is_favorited);
       setStatus(data.status);
       setEditContent(data.clean_content || data.raw_content || '');
-      // Auto-enter edit mode for notes when ?edit=1 is present in URL
       if (data.content_type === 'note' && typeof window !== 'undefined') {
         const sp = new URLSearchParams(window.location.search);
         if (sp.get('edit') === '1') setEditMode(true);
       }
-      // Mark as reading if currently unread
       if (data.status === 'unread') {
         api.updateArticle(params.id, { status: 'reading' }).catch(() => {});
         setStatus('reading');
@@ -612,7 +620,26 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
     } catch (err: any) {
       if (!silent) {
         const msg = err.message || '加载文章失败';
-        if (msg.includes('404') || msg.includes('not found') || msg.includes('Not Found')) {
+        const is404 = msg.includes('404') || msg.includes('not found') || msg.includes('Not Found');
+        if (is404) {
+          if (jobId) {
+            router.replace(`/processing/${jobId}`);
+            return;
+          }
+          if (fetchAttemptRef.current < 1) {
+            fetchAttemptRef.current += 1;
+            window.setTimeout(() => { void fetchArticle(silent); }, 600);
+            return;
+          }
+          try {
+            const job = await api.getJobByArticleId(params.id);
+            if (job?.job_id) {
+              router.replace(`/processing/${job.job_id}`);
+              return;
+            }
+          } catch {
+            // ignore
+          }
           setNotFound(true);
         } else {
           setError(msg);
@@ -621,7 +648,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [params.id]);
+  }, [params.id, jobId, router]);
 
   // ── Fetch folders ──────────────────────────────────────────────────────
   const fetchFolders = useCallback(async () => {
@@ -634,9 +661,10 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
   }, []);
 
   useEffect(() => {
+    if (authLoading || !token) return;
     fetchArticle();
     fetchFolders();
-  }, [fetchArticle, fetchFolders]);
+  }, [authLoading, token, fetchArticle, fetchFolders]);
 
   // Auto-poll while article is being ingested, pending agent fetch, or AI summarizing.
   const pollRef = useRef(0);
@@ -693,14 +721,16 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
 
   // Fetch all available tags for autocomplete
   useEffect(() => {
+    if (authLoading || !token) return;
     const fetchTags = async () => {
       try { const data = await api.getTags() as TagType[]; setAllTags(data); } catch {}
     };
     fetchTags();
-  }, []);
+  }, [authLoading, token]);
 
   // Fetch related articles
   useEffect(() => {
+    if (authLoading || !token) return;
     const fetchRelated = async () => {
       try {
         const data = await api.getRelatedArticles(params.id) as RelatedArticlesResponse;
@@ -710,7 +740,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
       }
     };
     fetchRelated();
-  }, [params.id]);
+  }, [params.id, authLoading, token]);
 
   // ── Close folder dropdown on outside click ────────────────────────────
   useEffect(() => {

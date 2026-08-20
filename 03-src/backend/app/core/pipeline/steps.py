@@ -114,7 +114,7 @@ async def run_normalize_text(
             current_status="normalizing",
             target_status="normalized",
         )
-        phase.end(chars=len(plain), file=out.name)
+        phase.end()
         return txt_path
 
     except Exception as exc:
@@ -224,7 +224,7 @@ async def run_chapters(
         )
         if path:
             from pathlib import Path as _Path
-            phase.end(file=_Path(path).name)
+            phase.end()
         else:
             phase.skip("无可用转写输入")
         return path
@@ -259,7 +259,7 @@ async def run_parse(
         raw_data = await default_storage.read_raw(raw_file_path)
         title = (raw_data.get("raw") or {}).get("title") or ""
         platform = (raw_data.get("meta") or {}).get("source_platform") or ""
-        phase.start(platform=platform, title=title[:40])
+        phase.start()
 
         parsed_path = await parse_job(
             job_id=job_id,
@@ -279,7 +279,7 @@ async def run_parse(
 
         parsed_data = await default_storage.read_parsed(parsed_path)
         ai_title = (parsed_data.get("article") or {}).get("title") or title
-        phase.end(title=(ai_title or "")[:40])
+        phase.end()
         return parsed_path
 
     except Exception as exc:
@@ -323,9 +323,10 @@ async def run_compose_card(
 
         from app.s4_compose.card_renderer import render_card_png_for_job
 
-        phase.start(platform=source_platform or "")
+        phase.start()
         result_png = await render_card_png_for_job(
             str(job_id),
+            raw_file_path=raw_file_path,
             asr_file_path=asr_file_path,
             parsed_file_path=parsed_file_path,
             source_platform=source_platform,
@@ -338,7 +339,7 @@ async def run_compose_card(
             current_status="composing",
             target_status="composed",
         )
-        phase.end(png=Path(result_png).name)
+        phase.end()
         return html_path, result_png
 
     except Exception as exc:
@@ -380,7 +381,7 @@ async def run_index(
             target_status="indexing",
         )
 
-        phase.start(platform=source_platform or "")
+        phase.start()
 
         from app.s3_display.renderer import render_job
         rendered_article_id = await render_job(
@@ -428,7 +429,7 @@ async def run_index(
 
         await _notify_wechat_callback(db, job_id=job_id)
 
-        phase.end(status="ready", article=short_job_id(article_id))
+        phase.end()
         return index_path
 
     except Exception as exc:

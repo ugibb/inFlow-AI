@@ -178,6 +178,17 @@ def display_card_png_path(raw_file_path: str, job_id: UUID) -> str:
     return display_file_path(raw_file_path, f"{job_id}.png")
 
 
+def ext_display_card_png_rel(raw_file_path: str, job_id: UUID) -> str:
+    """本地 worker 回传 PNG 的云端相对路径（相对 $INFLOW_PIPELINE_DATA_DIR）。
+
+    与 bot 读取路径同源：``display_card_png_path`` 得到 ``data/03_display/...``，
+    剥掉 ``data/`` 前缀后在云端拼 ``{INFLOW_PIPELINE_DATA_DIR}/{rel}``。
+
+    Example: 03_display/xiaoyuzhou/20260621/001-title/{uuid}.png
+    """
+    return display_card_png_path(raw_file_path, job_id).removeprefix("data/")
+
+
 def parse_transcript_base(raw_file_path: str, job_id: UUID) -> str:
     """Base path for ASR transcript files (WhisperTranscriber appends suffixes).
 

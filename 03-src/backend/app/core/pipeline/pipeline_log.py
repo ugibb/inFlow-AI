@@ -1,7 +1,8 @@
 """Structured pipeline phase logging for ingest jobs.
 
 Unified line format::
-    2026-06-28 19:48:33 | INFO | pipeline | │ 01-采集 | job=eec9650a | ▶ 开始 | ...
+    2026-06-28 19:48:33 | INFO | pipeline | │ 01-采集 | job=eec9650a | ▶ 任务开始：... | ...
+    2026-06-28 19:48:33 | INFO | pipeline | │ 00-发起 | job=eec9650a | method=URL | url=...
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ logger = get_logger("pipeline")
 # 任务开始日志：▶ 任务开始：{任务名}
 _AUDIO_PHASES: dict[str, tuple[str, str]] = {
     "capturing": ("01-采集", "原始信息采集，xxx.json + 音频文件"),
-    "transcribing": ("02-转录", "音频 ASR 转录（听悟/Groq），音频文件 --> _asr_verbose.json + _asr.json + _asr.txt + _tingwu.json"),
+    "transcribing": ("02-转录", "音频 ASR 转录（Groq Whisper），音频文件 --> _asr_verbose.json + _asr.json + _asr.txt"),
     "chapters": ("03-章节", "章节生成，_asr_verbose.json --> _chapters.json"),
     "parsing": ("04-解析", "AI 内容解析，_asr.txt --> xxx.json"),
     "composing": ("05-卡片", "精华卡片合成，_asr.json --> html + png"),
@@ -39,7 +40,7 @@ _ARTICLE_PHASES: dict[str, tuple[str, str]] = {
 _VIDEO_PHASES: dict[str, tuple[str, str]] = {
     "capturing": ("01-采集", "原始信息采集，xxx.json + 视频文件"),
     "preprocessing": ("02-抽离", "音视频抽离，视频文件 --> 音频文件 + 视频截图"),
-    "transcribing": ("03-转录", "音频 ASR 转录（听悟/Groq），音频文件 --> _asr_verbose.json + _asr.json + _asr.txt + _tingwu.json"),
+    "transcribing": ("03-转录", "音频 ASR 转录（Groq Whisper），音频文件 --> _asr_verbose.json + _asr.json + _asr.txt"),
     "chapters": ("04-章节", "章节生成，_asr_verbose.json --> _chapters.json"),
     "parsing": ("05-解析", "AI 内容解析，_asr.txt --> xxx.json"),
     "composing": ("06-卡片", "精华卡片合成，_asr.json --> html + png"),
@@ -138,7 +139,7 @@ def log_task_start(
         for key, value in context.items()
         if key not in _PHASE_SUPPRESS_KEYS and value is not None and value != ""
     )
-    logger.info(f"╭ 00-发起 │ {' │ '.join(parts)}")
+    logger.info(f"│ 00-发起 | {' | '.join(parts)}")
 
 
 class PhaseLogger:
@@ -164,18 +165,22 @@ class PhaseLogger:
 
     def start(self, **_details: Any) -> None:
         self._started = True
-        backend = _details.get("backend")
-        if backend:
-            logger.info(self._line(f"▶ 任务开始：{self.task_name} "))
-        else:
-            logger.info(self._line(f"▶ 任务开始：{self.task_name}"))
+        segments = [f"▶ 任务开始：{self.task_name}"]
+        for key, value in _details.items():
+            if value is not None and value != "":
+                segments.append(f"{key}={sanitize_log_text(value)}")
+        logger.info(self._line(*segments))
 
     def detail(self, message: str) -> None:
         logger.info(self._line(sanitize_log_text(message)))
 
     def end(self, **_details: Any) -> None:
         elapsed = time.monotonic() - self._t0
-        logger.info(self._line("■ 任务完成", f"{elapsed:.1f}s"))
+        segments = ["■ 任务完成", f"{elapsed:.1f}s, {self.task_name}"]
+        for key, value in _details.items():
+            if value is not None and value != "":
+                segments.append(f"{key}={sanitize_log_text(value)}")
+        logger.info(self._line(*segments))
 
     def skip(self, reason: str) -> None:
         """Non-fatal skip (e.g. optional chapters)."""

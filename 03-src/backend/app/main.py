@@ -210,6 +210,13 @@ async def lifespan(app: FastAPI):
     from app.s1_ingest.orchestrator import recover_captured_jobs
     await recover_captured_jobs()
 
+    if settings.external_processing:
+        get_logger("main").warning(
+            "EXTERNAL_PROCESSING=true：URL ingest 将全部交给本地 worker 承接，"
+            "云端只登记不处理。请确认本地 worker（start-worker.sh）已部署并运行，"
+            "否则新提交的 URL 会永久停在 pending。"
+        )
+
     # Start auto-backfill background task
     backfill_task = asyncio.create_task(auto_backfill_embeddings())
     # logger.info("Auto-backfill background task started (scans every 5 minutes)")
@@ -265,6 +272,20 @@ class OptionsHandler(BaseHTTPMiddleware):
         return await call_next(request)
 
 app.add_middleware(OptionsHandler)
+
+
+class ApiNoCacheMiddleware(BaseHTTPMiddleware):
+    """Prevent CDN / reverse-proxy from caching authenticated API responses."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
+
+app.add_middleware(ApiNoCacheMiddleware)
 
 # Routes
 app.include_router(articles.router)

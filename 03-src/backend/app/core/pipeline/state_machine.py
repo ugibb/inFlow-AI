@@ -141,13 +141,29 @@ async def transition(
     if error_message is not None:
         values["error_message"] = error_message
 
-    await db.execute(
+    result = await db.execute(
         update(IngestJob)
-        .where(IngestJob.id == job_id)
+        .where(
+            IngestJob.id == job_id,
+            # Compare-and-set：仅当 DB 实际状态仍为 current_status 才生效。
+            # 云端单写入者时恒为 1 行；worker 多写入者（租约超时被抢）时，
+            # 过期 owner 的 transition 在这里失败而非回退/覆盖新 owner 的进度。
+            IngestJob.status == current_status,
+        )
         .values(**values)
     )
-    await db.commit()
+    if result.rowcount == 0:
+        await db.rollback()
+        logger.warning(
+            "ingest_job %s: 状态变更 %s → %s 未生效（rowcount=0，实际状态与预期不符）",
+            job_id, current_status, target_status,
+        )
+        raise RuntimeError(
+            f"ingest_job {job_id} 状态变更未生效: {current_status} → {target_status} "
+            f"（可能已被其他 worker/进程抢先变更）"
+        )
 
+    await db.commit()
     logger.debug("ingest_job %s: %s → %s", job_id, current_status, target_status)
 
 

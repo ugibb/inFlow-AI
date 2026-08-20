@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import subprocess
 import tempfile
@@ -74,6 +75,37 @@ def _format_segment_label(idx: int, total: int) -> str:
     """e.g. 分段[01/12] — zero-pad width follows total segment count."""
     width = max(2, len(str(total)))
     return f"分段[{idx:0{width}d}/{total:0{width}d}]"
+
+
+def _is_groq_auth_error(exc: Exception) -> bool:
+    """鉴权/地域拒绝类错误（401/403）重试无意义，应直接回退本地。"""
+    text = f"{type(exc).__name__}: {exc}"
+    return any(
+        marker in text
+        for marker in ("401", "403", "PermissionDenied", "Unauthorized", "AuthenticationError")
+    )
+
+
+def _format_local_progress(
+    segment_count: int,
+    current_sec: float,
+    total_sec: float,
+) -> str:
+    """本地转录进度消息：带估算总段数与时间进度。
+
+    faster-whisper 流式产出段，总段数需转完才知道；这里按音频时间进度
+    反推估算（越到后面越接近真实值）。
+    """
+    if total_sec and total_sec > 0 and current_sec > 0:
+        ratio = min(1.0, max(1e-6, current_sec / total_sec))
+        estimated_total = max(segment_count, round(segment_count / ratio))
+        return (
+            f"转录进行中… 已识别 {segment_count} / 预计 {estimated_total} 段，"
+            f"进度至 {current_sec:.0f}/{total_sec:.0f} 秒"
+        )
+    return (
+        f"转录进行中… 已识别 {segment_count} 段，进度至 {current_sec:.0f} 秒"
+    )
 
 
 def _start_groq_heartbeat(
@@ -148,29 +180,58 @@ class WhisperTranscriber:
     ) -> TranscriptionResult:
         """Transcribe *audio_path*.
 
-        When *json_save_path* is given, Groq verbose_json responses are saved
-        as three files beside it: .txt, .json, _verbose.json — mirroring the
-        06-src behaviour.
+        Groq Whisper 优先；API 不可用或调用失败（如大陆 IP 403）时自动
+        回退到本地 faster-whisper（离线，模型大、速度慢）。
+
+        When *json_save_path* is given, the verbose transcription response is
+        saved as three files beside it: .txt, .json, _verbose.json — mirroring
+        the 06-src behaviour.
 
         Raises:
-            RuntimeError: No backend available, or model failed to load.
+            RuntimeError: 无任何可用后端，或模型加载失败。
             ValueError: Transcription returned empty text.
         """
         self._emit_log = emit_log
         file_size = audio_path.stat().st_size
         mb = file_size / (1024 * 1024)
 
-        if not self._groq_api_key:
-            raise RuntimeError(
-                "未配置 GROQ_API_KEY，音频转录仅支持 Groq Whisper ASR。"
-                "请在 .env 中设置 GROQ_API_KEY。"
-            )
-        if not _GROQ_AVAILABLE:
-            raise RuntimeError(
-                "已配置 GROQ_API_KEY 但 groq 包未安装。"
-                "请确认 backend 镜像已安装 groq 依赖。"
-            )
+        use_groq = bool(self._groq_api_key and _GROQ_AVAILABLE)
 
+        if not use_groq:
+            if not _FASTER_WHISPER_AVAILABLE:
+                raise RuntimeError(
+                    "无可用转录后端：未配置 GROQ_API_KEY（或 groq 包缺失）"
+                    "且 faster-whisper 未安装。"
+                )
+            if self._emit_log:
+                self._emit_log(
+                    "未配置 Groq（或 groq 包缺失），改用本地 faster-whisper 转录"
+                )
+            return self._transcribe_local(audio_path, json_save_path)
+
+        # Groq 优先；失败自动回退本地 faster-whisper
+        try:
+            return self._transcribe_via_groq(audio_path, json_save_path)
+        except (RuntimeError, ValueError) as exc:
+            if not _FASTER_WHISPER_AVAILABLE:
+                raise RuntimeError(
+                    f"Groq 转录失败且 faster-whisper 未安装，无法本地回退：{exc}"
+                ) from exc
+            fallback_msg = f"Groq 转录失败，回退本地 faster-whisper：{exc}"
+            if self._emit_log:
+                self._emit_log(fallback_msg)
+            else:
+                logger.warning(fallback_msg)
+            return self._transcribe_local(audio_path, json_save_path)
+
+    def _transcribe_via_groq(
+        self,
+        audio_path: Path,
+        json_save_path: Optional[Path] = None,
+    ) -> TranscriptionResult:
+        """Groq Whisper 转录（直传或分块）；失败时抛错交由上层回退。"""
+        file_size = audio_path.stat().st_size
+        mb = file_size / (1024 * 1024)
         duration_sec = self._get_audio_duration_sec(audio_path)
         needs_chunk = file_size > _GROQ_MAX_BYTES or duration_sec > _GROQ_CHUNK_IF_LONGER_SEC
 
@@ -191,7 +252,7 @@ class WhisperTranscriber:
                     )
                 except (RuntimeError, ValueError) as exc:
                     last_exc = exc
-                    if attempt < _GROQ_SEGMENT_MAX_ATTEMPTS:
+                    if attempt < _GROQ_SEGMENT_MAX_ATTEMPTS and not _is_groq_auth_error(exc):
                         retry_msg = (
                             f"单文件转录第 {attempt} 次失败，"
                             f"{int(_GROQ_SEGMENT_RETRY_DELAY_SEC)}s 后重试：{exc}"
@@ -510,6 +571,7 @@ class WhisperTranscriber:
             logger.info(start_msg)
 
         try:
+            total_duration = self._get_audio_duration_sec(audio_path)
             segments_iter, info = model.transcribe(
                 str(audio_path),
                 beam_size=5,
@@ -532,8 +594,8 @@ class WhisperTranscriber:
                 segment_count += 1
                 now = time.monotonic()
                 if now - last_log >= _LOCAL_PROGRESS_INTERVAL_SEC:
-                    progress_msg = (
-                        f"转录进行中… 已识别 {segment_count} 段，进度至 {seg.end:.0f} 秒"
+                    progress_msg = _format_local_progress(
+                        segment_count, seg.end, total_duration
                     )
                     if self._emit_log:
                         self._emit_log(progress_msg)

@@ -12,6 +12,7 @@ import { api } from '@/lib/api';
 import type { Article, Tag as TagType, TagWithCount, Folder, ArticleListResponse, IngestJob } from '@/lib/types';
 import ArticleCard from '@/components/ArticleCard';
 import AddContentModal from '@/components/AddContentModal';
+import { useAuth } from '@/contexts/AuthContext';
 
 // ─── Platform labels (shared with processing page) ───────────────────────────
 
@@ -46,9 +47,7 @@ function ProcessingJobCard({ job }: { job: IngestJob }) {
   const gradient = PLATFORM_GRADIENTS[platform] || PLATFORM_GRADIENTS.generic;
   const initial = (PLATFORM_LABELS[platform] || platform).charAt(0).toUpperCase();
 
-  const href = job.article_id
-    ? `/read/${job.article_id}?job=${job.job_id}`
-    : `/processing/${job.job_id}`;
+  const href = `/processing/${job.job_id}`;
 
   return (
     <Link
@@ -142,6 +141,7 @@ function articleQualityScore(a: Article): number {
 
 export default function LibraryPage() {
   const searchParams = useSearchParams();
+  const { loading: authLoading, token } = useAuth();
   const [articles, setArticles] = useState<Article[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -185,6 +185,7 @@ export default function LibraryPage() {
   // Active ingest jobs (shown as processing cards)
   const [activeJobs, setActiveJobs] = useState<IngestJob[]>([]);
   const prevJobIdsRef = useRef<string>('');
+  const listEmptyRetryRef = useRef(0);
 
   // Article selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -219,6 +220,13 @@ export default function LibraryPage() {
       if (username) params.username = username;
       const data = await api.getArticles(params) as ArticleListResponse;
       setArticles(data.items); setTotal(data.total);
+      const noFilters = !statusFilter && !tagFilter && !folderFilter && !sourceFilter && !search && !username;
+      if (noFilters && data.total === 0 && data.items.length === 0 && listEmptyRetryRef.current < 2) {
+        listEmptyRetryRef.current += 1;
+        window.setTimeout(() => fetchArticlesRef.current(), 800);
+        return;
+      }
+      if (data.total > 0) listEmptyRetryRef.current = 0;
     } catch (e: any) {
       setError(e.message || '加载失败');
     } finally { setLoading(false); }
@@ -237,8 +245,16 @@ export default function LibraryPage() {
   const fetchArticlesRef = useRef(fetchArticles);
   fetchArticlesRef.current = fetchArticles;
 
-  useEffect(() => { fetchArticles(); }, [fetchArticles]);
-  useEffect(() => { fetchTags(); fetchFolders(); fetchActiveJobs(); }, [fetchActiveJobs]);
+  useEffect(() => {
+    if (authLoading || !token) return;
+    fetchArticles();
+  }, [authLoading, token, fetchArticles]);
+  useEffect(() => {
+    if (authLoading || !token) return;
+    fetchTags();
+    fetchFolders();
+    fetchActiveJobs();
+  }, [authLoading, token, fetchActiveJobs]);
 
   // Poll active jobs every 3s; when count drops, a job finished → refresh articles
   useEffect(() => {
@@ -289,8 +305,15 @@ export default function LibraryPage() {
   }, [articles]);
 
   // Debounced search via ref to avoid stale closure
-  useEffect(() => { const t = setTimeout(() => { setPage(1); fetchArticlesRef.current(); }, 300); return () => clearTimeout(t); }, [search]);
-  useEffect(() => { if (search) { setPage(1); fetchArticlesRef.current(); } }, [searchMode]);
+  useEffect(() => {
+    if (authLoading || !token) return;
+    const t = setTimeout(() => { setPage(1); fetchArticlesRef.current(); }, 300);
+    return () => clearTimeout(t);
+  }, [search, authLoading, token]);
+  useEffect(() => {
+    if (authLoading || !token) return;
+    if (search) { setPage(1); fetchArticlesRef.current(); }
+  }, [searchMode, search, authLoading, token]);
 
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds);
@@ -451,9 +474,18 @@ export default function LibraryPage() {
   // 处理中同一集会同时产生 job 卡 + article stub 卡；保留 article 卡（信息更完整），
   // 仅当 job 尚未绑定 article（stub 还没生成的一瞬间）才用 ProcessingJobCard 兜底展示进度。
   const articleIds = useMemo(() => new Set(dedupedArticles.map(a => a.id)), [dedupedArticles]);
+  const articleUrlKeys = useMemo(
+    () => new Set(dedupedArticles.map(a => normalizedArticleUrl(a.url)).filter(Boolean)),
+    [dedupedArticles],
+  );
   const visibleJobs = useMemo(
-    () => activeJobs.filter(j => !j.article_id || !articleIds.has(j.article_id)),
-    [activeJobs, articleIds]
+    () => activeJobs.filter(j => {
+      if (j.article_id && articleIds.has(j.article_id)) return false;
+      const jobUrl = normalizedArticleUrl(j.source_url);
+      if (jobUrl && articleUrlKeys.has(jobUrl)) return false;
+      return true;
+    }),
+    [activeJobs, articleIds, articleUrlKeys],
   );
 
   return (

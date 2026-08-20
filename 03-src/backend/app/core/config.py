@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     # 登录 JWT 有效期（天）。7=一周，30=一月，0=近似永久（仅自建环境）
     access_token_expire_days: int = 30
 
+    # ── 本地 worker 分流 ──────────────────────────────────────
+    # True：URL ingest 的 job 置 external_processing=True，由本地 worker 承接
+    #      完整 pipeline，云端只登记不处理（ingest_url 跳过 capture/后台任务）。
+    # False：恢复云端全流程（upload/paste 等本就在云端处理，不受此开关影响）。
+    #
+    # 默认 False（opt-in）：若误设为 True 而 worker 未部署，所有 URL ingest
+    # 会永久停在 pending 且云端不再调度，属于静默故障。启用方必须在部署时
+    # 显式设 EXTERNAL_PROCESSING=true 并确认 worker 已运行。
+    external_processing: bool = False
+
     # ── Logging — see 02-docs/20260623_06_的日志系统重构方案.md ──
     log_dir: str = "04-log/backend"
     log_level: str = "INFO"
@@ -53,8 +63,8 @@ class Settings(BaseSettings):
     card_screenshot_scale: int = 2
 
     # ── Transcription ────────────────────────────────────────
-    # ASR_PROVIDER: tingwu（默认，国内）| groq（海外/本地开发）
-    asr_provider: str = "tingwu"
+    # ASR_PROVIDER: groq（默认，Groq Whisper）| tingwu（通义听悟）
+    asr_provider: str = "groq"
     groq_api_key: str = ""
     whisper_model: str = "large-v3"
     whisper_model_path: str = ""

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { User, LoginResponse } from '@/lib/types';
+import { setAuthToken } from '@/lib/api';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -93,20 +94,35 @@ export function useAuth() {
 // ─── Provider ──────────────────────────────────────────────────────────────
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
+  // SSR 安全：首帧统一未登录 / loading=true，避免 localStorage 初始化
+  // useState 造成服务端与客户端首帧不一致（hydration 失败）。
+  // 乐观恢复改在 effect 中进行——挂载后立即注入 token，不阻塞数据请求。
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ── Validate token on mount ──────────────────────────────────────────
+  // ── 乐观恢复 + 后台校验 token（挂载后立即执行）──────────────────────
 
   useEffect(() => {
     let cancelled = false;
 
-    async function validateOnMount() {
+    async function restoreAndValidate() {
       const storedToken = localStorage.getItem(TOKEN_KEY);
       if (!storedToken) {
+        setAuthToken(null);
+        setToken(null);
+        setUser(null);
         setLoading(false);
         return;
+      }
+
+      // 乐观注入：本地有可解析 JWT 就立即放行 UI，后台再校验 /me
+      setAuthToken(storedToken);
+      const optimisticUser = userFromToken(storedToken);
+      if (optimisticUser) {
+        setToken(storedToken);
+        setUser(optimisticUser);
+        setLoading(false);
       }
 
       const result = await fetchCurrentUser(storedToken);
@@ -114,27 +130,24 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
       if (result.status === 'invalid') {
         localStorage.removeItem(TOKEN_KEY);
+        setAuthToken(null);
         setToken(null);
         setUser(null);
       } else if (result.status === 'ok') {
+        setAuthToken(storedToken);
         setToken(storedToken);
         setUser(result.user);
-      } else {
-        // 后端暂不可达（如重启中）：保留 token，用 JWT 降级恢复登录态
-        const fallbackUser = userFromToken(storedToken);
-        if (fallbackUser) {
-          setToken(storedToken);
-          setUser(fallbackUser);
-        } else {
-          localStorage.removeItem(TOKEN_KEY);
-          setToken(null);
-          setUser(null);
-        }
+      } else if (!optimisticUser) {
+        // /me 不可达且 JWT 无法解析 —— 无法确认身份，清空会话
+        localStorage.removeItem(TOKEN_KEY);
+        setAuthToken(null);
+        setToken(null);
+        setUser(null);
       }
       setLoading(false);
     }
 
-    validateOnMount();
+    restoreAndValidate();
     return () => {
       cancelled = true;
     };
@@ -144,7 +157,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
   const login = useCallback(async (username: string, password: string) => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
     try {
       const res = await fetch('/api/auth/login', {
@@ -161,8 +174,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
       const data: LoginResponse = await res.json();
       localStorage.setItem(TOKEN_KEY, data.access_token);
+      setAuthToken(data.access_token);
       setToken(data.access_token);
       setUser(data.user);
+      setLoading(false);
     } catch (err: any) {
       if (err.name === 'AbortError') {
         throw new Error('请求超时，请检查网络连接或稍后重试');
@@ -177,6 +192,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
+    setAuthToken(null);
     setToken(null);
     setUser(null);
   }, []);
@@ -185,8 +201,6 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
   const isAuthenticated = !!token && !!user;
   const isSuperAdmin = user?.is_super_admin ?? false;
-
-  // ── Value ────────────────────────────────────────────────────────────
 
   const value: AuthContextType = {
     user,

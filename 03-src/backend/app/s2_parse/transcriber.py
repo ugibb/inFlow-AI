@@ -48,7 +48,7 @@ async def transcribe_job(
     transcriber = _build_transcriber()
     size_mb = audio_dest.stat().st_size / 1024 / 1024 if audio_dest.is_file() else 0.0
     if phase:
-        phase.start(backend=transcriber.backend_label())
+        phase.start()
 
     if audio_dest.is_file() and audio_dest.stat().st_size > 0:
         audio_path = audio_dest
@@ -88,11 +88,7 @@ async def transcribe_job(
     )
 
     if phase:
-        phase.end(
-            lang=result.language,
-            audio=f"{size_mb:.1f}MB",
-            # chars=len(result.text),
-        )
+        phase.end()
 
     return str(verbose_path)
 

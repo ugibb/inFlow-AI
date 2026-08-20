@@ -39,6 +39,15 @@ export default function WechatBinding() {
     refresh();
   }, [refresh]);
 
+  // 绑定后 bot 最长约 30s 才发现新账号并完成首轮长轮询，期间自动刷新状态
+  useEffect(() => {
+    if (!account?.is_active || workerStatus?.worker_likely_active) return;
+    const timer = window.setInterval(() => {
+      refresh();
+    }, 12_000);
+    return () => window.clearInterval(timer);
+  }, [account?.is_active, workerStatus?.worker_likely_active, refresh]);
+
   const startBind = useCallback(async () => {
     setBindError('');
     setBindStatus('wait');
@@ -116,6 +125,21 @@ export default function WechatBinding() {
     }
   }, [refresh]);
 
+  // 会话已失效时的一键「解绑并重新绑定」：解绑成功后自动打开扫码二维码
+  const unbindAndRebind = useCallback(async () => {
+    if (!confirm('确定要解绑微信吗？解绑后将自动打开重新绑定二维码。')) return;
+    setUnbinding(true);
+    try {
+      await api.wechatUnbind();
+      await refresh();
+      startBind();
+    } catch (e: any) {
+      alert(e.message || '解绑失败');
+    } finally {
+      setUnbinding(false);
+    }
+  }, [refresh, startBind]);
+
   // Format helpers
   const formatLastSeen = (iso?: string) => {
     if (!iso) return '从未活跃';
@@ -124,6 +148,7 @@ export default function WechatBinding() {
     if (diff < 60_000) return '刚刚';
     if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`;
     if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`;
+    if (diff < 7 * 86_400_000) return `${Math.floor(diff / 86_400_000)} 天前`;
     return d.toLocaleString('zh-CN');
   };
 
@@ -137,14 +162,16 @@ export default function WechatBinding() {
         </div>
       </div>
       <p className="text-sm text-[var(--text-secondary)] mb-4">
-        绑定个人微信后，需运行消息服务才能自动入库；发问题走 RAG 检索你自己的知识库。
-        本地开发由 <code className="text-xs">./start-local.sh</code> 启动，日志见 <code className="text-xs">04-log/wechat-bot.log</code>。
+        绑定个人微信后，可向 bot 发送文章链接自动入库，或直接提问检索你的知识库。
       </p>
 
-      {account && account.is_active && workerStatus && !workerStatus.worker_likely_active && workerStatus.hint && (
-        <div className="mb-4 text-xs rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200 px-3 py-2">
-          {workerStatus.hint}
-        </div>
+      {account && account.is_active && workerStatus && !workerStatus.worker_likely_active && (
+        <WorkerNotReadyNotice
+          connectionState={workerStatus.connection_state}
+          lastSeenAt={account.last_seen_at}
+          createdAt={account.created_at}
+          onUnbind={unbindAndRebind}
+        />
       )}
 
       {loading ? (
@@ -167,7 +194,7 @@ export default function WechatBinding() {
               {workerStatus?.worker_likely_active ? (
                 <span className="text-[#34c759]">运行中</span>
               ) : (
-                <span className="text-amber-600">未检测到心跳</span>
+                <span className="text-amber-600">连接中</span>
               )}
             </div>
           </div>
@@ -260,6 +287,82 @@ export default function WechatBinding() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+interface WorkerNotReadyNoticeProps {
+  connectionState?: string;
+  lastSeenAt?: string;
+  createdAt?: string;
+  onUnbind?: () => void;
+}
+
+function WorkerNotReadyNotice({
+  connectionState,
+  lastSeenAt,
+  createdAt,
+  onUnbind,
+}: WorkerNotReadyNoticeProps) {
+  const bootGraceMs = 90_000;
+  const createdMs = createdAt ? new Date(createdAt).getTime() : 0;
+  const isStartingUp =
+    connectionState === 'connecting' ||
+    (!lastSeenAt && createdMs > 0 && Date.now() - createdMs < bootGraceMs);
+
+  if (connectionState === 'expired') {
+    return (
+      <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3">
+        <div className="flex items-start gap-2">
+          <AlertCircle size={16} className="text-red-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-red-700 dark:text-red-300">⚠️ 微信连接已失效</p>
+            <p className="text-xs text-red-800/90 dark:text-red-200/90 mt-1 leading-relaxed">
+              微信登录会话已过期（超过 10 分钟无心跳），消息服务无法收发。请解绑后重新扫码绑定，即可恢复使用。
+            </p>
+            {onUnbind && (
+              <button
+                onClick={onUnbind}
+                className="mt-3 text-xs px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
+              >
+                解绑并重新绑定
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isStartingUp) {
+    return (
+      <div className="mb-4 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent-light)]/40 px-4 py-3">
+        <div className="flex items-start gap-2">
+          <Loader2 size={16} className="text-[var(--accent)] animate-spin mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-[var(--foreground)]">正在连接消息服务…</p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
+              绑定刚完成，通常 1～2 分钟内即可使用。本页会自动刷新，无需操作。
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+      <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+        消息服务暂未就绪
+      </p>
+      <p className="text-xs text-amber-800/90 dark:text-amber-200/90 mt-1 leading-relaxed">
+        微信已绑定，但后台尚未连上。你可以先按下面步骤排查：
+      </p>
+      <ol className="mt-2 space-y-1.5 text-xs text-amber-800/90 dark:text-amber-200/90 list-decimal list-inside leading-relaxed">
+        <li>等待约 1 分钟，本页会自动刷新状态</li>
+        <li>向微信 bot 发送一条文章链接，看「知识库」列表是否有新增文章</li>
+        <li>若仍无反应，点击下方「解绑」后重新扫码绑定</li>
+      </ol>
     </div>
   );
 }

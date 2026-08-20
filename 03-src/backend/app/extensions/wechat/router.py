@@ -19,7 +19,6 @@ See memory: inFlow_wechat_bot, reference_openclaw_weixin.
 import base64
 import io
 import logging
-import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -121,6 +120,7 @@ class AccountInfo(BaseModel):
 class WechatStatusResponse(BaseModel):
     bound: bool
     worker_likely_active: bool
+    connection_state: Optional[str] = None  # active / connecting / expired
     last_seen_at: Optional[datetime] = None
     hint: Optional[str] = None
 
@@ -279,7 +279,7 @@ async def get_status(
         return WechatStatusResponse(
             bound=False,
             worker_likely_active=False,
-            hint="绑定后需运行微信 bot 消息服务（本地：./start-local.sh 会自动启动；Docker：取消注释 wechat-bot 服务）。",
+            hint="绑定成功后，可以通过微信Bot自动收藏链接。",
         )
 
     now = datetime.now(timezone.utc)
@@ -289,18 +289,36 @@ async def get_status(
         seen = last_seen if last_seen.tzinfo else last_seen.replace(tzinfo=timezone.utc)
         worker_active = (now - seen).total_seconds() < 120
 
-    hint = None
+    # 分级：active（正常）/ connecting（启动中或短暂中断）/ expired（会话已失效）
+    connection_state = "active"
     if not worker_active:
+        if last_seen is None:
+            created = acct.created_at or now
+            connection_state = (
+                "connecting" if (now - created).total_seconds() < 120 else "expired"
+            )
+        else:
+            seen = last_seen if last_seen.tzinfo else last_seen.replace(tzinfo=timezone.utc)
+            connection_state = (
+                "connecting" if (now - seen).total_seconds() < 600 else "expired"
+            )
+
+    hint = None
+    if connection_state == "connecting":
         hint = (
-            "已绑定，但消息服务尚未就绪。"
-            "若已执行 ./start-local.sh 仍如此，请查看 04-log/backend/日期.log："
-            "若出现 session timeout，请在下方解绑后重新扫码绑定；"
-            "Docker 部署需在 docker-compose 启用 wechat-bot（宝塔运行 ./deploy-baota.sh 会自动启动）。"
+            "微信已绑定成功，正在连接消息服务，请稍候约 1 分钟并刷新本页；"
+            "若长时间无反应，请解绑后重新扫码绑定。"
+        )
+    elif connection_state == "expired":
+        hint = (
+            "⚠️ 微信连接已失效（会话超时）。请在下方解绑后重新扫码绑定，"
+            "重新连接微信消息服务。"
         )
 
     return WechatStatusResponse(
         bound=True,
         worker_likely_active=worker_active,
+        connection_state=connection_state,
         last_seen_at=last_seen,
         hint=hint,
     )

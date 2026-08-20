@@ -114,7 +114,13 @@ async def get_current_user(
     Raises 401 if token is missing or invalid, or if user is inactive/deleted.
     """
     if not credentials:
-        # No token — return first active user as default (browser direct API calls)
+        # Production must never fall back to another user — caused empty/wrong library lists.
+        if os.getenv("inFlow_ENV", "").strip().lower() == "production":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="请先登录",
+            )
+        # Dev only: return first active user for direct API/browser testing
         result = await db.execute(
             select(User).where(User.is_active == True).order_by(User.created_at).limit(1)
         )

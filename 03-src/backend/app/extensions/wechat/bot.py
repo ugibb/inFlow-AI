@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import async_session
-from app.core.models import WechatAccount
+from app.core.models import User, WechatAccount
 from app.core.utils.logger import configure_third_party_loggers, get_logger, setup_logging
 
 logger = get_logger("wexinBot")
@@ -47,6 +47,15 @@ ILINK_APP_ID = "bot"
 ILINK_APP_CLIENT_VERSION = "132099"
 BOT_AGENT = "inFlowBot/0.2-multi"
 LONGPOLL_TIMEOUT_S = 35
+# 相同 errcode（如 -14 session timeout）持续出现时，日志节流间隔（秒）
+ERRCODE_LOG_THROTTLE_S = 300
+# getupdates 常见错误码 → 用户可看懂的中文说明（首次出现时以 ERROR 级打印 + 操作指引）
+ERRCODE_HINTS: dict[int, str] = {
+    -14: "微信登录会话已过期，请到「个人中心 → 微信绑定」解绑后重新扫码绑定。",
+    40001: "ilink 凭证无效，请在「个人中心 → 微信绑定」解绑后重新扫码绑定。",
+    42001: "ilink access_token 已过期，请在「个人中心 → 微信绑定」解绑后重新扫码绑定。",
+    88001: "ilink 会话已失效，请在「个人中心 → 微信绑定」解绑后重新扫码绑定。",
+}
 
 URL_RE = re.compile(
     r"https?://[^\s一-鿿\"'<>{}|\\^`，。、；：！？（）【】《》]+",
@@ -275,6 +284,14 @@ class AccountWorker:
         self._task: Optional[asyncio.Task] = None
         # Latest context_token per WeChat user (required for ilink sendmessage)
         self._context_tokens: Dict[str, str] = {}
+        # 相同 errcode 日志节流：仅首次 + 每隔 N 秒打印一次，避免 session timeout 刷屏
+        self._last_errcode: Optional[int] = None
+        self._last_errcode_log_ts: float = 0.0
+        self._errcode_repeat: int = 0
+        # -14 session timeout 连续出现次数（≥3 次才判定会话失效并自动解绑，防瞬时抖动）
+        self._session_timeout_streak: int = 0
+        # 账号所属用户名（首次加载时缓存，用于日志区分是哪个用户的账号）
+        self._owner_name: Optional[str] = None
 
     def start(self):
         self._task = asyncio.create_task(self._run(), name=f"wechat-{self.account_id}")
@@ -621,7 +638,7 @@ class AccountWorker:
                     _select(IngestJob).where(IngestJob.id == job_uuid)
                 )
                 job = result.scalar_one_or_none()
-            if job and job.status == "ready" and (job.parsed_file_path or job.asr_file_path):
+            if job and job.status == "ready" and job.raw_file_path:
                 initial_status = "ready"
 
         async with async_session() as db:
@@ -747,6 +764,13 @@ class AccountWorker:
                 push_label = resolve_phase_label("wechat_push", content_type)
                 png_path = display_card_png_path(job.raw_file_path, job_id)
                 if not Path(png_path).is_file() or Path(png_path).stat().st_size == 0:
+                    if job.external_processing:
+                        # 外部 worker job：PNG 由本地 worker 经 SFTP 回传云端，
+                        # 云端无 raw/parsed/asr 文件可补渲染，直接失败等 worker 重跑重传。
+                        raise ValueError(
+                            f"Card PNG not uploaded for external job {job_id}: "
+                            f"{png_path}（等待本地 worker SFTP 回传）"
+                        )
                     # Fallback: jobs from mixed versions / path drifts may miss the
                     # expected 03_display PNG; try a one-shot re-render before failing.
                     from app.s4_compose.card_renderer import render_card_png_for_job
@@ -755,6 +779,7 @@ class AccountWorker:
                     try:
                         rendered_png = await render_card_png_for_job(
                             str(job_id),
+                            raw_file_path=job.raw_file_path,
                             asr_file_path=job.asr_file_path,
                             parsed_file_path=job.parsed_file_path,
                             source_platform=job.source_platform,
@@ -963,15 +988,62 @@ class AccountWorker:
                 f"🪞 自我审稿：\n\n{critique}",
             )
 
+    def _log_errcode(self, account_id: str, errcode: int, errmsg: str) -> None:
+        """节流打印 getupdates 的 errcode：相同错误码仅首次立即打印，
+        之后每隔 ERRCODE_LOG_THROTTLE_S 打印一次，并附带累计次数，避免刷屏。
+        对已知「会话失效」类错误码，首次以 ERROR 级打印并附中文操作指引。"""
+        who = f" ({self._owner_name})" if self._owner_name else ""
+        now = time.time()
+        hint = ERRCODE_HINTS.get(errcode)
+        first_sight = errcode != self._last_errcode
+        if first_sight:
+            self._errcode_repeat = 1
+            if hint:
+                logger.error(
+                    f"[{account_id}{who}] 微信 bot 会话异常 (errcode={errcode}, {errmsg})。{hint}"
+                )
+            else:
+                logger.warning(f"[{account_id}{who}] server errcode={errcode} msg={errmsg}")
+        else:
+            self._errcode_repeat += 1
+            if now - self._last_errcode_log_ts < ERRCODE_LOG_THROTTLE_S:
+                return
+            logger.warning(
+                f"[{account_id}{who}] server errcode={errcode} msg={errmsg} "
+                f"(持续出现，已重复 {self._errcode_repeat} 次，每 "
+                f"{ERRCODE_LOG_THROTTLE_S}s 汇报一次)"
+                + (f"。{hint}" if hint else "")
+            )
+        self._last_errcode = errcode
+        self._last_errcode_log_ts = now
+
+    def _reset_errcode_log(self) -> None:
+        """一次成功轮询后重置节流状态，使下次出现的错误能立即打印首条。"""
+        self._last_errcode = None
+        self._last_errcode_log_ts = 0.0
+        self._errcode_repeat = 0
+        self._session_timeout_streak = 0
+
     async def _run(self):
         # Per-worker httpx client (long-poll-friendly timeout).
-        async with httpx.AsyncClient(timeout=LONGPOLL_TIMEOUT_S + 5) as client:
+        read_timeout = LONGPOLL_TIMEOUT_S + 15
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
+        ) as client:
             backoff = 1.0
             while not self._stop.is_set():
                 acct = await self._load()
                 if not acct or not acct.is_active:
                     logger.info(f"[{self.account_id}] account gone/inactive — exiting worker")
                     return
+
+                # 首次加载时缓存账号所属用户名，便于日志区分是哪个用户的账号
+                if self._owner_name is None:
+                    async with async_session() as db:
+                        r = await db.execute(
+                            select(User.username).where(User.id == acct.user_id)
+                        )
+                        self._owner_name = r.scalar_one_or_none()
 
                 try:
                     r = await client.post(
@@ -984,6 +1056,8 @@ class AccountWorker:
                     resp = r.json()
                     backoff = 1.0
                 except httpx.ReadTimeout:
+                    # ilink 长轮询在部分网络下会以读超时结束，仍视为 worker 存活
+                    await self._mark_seen()
                     continue
                 except Exception as e:
                     logger.warning(f"[{acct.account_id}] poll err: {str(e)[:30]}; backoff {backoff}s")
@@ -995,11 +1069,21 @@ class AccountWorker:
                 errcode = resp.get("errcode") or resp.get("ret")
                 if errcode and errcode != 0:
                     errmsg = resp.get("errmsg") or ""
-                    logger.warning(f"[{acct.account_id}] server errcode={errcode} msg={errmsg}")
-                    # If token revoked/invalid, give up this worker — supervisor will not respawn
-                    # until user re-binds.
-                    if errcode in (40001, 42001, 88001):  # heuristic auth-related errors
-                        logger.error(f"[{acct.account_id}] auth invalid, marking inactive")
+                    self._log_errcode(acct.account_id, errcode, errmsg)
+                    # -14 session timeout：连续出现 ≥3 次（约 15s）才判定会话失效，防瞬时抖动误杀
+                    if errcode == -14:
+                        self._session_timeout_streak += 1
+                    else:
+                        self._session_timeout_streak = 0
+                    # 会话失效/凭证无效 → 标记解绑，supervisor 不再为该账号起 worker，直到重新绑定
+                    if errcode in (40001, 42001, 88001) or (
+                        errcode == -14 and self._session_timeout_streak >= 3
+                    ):
+                        who = f" ({self._owner_name})" if self._owner_name else ""
+                        logger.error(
+                            f"[{acct.account_id}{who}] 微信会话已失效 (errcode={errcode})，"
+                            f"已自动解绑。请该用户在「个人中心 → 微信绑定」重新扫码。"
+                        )
                         async with async_session() as db:
                             await db.execute(
                                 update(WechatAccount)
@@ -1011,6 +1095,10 @@ class AccountWorker:
                         return
                     await asyncio.sleep(5)
                     continue
+
+                # 仅真正成功的轮询（errcode 为 0/None）才重置节流状态；
+                # 否则 -14 等错误码每次都被当作「首次」，日志节流永远无法生效
+                self._reset_errcode_log()
 
                 new_cursor = resp.get("get_updates_buf") or acct.sync_cursor or ""
                 if new_cursor != (acct.sync_cursor or ""):

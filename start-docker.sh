@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
-# inFlow AI — 服务器 Docker 一键启动（对标 ./start-local.sh）
+# inFlow AI — 服务器基础设施容器启动（直接代码部署模式下，backend/bot 由 ./start-server.sh 直跑）
 #
 # 用法:
-#   ./start-docker.sh              启动并跟踪 backend 日志（Ctrl+C 不停止容器）
+#   ./start-docker.sh              启动基础设施容器（postgres/redis/nginx/frontend）
 #   ./start-docker.sh --detach     仅后台启动
-#   ./start-docker.sh --logs       只跟踪日志（服务已在跑）
-#   ./start-docker.sh --restart    改 .env 后重建 backend + wechat-bot
-#   ./start-docker.sh --verify     启动/重启后自动验证 Key（常与 --restart 合用）
-#   ./sync-env-docker.sh           改 .env 后：同步 Docker + 验证 Key（推荐）
+#   ./start-docker.sh --logs       只跟踪 backend 日志（直跑模式下请用 ./start-server.sh --logs）
+#   ./start-docker.sh --restart    重建 frontend 容器（直跑 backend/bot 的重建用 ./start-server.sh）
+#   ./start-docker.sh --verify     启动后自动验证 Key + 部署挂载（常与 --restart 合用）
+#   ./sync-env-docker.sh           改 .env 后：同步 Docker + 验证 Key + 部署校验（推荐）
 #   ./verify-docker-keys.sh        仅验证 Key，不重启
+#   ./verify-docker-deploy.sh      仅校验 Pipeline 挂载与前后端一致性
 #   ./logs-docker.sh               实时查看 Docker 运行日志
 #   ./stop-docker.sh               停止全部容器
 #
-# 首次运行会自动：复制 .env.example、生成密码/密钥、配置微信 bot token。
+# ⚠️ 直接代码部署（推荐，日志好定位）：应用用 ./start-server.sh 直跑宿主机，
+#    本脚本只负责基础设施容器。首次运行会自动：复制 .env.example、生成密码/密钥、配置微信 bot token。
 
 set -euo pipefail
 
@@ -105,6 +107,36 @@ bootstrap_env() {
   if ! grep -q '^inFlow_PUBLIC_BASE=.' .env 2>/dev/null; then
     warn "可选：在 .env 设置 inFlow_PUBLIC_BASE=https://你的域名"
   fi
+
+  bootstrap_pipeline_dir
+}
+
+# 生产环境自动使用独立 pipeline 目录，避免误挂到 03-src/backend/data
+bootstrap_pipeline_dir() {
+  local pipeline_dir
+  pipeline_dir=$(env_get INFLOW_PIPELINE_DATA_DIR)
+  local prod_dir="/www/data/inflow/pipeline"
+
+  if [[ "$SCRIPT_DIR" == /www/wwwroot/* ]] || [[ -d /www/server/panel ]]; then
+    if [ -z "$pipeline_dir" ] \
+      || [[ "$pipeline_dir" == ./03-src/* ]] \
+      || [[ "$pipeline_dir" == */03-src/backend/data ]]; then
+      pipeline_dir="$prod_dir"
+      env_set INFLOW_PIPELINE_DATA_DIR "$pipeline_dir"
+      warn "生产环境已自动设置 INFLOW_PIPELINE_DATA_DIR=$pipeline_dir"
+    fi
+    if [ ! -d "$pipeline_dir" ]; then
+      if command -v sudo &>/dev/null; then
+        sudo mkdir -p "$pipeline_dir" && sudo chown -R "$(whoami):$(whoami)" "$pipeline_dir" 2>/dev/null \
+          || mkdir -p "$pipeline_dir" 2>/dev/null || true
+      else
+        mkdir -p "$pipeline_dir" 2>/dev/null || true
+      fi
+    fi
+  elif [ -z "$pipeline_dir" ]; then
+    env_set INFLOW_PIPELINE_DATA_DIR "./03-src/backend/data"
+    info "本地开发使用 INFLOW_PIPELINE_DATA_DIR=./03-src/backend/data"
+  fi
 }
 
 follow_logs() {
@@ -128,38 +160,38 @@ if [ ! -f "$CONFIG_STORE" ] && [ -f "$CONFIG_EXAMPLE" ]; then
   info "已初始化 config_store.json"
 fi
 
-info "启动 inFlow AI（Docker / 宝塔模式，127.0.0.1:8080）..."
+info "启动基础设施容器（postgres / redis / nginx / frontend）…"
 
-if [ "$FORCE_RECREATE" = true ]; then
-  "${COMPOSE[@]}" up -d --build --force-recreate backend wechat-bot
-  "${COMPOSE[@]}" up -d nginx frontend postgres redis
-else
-  # 日常启动：不 down 全栈，避免误删数据卷感；仅 build + up
-  "${COMPOSE[@]}" up -d --build
-fi
+# 直接代码部署模式：backend / wechat-bot 已在 compose 中注释，改为宿主机直跑，
+# 由 ./start-server.sh 管理（PID + 04-log 文本日志，改代码后重启即可，便于定位问题）。
+# 本脚本只拉起基础设施容器。
+"${COMPOSE[@]}" up -d --build --force-recreate frontend
+"${COMPOSE[@]}" up -d nginx postgres redis
 
 for i in $(seq 1 45); do
   if curl -sf "http://127.0.0.1:8080/api/health" 2>/dev/null | grep -q '"status"'; then
     break
   fi
-  [ "$i" -eq 45 ] && warn "健康检查超时，可执行: ${COMPOSE[*]} logs backend --tail 50"
+  [ "$i" -eq 45 ] && warn "健康检查超时：请确认 backend 已直跑（./start-server.sh --restart），或查看 04-log/backend/$(date +%F).log"
   sleep 2
 done
 
 echo ""
-info "inFlow AI 已运行"
+info "inFlow AI 基础设施已运行（backend / bot 请用 ./start-server.sh 直跑）"
 echo "  本机: http://127.0.0.1:8080"
 echo "  公网: 宝塔反向代理 → 127.0.0.1:8080"
 echo "  默认账号: weaiw / Aa41312432（登录后请改密）"
 echo ""
-echo "  改 .env 后: ./sync-env-docker.sh"
-echo "  或:         ./start-docker.sh --restart --verify"
-echo "  只看日志:   ./start-docker.sh --logs"
-echo "  停止:       ./stop-docker.sh"
+echo "  启动应用（直跑 backend + wechat-bot）: ./start-server.sh"
+echo "  改 .env / 拉代码后:                  ./start-server.sh --restart"
+echo "  只看日志:                            ./start-server.sh --logs"
+echo "  停止直跑:                            ./stop-server.sh"
+echo "  停止容器:                            ./stop-docker.sh"
 echo ""
 
 if [ "$VERIFY_KEYS" = true ]; then
   "$SCRIPT_DIR/verify-docker-keys.sh"
+  "$SCRIPT_DIR/verify-docker-deploy.sh"
 fi
 
 if [ "$FOLLOW_LOGS" = true ]; then

@@ -9,9 +9,48 @@ export interface StepLogEntry {
 
 const API_BASE = '';
 
+/** In-memory token mirror — updated by AuthProvider before localStorage round-trips complete. */
+let runtimeAuthToken: string | null = null;
+const AUTH_WAIT_MS = 3000;
+let authWaiters: Array<(token: string | null) => void> = [];
+
+export function setAuthToken(token: string | null): void {
+  runtimeAuthToken = token;
+  if (token) {
+    for (const cb of authWaiters) cb(token);
+    authWaiters = [];
+  }
+}
+
+function isPublicApiPath(path: string): boolean {
+  return path === '/api/auth/login' || path.startsWith('/api/auth/login?');
+}
+
 function getToken(): string | null {
+  if (runtimeAuthToken) return runtimeAuthToken;
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('inFlow_token');
+}
+
+/** Wait briefly for AuthProvider to hydrate token (fixes Docker first-paint race). */
+async function resolveAuthToken(path: string): Promise<string | null> {
+  const immediate = getToken();
+  if (immediate || isPublicApiPath(path)) return immediate;
+  if (typeof window === 'undefined') return null;
+
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => resolve(getToken()), AUTH_WAIT_MS);
+    authWaiters.push((token) => {
+      window.clearTimeout(timer);
+      resolve(token ?? getToken());
+    });
+  });
+}
+
+// Hydrate from localStorage as soon as the client bundle loads (before React mount).
+if (typeof window !== 'undefined') {
+  const stored = localStorage.getItem('inFlow_token');
+  if (stored) runtimeAuthToken = stored;
 }
 
 class ApiClient {
@@ -23,7 +62,7 @@ class ApiClient {
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
     const url = `${this.baseUrl}${path}`;
-    const token = getToken();
+    const token = await resolveAuthToken(path);
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -527,6 +566,7 @@ class ApiClient {
   async wechatGetStatus(): Promise<{
     bound: boolean;
     worker_likely_active: boolean;
+    connection_state?: 'active' | 'connecting' | 'expired';
     last_seen_at?: string;
     hint?: string;
   }> {

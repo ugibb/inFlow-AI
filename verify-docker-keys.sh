@@ -78,6 +78,10 @@ async def probe(name, coro):
     return ok
 
 async def probe_groq():
+    provider = (os.environ.get("ASR_PROVIDER") or "tingwu").strip().lower()
+    if provider != "groq":
+        print(f"[SKIP] GROQ ASR: ASR_PROVIDER={provider}（非 groq，跳过 Groq 探测）")
+        return True
     key = (os.environ.get("GROQ_API_KEY") or "").strip()
     if not key:
         print("[SKIP] GROQ ASR: 未配置 GROQ_API_KEY")

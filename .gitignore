@@ -1,5 +1,6 @@
 # Secrets — never commit
 .env
+*.env-bak
 *.pem
 
 # Python
@@ -12,6 +13,10 @@
 **/node_modules/
 03-src/frontend/.next/
 03-src/frontend/out/
+**/*.tsbuildinfo
+
+# Finder/manual duplicate copies (stale backups — keep the original only)
+* copy.md
 
 # Backend local config (UI runtime overrides; secrets go in .env)
 03-src/backend/app/config_store.json
@@ -35,6 +40,11 @@ Thumbs.db
 logs/
 log/
 04-log/
+
+# PID files（start-server.sh / start-worker.sh 进程管理）
+.server/
+.worker.pid
+.worker.pid.*
 
 # Project local artifacts
 _archive/

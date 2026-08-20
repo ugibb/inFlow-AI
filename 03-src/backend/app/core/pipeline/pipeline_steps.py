@@ -27,6 +27,36 @@ StepState = Literal["pending", "active", "done", "failed"]
 _AUDIO_EXTS = {".mp3", ".m4a", ".ogg", ".flac", ".wav", ".aac"}
 _VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".mov", ".avi"}
 
+# 外部 worker job 的步骤完成判定：按状态排名（云端看不到本地文件，_step_done 全 False）。
+# 状态 → 数值排名，单调递增；数值越大表示 pipeline 走得越深。
+_EXT_RANK = {
+    "pending": 0, "capturing": 1, "captured": 2,
+    "normalizing": 3, "normalized": 4,
+    "transcribing": 3, "transcribed": 4,
+    "parsing": 5, "parsed": 6,
+    "composing": 7, "composed": 8,
+    "indexing": 9, "ready": 10,
+    "failed": 0, "cancelled": 0,
+}
+# 每个步骤完成所需的排名阈值（rank >= 阈值 → done）
+_EXT_STEP_DONE_RANK = {
+    "capture": 2, "media_download": 2, "video_download": 2,
+    "normalize": 4, "transcribe": 4,
+    # chapters 在 parsing 开始即视为完成（rank 5），否则 parsing 期间
+    # "章节解析"显示 active 而真正在跑的 "AI 解析"却显示 pending。
+    "chapters": 5, "parse": 6,
+    "compose_html": 8, "compose_png": 8,
+    "index": 10,
+}
+
+
+def _ext_step_done(spec_id: str, status: str) -> bool:
+    """外部 worker job 的步骤是否完成（按状态排名，不查本地文件）。"""
+    if spec_id == "done":
+        return False
+    threshold = _EXT_STEP_DONE_RANK.get(spec_id, 99)
+    return _EXT_RANK.get(status, 0) >= threshold
+
 
 @dataclass(frozen=True)
 class StepSpec:
@@ -159,7 +189,7 @@ def _build_specs(content_type: str, raw_file_path: str, job_id: UUID) -> list[St
         StepSpec("capture", "资源下载", "资源", "capturing", raw_file_path,
                  active_statuses=frozenset({"pending", "capturing"}),
                  error_keys=frozenset({"capturing"})),
-        StepSpec("normalize", "文本规范化", "规范", "normalizing", parse_asr_txt_path(raw_file_path, jid),
+        StepSpec("normalize", "音频转录", "转录", "normalizing", parse_asr_txt_path(raw_file_path, jid),
                  active_statuses=frozenset({"normalizing"}),
                  error_keys=frozenset({"normalizing"})),
         StepSpec("chapters", "章节解析", "章节", "parsing", parse_chapters_path(raw_file_path, jid),
@@ -217,6 +247,13 @@ def compute_pipeline_steps(
     status = job.status
     error_stage = job.error_stage or ""
 
+    # 外部 worker job：云端看不到本地文件，改用状态排名判定各步骤完成度
+    done_flags = [
+        (_ext_step_done(spec.id, status) if job.external_processing
+         else _step_done(spec, raw_file_path, job_id))
+        for spec in specs
+    ]
+
     if status == "ready":
         states: list[StepState] = ["done"] * len(specs)
         states[-1] = "done"
@@ -230,7 +267,7 @@ def compute_pipeline_steps(
                 break
         else:
             for i, spec in enumerate(specs):
-                if not _step_done(spec, raw_file_path, job_id) and spec.id != "done":
+                if not done_flags[i] and spec.id != "done":
                     failed_idx = i
                     break
             else:
@@ -247,8 +284,6 @@ def compute_pipeline_steps(
             else:
                 states.append("pending")
         return _pack(specs, states, raw_file_path, job_id)
-
-    done_flags = [_step_done(s, raw_file_path, job_id) for s in specs]
     first_incomplete = next(
         (i for i, s in enumerate(specs) if s.id != "done" and not done_flags[i]),
         len(specs) - 1,

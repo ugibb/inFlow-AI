@@ -20,6 +20,7 @@ import { api } from '@/lib/api';
 import type { Article, Stats } from '@/lib/types';
 import ArticleCard from '@/components/ArticleCard';
 import AddContentModal from '@/components/AddContentModal';
+import { useAuth } from '@/contexts/AuthContext';
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
 
@@ -92,6 +93,7 @@ const statColorMap: Record<string, string> = {
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
+  const { loading: authLoading, token } = useAuth();
   // State
   const [stats, setStats] = useState<Stats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -156,11 +158,12 @@ export default function HomePage() {
     }
   }, [viewUsername]);
 
-  // Initial load
+  // Initial load — wait until auth token is ready to avoid anonymous API fallback
   useEffect(() => {
+    if (authLoading || !token) return;
     fetchStats();
     fetchArticles();
-  }, [fetchStats, fetchArticles]);
+  }, [authLoading, token, fetchStats, fetchArticles]);
 
   // Refresh on content added
   const refreshAll = useCallback(async () => {

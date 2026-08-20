@@ -24,6 +24,7 @@ specified step, skipping already-completed work.
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from uuid import UUID
 
 from fastapi import BackgroundTasks
@@ -33,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.models.ingest_job import IngestJob
 from app.core.models.article import Article
 from app.s1_ingest.adapters.registry import adapter_registry
+from app.core.config import get_settings
 from app.core.pipeline.state_machine import transition
 from app.core.pipeline.steps import (
     run_chapters,
@@ -46,6 +48,7 @@ from app.core.pipeline.pipeline_log import PhaseLogger, log_task_start, sanitize
 from app.core.shared.storage import default_storage
 
 logger = logging.getLogger("inFlow.ingest.orchestrator")
+settings = get_settings()
 
 # Platforms inferred as audio before capture begins
 _AUDIO_PLATFORMS = frozenset({"xiaoyuzhou", "bilibili"})
@@ -69,8 +72,14 @@ async def _route_pipeline(
     raw_file_path: str,
     source_url: str | None,
     source_platform: str | None,
+    on_composed: Callable[[UUID, str], Awaitable[bool]] | None = None,
 ) -> None:
-    """Route to the correct pipeline chain based on content_type."""
+    """Route to the correct pipeline chain based on content_type.
+
+    ``on_composed``：compose 成功后、index 之前调用的可选钩子（本地 worker 用它把
+    PNG 回传云端）。返回 False 表示回传失败 → job 停在 composed→failed，
+    不再继续 run_index。云端路径传 None，行为零变化。
+    """
     asr_for_card: str | None = None
 
     if content_type == "audio":
@@ -123,24 +132,102 @@ async def _route_pipeline(
     if parsed_path is None:
         return
 
-    composed = await run_compose_card(
+    await _compose_and_continue(
         db,
         job_id=job_id,
+        article_id=article_id,
+        user_id=user_id,
         raw_file_path=raw_file_path,
         parsed_file_path=parsed_path,
         asr_file_path=asr_for_card,
         source_platform=source_platform,
         content_type=content_type,
+        source_url=source_url,
+        on_composed=on_composed,
     )
-    if composed is None:
+
+
+async def _upload_png_or_fail(
+    db: AsyncSession,
+    *,
+    job_id: UUID,
+    png_path: str,
+    on_composed: Callable[[UUID, str], Awaitable[bool]],
+) -> bool:
+    """调用 on_composed 回传 PNG；成功返回 True。
+
+    失败（on_composed 返回 False 或抛异常）时把 job 置 composed→failed
+    （error_stage=composing）并返回 False。幂等：SFTP .tmp→rename 覆盖，
+    崩溃后重复回传安全。
+    """
+    try:
+        ok = await on_composed(job_id, png_path)
+    except Exception as exc:
+        logger.error("on_composed PNG 回传异常 job=%s: %s", job_id, exc)
+        ok = False
+    if ok:
+        return True
+    try:
+        await transition(
+            db,
+            job_id=job_id,
+            current_status="composed",
+            target_status="failed",
+            error_stage="composing",
+            error_message="PNG 回传云端失败",
+        )
+    except Exception as exc:
+        # transition 原子化后，若 composed 已被抢先变更，这里只记录不掩盖。
+        logger.error("composed→failed 回滚失败 job=%s: %s", job_id, exc)
+    return False
+
+
+async def _compose_and_continue(
+    db: AsyncSession,
+    *,
+    job_id: UUID,
+    article_id: UUID | None,
+    user_id: UUID,
+    raw_file_path: str,
+    parsed_file_path: str,
+    asr_file_path: str | None,
+    source_platform: str | None,
+    content_type: str,
+    source_url: str | None,
+    on_composed: Callable[[UUID, str], Awaitable[bool]] | None = None,
+) -> None:
+    """Run compose_card, then (optionally) upload PNG before indexing.
+
+    收敛 retry/_route_pipeline 里多处内联的 compose+index 序列：
+      1. run_compose_card 失败（返回 None）→ 已由步骤自身转 failed，直接返回
+      2. 外部 worker 时 on_composed 负责把本地 PNG 回传云端：
+         - 回传失败 → job 停在 composed→failed（error_stage=composing），不再 index
+         - 成功 → 继续 run_index（composed→indexing→ready）
+    """
+    composed = await run_compose_card(
+        db,
+        job_id=job_id,
+        raw_file_path=raw_file_path,
+        parsed_file_path=parsed_file_path,
+        asr_file_path=asr_file_path,
+        source_platform=source_platform,
+        content_type=content_type,
+    )
+    if composed is None or article_id is None:
         return
+
+    if on_composed is not None:
+        if not await _upload_png_or_fail(
+            db, job_id=job_id, png_path=composed[1], on_composed=on_composed
+        ):
+            return
 
     await run_index(
         db,
         job_id=job_id,
         article_id=article_id,
         user_id=user_id,
-        parsed_file_path=parsed_path,
+        parsed_file_path=parsed_file_path,
         raw_file_path=raw_file_path,
         source_url=source_url,
         source_platform=source_platform,
@@ -242,6 +329,23 @@ async def ingest_url(
     db.add(job)
     await db.flush()
     job_id = job.id
+
+    if settings.external_processing:
+        # 本地 worker 承接完整 pipeline：云端只登记 job，不跑 capture/后台任务。
+        # job 停在 pending，等本地 worker 认领。
+        job.external_processing = True
+        await db.commit()
+        log_task_start(
+            job_id=job_id,
+            article_id=article_id,
+            method="url",
+            platform=adapter.platform,
+            url=clean_url,
+        )
+        logger.info(
+            "外部处理分流: job=%s → 交给本地 worker（external_processing）", job_id
+        )
+        return job_id
 
     await transition(
         db,
@@ -410,6 +514,11 @@ async def resume_job(
         logger.warning("resume_job: job %s not found", job_id)
         return
 
+    if job.external_processing:
+        # 由本地 worker 承接的 job：云端不调度，交给 worker 的 claim/心跳循环处理
+        logger.info("resume_job: job %s 由本地 worker 处理，云端跳过调度", job_id)
+        return
+
     background_tasks.add_task(_run_resume, job_id=job_id)
     logger.info(
         "resume_job queued: job=%s from_status=%s", job_id, job.status,
@@ -456,7 +565,7 @@ async def _run_url_capture(
             phase = PhaseLogger(
                 job_id, "capturing", content_type=_infer_content_type(adapter.platform),
             )
-            phase.start(backend='浏览器抓取')
+            phase.start()
             # phase.detail("抓取页面元数据…")
 
             raw_capture = await adapter.fetch(url, user_id=user_id, capture_method=capture_method)
@@ -512,7 +621,6 @@ async def _run_url_capture(
 
         except Exception as exc:
             phase.fail(str(exc)[:200])
-            logger.error("URL capture failed: job=%s error=%s", job_id, exc)
             try:
                 await transition(
                     db,
@@ -541,7 +649,7 @@ async def _run_upload_capture(
         phase = PhaseLogger(job_id, "capturing", content_type="article")
         try:
             adapter = UploadAdapter()
-            phase.start(platform="upload", file=filename)
+            phase.start()
             phase.detail("解析上传文件…")
 
             raw_capture = await adapter.fetch_from_bytes(
@@ -568,7 +676,7 @@ async def _run_upload_capture(
 
             await _update_article_from_raw(db, job_id, raw_capture)
 
-            phase.end(file=filename)
+            phase.end()
 
             job = await db.get(IngestJob, job_id)
             article = await db.get(Article, job.article_id) if job and job.article_id else None
@@ -585,7 +693,6 @@ async def _run_upload_capture(
 
         except Exception as exc:
             phase.fail(str(exc)[:200])
-            logger.error("Upload capture failed: job=%s error=%s", job_id, exc)
             try:
                 await transition(
                     db,
@@ -612,7 +719,7 @@ async def _run_text_capture(
     async with async_session() as db:
         phase = PhaseLogger(job_id, "capturing", content_type="article")
         try:
-            phase.start(platform="generic", title=sanitize_log_text(title)[:60])
+            phase.start()
 
             meta = RawMeta(
                 source_platform="generic",
@@ -641,7 +748,7 @@ async def _run_text_capture(
                 raw_file_path=raw_path,
             )
 
-            phase.end(chars=len(text))
+            phase.end()
 
             job = await db.get(IngestJob, job_id)
             await _route_pipeline(
@@ -657,7 +764,6 @@ async def _run_text_capture(
 
         except Exception as exc:
             phase.fail(str(exc)[:200])
-            logger.error("Text capture failed: job=%s error=%s", job_id, exc)
             try:
                 await transition(
                     db,
@@ -671,8 +777,15 @@ async def _run_text_capture(
                 pass
 
 
-async def _run_resume(*, job_id: UUID) -> None:
-    """Background task for resuming a retried job from its current status."""
+async def _run_resume(
+    *,
+    job_id: UUID,
+    on_composed: Callable[[UUID, str], Awaitable[bool]] | None = None,
+) -> None:
+    """Background task for resuming a retried job from its current status.
+
+    ``on_composed``：本地 worker 传入时，compose 后先把 PNG 回传云端再 index。
+    """
     from app.core.database import async_session
 
     async with async_session() as db:
@@ -722,6 +835,7 @@ async def _run_resume(*, job_id: UUID) -> None:
                     raw_file_path=raw_path,
                     source_url=source_url,
                     source_platform=source_platform,
+                    on_composed=on_composed,
                 )
             return
 
@@ -738,6 +852,7 @@ async def _run_resume(*, job_id: UUID) -> None:
                 raw_file_path=job.raw_file_path,
                 source_url=source_url,
                 source_platform=source_platform,
+                on_composed=on_composed,
             )
             return
 
@@ -762,26 +877,19 @@ async def _run_resume(*, job_id: UUID) -> None:
             )
             if not parsed_path or not article_id:
                 return
-            composed = await run_compose_card(
+            await _compose_and_continue(
                 db,
                 job_id=job_id,
+                article_id=article_id,
+                user_id=user_id,
                 raw_file_path=job.raw_file_path,
                 parsed_file_path=parsed_path,
                 asr_file_path=job.asr_file_path,
                 source_platform=source_platform,
                 content_type=content_type,
+                source_url=source_url,
+                on_composed=on_composed,
             )
-            if composed and article_id:
-                await run_index(
-                    db,
-                    job_id=job_id,
-                    article_id=article_id,
-                    user_id=user_id,
-                    parsed_file_path=parsed_path,
-                    raw_file_path=job.raw_file_path,
-                    source_url=source_url,
-                    source_platform=source_platform,
-                )
             return
 
         if job.status == "normalized":
@@ -807,26 +915,19 @@ async def _run_resume(*, job_id: UUID) -> None:
             )
             if not parsed_path or not article_id:
                 return
-            composed = await run_compose_card(
+            await _compose_and_continue(
                 db,
                 job_id=job_id,
+                article_id=article_id,
+                user_id=user_id,
                 raw_file_path=job.raw_file_path,
                 parsed_file_path=parsed_path,
                 asr_file_path=asr_txt,
                 source_platform=source_platform,
                 content_type=content_type,
+                source_url=source_url,
+                on_composed=on_composed,
             )
-            if composed and article_id:
-                await run_index(
-                    db,
-                    job_id=job_id,
-                    article_id=article_id,
-                    user_id=user_id,
-                    parsed_file_path=parsed_path,
-                    raw_file_path=job.raw_file_path,
-                    source_url=source_url,
-                    source_platform=source_platform,
-                )
             return
 
         if job.status == "parsed":
@@ -837,32 +938,35 @@ async def _run_resume(*, job_id: UUID) -> None:
             asr_for_card = job.asr_file_path
             if content_type != "audio":
                 asr_for_card = parse_asr_txt_path(job.raw_file_path, job_id)
-            composed = await run_compose_card(
+            await _compose_and_continue(
                 db,
                 job_id=job_id,
+                article_id=article_id,
+                user_id=user_id,
                 raw_file_path=job.raw_file_path,
                 parsed_file_path=job.parsed_file_path,
                 asr_file_path=asr_for_card,
                 source_platform=source_platform,
                 content_type=content_type,
+                source_url=source_url,
+                on_composed=on_composed,
             )
-            if composed:
-                await run_index(
-                    db,
-                    job_id=job_id,
-                    article_id=article_id,
-                    user_id=user_id,
-                    parsed_file_path=job.parsed_file_path,
-                    raw_file_path=job.raw_file_path,
-                    source_url=source_url,
-                    source_platform=source_platform,
-                )
             return
 
         if job.status == "composed":
             if not job.parsed_file_path or not job.raw_file_path or not article_id:
                 logger.error("resume: job %s missing paths for composed status", job_id)
                 return
+            # 崩溃于 compose 之后、SFTP 回传完成前：重跑回传（幂等 .tmp→rename 覆盖），
+            # 失败则 job 停在 composed→failed，绝不出现 ready 却无云端 PNG。
+            if on_composed is not None:
+                from app.core.shared.storage.conventions import display_card_png_path
+
+                png_path = display_card_png_path(job.raw_file_path, job_id)
+                if not await _upload_png_or_fail(
+                    db, job_id=job_id, png_path=png_path, on_composed=on_composed
+                ):
+                    return
             await run_index(
                 db,
                 job_id=job_id,
@@ -891,6 +995,7 @@ async def _run_resume(*, job_id: UUID) -> None:
                 raw_file_path=job.raw_file_path,
                 source_url=source_url,
                 source_platform=source_platform,
+                on_composed=on_composed,
             )
             return
 
@@ -909,6 +1014,7 @@ async def _run_resume(*, job_id: UUID) -> None:
                 raw_file_path=job.raw_file_path,
                 source_url=source_url,
                 source_platform=source_platform,
+                on_composed=on_composed,
             )
             return
 
@@ -953,29 +1059,21 @@ async def _run_resume(*, job_id: UUID) -> None:
                     current_status="parsing",
                     content_type=content_type,
                 )
-            if parsed_path and article_id and job.raw_file_path:
+            if parsed_path and job.raw_file_path:
                 asr_for_card = job.asr_file_path or parse_asr_txt_path(job.raw_file_path, job_id)
-                composed = await run_compose_card(
+                await _compose_and_continue(
                     db,
                     job_id=job_id,
+                    article_id=article_id,
+                    user_id=user_id,
                     raw_file_path=job.raw_file_path,
                     parsed_file_path=parsed_path,
                     asr_file_path=asr_for_card,
                     source_platform=source_platform,
                     content_type=content_type,
+                    source_url=source_url,
+                    on_composed=on_composed,
                 )
-                if composed:
-                    await run_index(
-                        db,
-                        job_id=job_id,
-                        article_id=article_id,
-                        user_id=user_id,
-                        parsed_file_path=parsed_path,
-                        raw_file_path=job.raw_file_path,
-                        source_url=source_url,
-                        source_platform=source_platform,
-                        content_type=content_type,
-                    )
             return
 
         if job.status == "composing":
@@ -986,26 +1084,19 @@ async def _run_resume(*, job_id: UUID) -> None:
             if content_type != "audio":
                 from app.core.shared.storage.conventions import parse_asr_txt_path
                 asr_for_card = parse_asr_txt_path(job.raw_file_path, job_id)
-            composed = await run_compose_card(
+            await _compose_and_continue(
                 db,
                 job_id=job_id,
+                article_id=article_id,
+                user_id=user_id,
                 raw_file_path=job.raw_file_path,
                 parsed_file_path=job.parsed_file_path,
                 asr_file_path=asr_for_card,
                 source_platform=source_platform,
                 content_type=content_type,
+                source_url=source_url,
+                on_composed=on_composed,
             )
-            if composed:
-                await run_index(
-                    db,
-                    job_id=job_id,
-                    article_id=article_id,
-                    user_id=user_id,
-                    parsed_file_path=job.parsed_file_path,
-                    raw_file_path=job.raw_file_path,
-                    source_url=source_url,
-                    source_platform=source_platform,
-                )
             return
 
         if job.status == "indexing":
@@ -1130,6 +1221,8 @@ async def recover_captured_jobs() -> None:
                 select(IngestJob).where(
                     IngestJob.status.in_(_RECOVERABLE),
                     IngestJob.article_id.isnot(None),
+                    # 由本地 worker 承接的 job 不在云端恢复，避免云端抢跑/重复处理
+                    IngestJob.external_processing.is_(False),
                 )
             )
             jobs = result.scalars().all()

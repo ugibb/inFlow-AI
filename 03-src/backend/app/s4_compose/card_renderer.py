@@ -26,10 +26,17 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
+from uuid import UUID
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.core.config import get_settings
+from app.core.shared.storage.conventions import (
+    display_card_png_path,
+    parse_asr_txt_path,
+    parse_json_path,
+    parse_transcript_base,
+)
 from app.core.utils.logger import get_logger
 from app.s2_parse.schema import ParsedContent
 from app.prompts import load_prompt
@@ -456,18 +463,53 @@ _PROMPT_CARD_HTML = "s4/20250413-播客访谈记录生成网页Prompt"
 _CONTENT_MAX_CHARS = 12_000
 
 
+def _resolve_card_source_paths(
+    raw_file_path: str | None,
+    job_id: str,
+    *,
+    parsed_file_path: str | None = None,
+    asr_file_path: str | None = None,
+) -> tuple[str | None, str | None]:
+    """Fill parsed/asr paths from storage conventions when DB columns are unset."""
+    jid = UUID(job_id)
+    parsed = parsed_file_path if parsed_file_path and Path(parsed_file_path).is_file() else None
+    asr = asr_file_path if asr_file_path and Path(asr_file_path).is_file() else None
+    if not raw_file_path:
+        return parsed, asr
+
+    if not parsed:
+        candidate = parse_json_path(raw_file_path, jid)
+        if Path(candidate).is_file():
+            parsed = candidate
+    if not asr:
+        for candidate in (
+            parse_asr_txt_path(raw_file_path, jid),
+            parse_transcript_base(raw_file_path, jid),
+        ):
+            if Path(candidate).is_file():
+                asr = candidate
+                break
+    return parsed, asr
+
+
 def _resolve_cards_dir(
-    asr_file_path: str | None,
-    parsed_file_path: str | None,
+    *,
+    raw_file_path: str | None = None,
+    job_id: str | None = None,
+    asr_file_path: str | None = None,
+    parsed_file_path: str | None = None,
 ) -> Path:
-    """Map 02_parse episode folder → parallel 03_display folder."""
-    base = Path(parsed_file_path or asr_file_path or "").parent
-    if not base.name:
-        cards_dir = _S4_DIR / "cards"
+    """Resolve 03_display output folder for card HTML/PNG."""
+    if raw_file_path and job_id:
+        cards_dir = Path(display_card_png_path(raw_file_path, UUID(job_id))).parent
     else:
-        cards_dir = Path(str(base).replace("/02_parse/", "/03_display/", 1))
-        if cards_dir == base:
+        base = Path(parsed_file_path or asr_file_path or "").parent
+        if not base.name:
             cards_dir = _S4_DIR / "cards"
+        else:
+            cards_dir = Path(str(base).replace("/02_parse/", "/03_display/", 1))
+            if cards_dir == base:
+                cards_dir = _S4_DIR / "cards"
     cards_dir.mkdir(parents=True, exist_ok=True)
     return cards_dir
 
@@ -631,7 +673,13 @@ async def _screenshot_html_to_png(
     t0 = time.monotonic()
     try:
         async with async_playwright() as pw:
-            browser = await pw.chromium.launch()
+            browser = await pw.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                ],
+            )
             page = await browser.new_page(
                 viewport={
                     "width": viewport_w,
@@ -640,11 +688,20 @@ async def _screenshot_html_to_png(
                 device_scale_factor=scale,
             )
             url = f"http://127.0.0.1:{port}/{html_path.name}"
-            await page.goto(url, wait_until="networkidle", timeout=45000)
+            # networkidle hangs in Docker when LLM HTML references slow/blocked CDN
+            # images or fonts; load + short settle is enough for local screenshot.
+            goto_timeout_ms = 60_000
+            try:
+                await page.goto(url, wait_until="load", timeout=goto_timeout_ms)
+            except Exception as first_err:
+                _log(f"HTML→PNG load 超时，降级 domcontentloaded: {first_err}")
+                await page.goto(
+                    url, wait_until="domcontentloaded", timeout=goto_timeout_ms
+                )
             await page.evaluate(
                 "typeof window.hideToolbar === 'function' && window.hideToolbar()"
             )
-            await page.wait_for_timeout(1500)
+            await page.wait_for_timeout(2000)
             await page.screenshot(path=str(png_path), full_page=True, type="png")
             await browser.close()
     finally:
@@ -673,6 +730,7 @@ async def screenshot_html_content(html_content: str) -> bytes:
 async def render_card_png_for_job(
     job_id: str,
     *,
+    raw_file_path: str | None = None,
     asr_file_path: str | None = None,
     parsed_file_path: str | None = None,
     source_platform: str | None = None,
@@ -683,7 +741,18 @@ async def render_card_png_for_job(
     Supports audio (ASR transcript) and article (ParsedContent). If ``{job_id}.png``
     already exists under ``data/03_display/…``, returns that path without re-rendering.
     """
-    cards_dir = _resolve_cards_dir(asr_file_path, parsed_file_path)
+    parsed_file_path, asr_file_path = _resolve_card_source_paths(
+        raw_file_path,
+        job_id,
+        parsed_file_path=parsed_file_path,
+        asr_file_path=asr_file_path,
+    )
+    cards_dir = _resolve_cards_dir(
+        raw_file_path=raw_file_path,
+        job_id=job_id,
+        asr_file_path=asr_file_path,
+        parsed_file_path=parsed_file_path,
+    )
     html_path = cards_dir / f"{job_id}.html"
     png_path = cards_dir / f"{job_id}.png"
     viewport_w, scale = _card_screenshot_settings()
