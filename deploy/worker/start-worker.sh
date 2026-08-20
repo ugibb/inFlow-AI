@@ -2,15 +2,16 @@
 # inFlow AI 本地独立 worker 启动脚本
 # 作用：连接云端 PostgreSQL（任务总线），轮询 external_processing 的外部 job，
 #       本地跑完整 pipeline（采集→转录→parse→compose→index），PNG 经 SFTP 回传云端。
-# 用法: ./start-worker.sh [--detach]
+# 用法: ./deploy/worker/start-worker.sh [--detach]
 #   默认    启动 worker 并 tail -F worker 日志（04-log/worker/YYYY-MM-DD.log）
 #   --detach / -d  仅后台启动，不跟踪日志
-# 停止：./stop-worker.sh（或 pkill -f 'app.local_worker'）
+# 停止：./deploy/worker/stop-worker.sh（或 pkill -f 'app.local_worker'）
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+cd "$REPO_ROOT"
 
 FOLLOW_LOGS=true
 for arg in "$@"; do
@@ -19,7 +20,7 @@ for arg in "$@"; do
       FOLLOW_LOGS=false
       ;;
     -h|--help)
-      echo "用法: ./start-worker.sh [--detach]"
+      echo "用法: ./deploy/worker/start-worker.sh [--detach]"
       echo ""
       echo "  默认    启动 worker 并跟踪日志（04-log/worker/YYYY-MM-DD.log）"
       echo "  --detach / -d  仅后台启动，不跟踪日志"
@@ -34,9 +35,9 @@ for arg in "$@"; do
   esac
 done
 
-BACKEND_DIR="${SCRIPT_DIR}/03-src/backend"
-WORKER_LOG_DIR="${SCRIPT_DIR}/04-log/worker"
-PID_FILE="${SCRIPT_DIR}/.worker.pid"
+BACKEND_DIR="${REPO_ROOT}/03-src/backend"
+WORKER_LOG_DIR="${REPO_ROOT}/04-log/worker"
+PID_FILE="${REPO_ROOT}/.worker.pid"
 ENV_WORKER="${BACKEND_DIR}/.env.local-worker"
 
 info()  { echo "[INFO]  $*"; }
@@ -127,7 +128,7 @@ LOG_FILE="${WORKER_LOG_DIR}/${TODAY}.log"
 
 # 若已有 worker 在跑，先提示
 if [ -f "${PID_FILE}" ] && kill -0 "$(cat "${PID_FILE}")" 2>/dev/null; then
-  warn "已有 worker 在运行（PID $(cat "${PID_FILE}")）。先执行 ./stop-worker.sh 再启动。"
+  warn "已有 worker 在运行（PID $(cat "${PID_FILE}")）。先执行 ./deploy/worker/stop-worker.sh 再启动。"
   exit 1
 fi
 
@@ -143,6 +144,6 @@ echo "${WORKER_PID}" > "${PID_FILE}"
 info "worker 已启动（PID ${WORKER_PID}）"
 
 if [ "${FOLLOW_LOGS}" = true ]; then
-  info "跟踪日志中（Ctrl+C 退出跟踪，worker 继续后台运行；停止用 ./stop-worker.sh）"
+  info "跟踪日志中（Ctrl+C 退出跟踪，worker 继续后台运行；停止用 ./deploy/worker/stop-worker.sh）"
   tail -F "${LOG_FILE}"
 fi

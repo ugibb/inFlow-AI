@@ -13,7 +13,7 @@
 
 > 🔥 **这是 Simonlin 优化版** ([simonlin000/ inFlow-ai](https://github.com/simonlin000/ inFlow-ai)) — 在原版 [weaiw/ inFlow-ai](https://github.com/weaiw/ inFlow-ai) 基础上增加了 B 站/YouTube 视频 ASR 语音转录、DeepSeek V4-Pro 驱动、UI 配置化等关键能力。详见下方 [Simon Fork 变更](#simon-fork-变更-v11)。
 
-[中文 README](README.zh.md) · [Self-host guide](docs/SELF_HOST.md) · [Obsidian plugin](https://github.com/weaiw/inFlow-sync-obsidian)
+[中文 README](README.zh.md) · [Deploy guide](deploy/cloud/README.md) · [Obsidian plugin](https://github.com/weaiw/inFlow-sync-obsidian)
 
 </div>
 
@@ -173,55 +173,45 @@ inFlow AI is the **only** option that combines: deep Chinese platform support ·
 
 ### Prerequisites
 
-- **Docker** ≥ 24.0 with Compose v2 (`docker compose ...`, not `docker-compose`)
-- ~ **4 GB RAM** free
-- ~ **5 GB disk**
+inFlow ships as two physically separated deployment units:
 
-That's it. No Python or Node required on the host.
+- **Cloud unit** (`deploy/cloud/`): backend + wechat-bot run directly on the host; only infrastructure (postgres / redis / nginx / frontend) runs in containers
+- **Local worker** (`deploy/worker/`, optional): a Mac polling the cloud PostgreSQL directly, taking over heavy compute pipelines such as podcast transcription
 
-### Steps
+**Cloud unit**
+
+- **Python 3.10+** (runs backend / bot), **Docker** ≥ 24.0 with Compose v2 (infra containers only)
+- ~ **4 GB RAM**, ~ **5 GB disk**
+
+**Local worker (optional)**
+
+- macOS with **Python 3.10+** and ffmpeg; access to external AI APIs (Groq etc.)
+- See [`deploy/worker/README.md`](deploy/worker/README.md)
+
+### Steps (cloud)
 
 ```bash
-# 1. Clone (Simon 优化版，含视频 ASR + YouTube + DeepSeek)
-git clone https://github.com/simonlin000/ inFlow-ai.git
-cd  inFlow-ai
+# 1. Clone
+git clone <repo-url> && cd inFlow-ai
 
-# 或原版
-# git clone https://github.com/weaiw/ inFlow-ai.git
+# 2. Backend dependencies (one-time)
+cd 03-src/backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && cd ../..
 
-# 2. Configure secrets
-cp .env.example .env
-# Edit .env, at minimum:
-#   POSTGRES_PASSWORD=$(openssl rand -base64 24)
-#   SECRET_KEY=$(openssl rand -base64 48)
+# 3. Start: generates .env secrets, brings up infra containers, runs backend / wechat-bot
+./deploy/cloud/start-server.sh
 
-# 3. (Optional) Pre-fill LLM keys (or skip — configure via web UI later)
-cp backend/app/config_store.example.json backend/app/config_store.json
-
-# 4. Run
-docker compose up -d
-
-# 5. Open
-open http://localhost
+# 4. Open
+open http://127.0.0.1:8080
 ```
 
 First-time setup creates an admin user. The credentials appear in backend logs:
 
 ```bash
-docker compose logs backend | grep -i admin
+grep -i admin "04-log/backend/$(date +%F).log"
 ```
 
-Full self-host guide with troubleshooting: **[`docs/SELF_HOST.md`](docs/SELF_HOST.md)**.
-
-### Cloud deployment
-
-Any Docker-capable VM works. Battle-tested on:
-- **腾讯云 Lighthouse / CVM** (recommended for China users)
-- AWS EC2 t3.medium
-- DigitalOcean 4GB droplet
-- Hetzner CX22
-
-Bring your own reverse proxy (**Caddy / Traefik / Nginx**) for HTTPS, or use Cloudflare Tunnel.
+Day-to-day updates: `git pull && ./deploy/cloud/start-server.sh --restart`.
+Container commands, DB backups and troubleshooting live in **[`deploy/cloud/README.md`](deploy/cloud/README.md)**.
 
 ---
 
@@ -358,7 +348,7 @@ The plugin auto-detects already-synced articles via dual-OR (sync_state.json ∪
 
 ## Documentation
 
-- [`docs/SELF_HOST.md`](docs/SELF_HOST.md) — Full self-host guide with troubleshooting
+- [`deploy/cloud/README.md`](deploy/cloud/README.md) · [`deploy/worker/README.md`](deploy/worker/README.md) — cloud / worker deployment
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — How to contribute
 - API docs at `/api/docs` (auto-generated from FastAPI)
 
@@ -510,7 +500,7 @@ v1.1 adds PWA so you can "add to home screen" on iOS / Android.
 <details>
 <summary><strong>Do I need to know coding to deploy?</strong></summary>
 
-Basic Docker familiarity helps. [`docs/SELF_HOST.md`](docs/SELF_HOST.md) walks through every step.
+Basic terminal familiarity is enough. [`deploy/cloud/README.md`](deploy/cloud/README.md) walks through every step.
 If you're stuck, open an issue and the community usually responds within a day.
 </details>
 

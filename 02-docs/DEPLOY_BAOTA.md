@@ -1,5 +1,10 @@
 # inFlow AI — 腾讯云宝塔面板部署指南
 
+
+> ⚠️ **本流程已废弃（2026-08-20）**：Docker 全容器部署形态已移除。
+> 当前部署形态为「云端代码直跑 + 本地 worker」两个单元，见 [`deploy/cloud/README.md`](../deploy/cloud/README.md) 与 [`deploy/worker/README.md`](../deploy/worker/README.md)。
+> 本文档仅作历史参考；相关脚本可从 git 历史找回。
+
 适用于 **宝塔 Linux 面板 11.4.0 腾讯云专享版**（及其他 11.x 版本）。
 
 > **OpenCloudOS 9 用户**：腾讯云 CVM 默认系统，与宝塔官方兼容列表一致（RHEL 9 系）。本项目数据库跑在 Docker 内的 PostgreSQL，**无需**在宝塔安装 MySQL/MariaDB，可避开 OpenCloudOS 9 上宝塔数据库软件的兼容性问题。详见下方 [OpenCloudOS 9 专项说明](#opencloudos-9-专项说明)。

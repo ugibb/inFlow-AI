@@ -1,5 +1,10 @@
 # inFlow AI — 腾讯云宝塔部署「逐步操作手册」
 
+
+> ⚠️ **本流程已废弃（2026-08-20）**：Docker 全容器部署形态已移除。
+> 当前部署形态为「云端代码直跑 + 本地 worker」两个单元，见 [`deploy/cloud/README.md`](../deploy/cloud/README.md) 与 [`deploy/worker/README.md`](../deploy/worker/README.md)。
+> 本文档仅作历史参考；相关脚本可从 git 历史找回。
+
 > **适用环境**：腾讯云 CVM / Lighthouse · **OpenCloudOS 9** · 宝塔 Linux 面板 **11.4.0 腾讯云专享版**  
 > **预计耗时**：首次部署约 30–60 分钟（含 Docker 镜像构建 10–20 分钟）
 

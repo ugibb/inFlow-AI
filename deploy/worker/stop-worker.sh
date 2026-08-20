@@ -3,7 +3,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PID_FILE="${SCRIPT_DIR}/.worker.pid"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+PID_FILE="${REPO_ROOT}/.worker.pid"
 
 if [ -f "${PID_FILE}" ]; then
   PID="$(cat "${PID_FILE}")"

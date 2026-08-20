@@ -11,7 +11,7 @@
 [![全端兼容: PC · Pad · 移动端](https://img.shields.io/badge/全端兼容-PC%20·%20Pad%20·%20移动端-007aff)]()
 [![Status: active](https://img.shields.io/badge/状态-持续更新-success.svg)]()
 
-[English README](README.md) · [自部署指南](docs/SELF_HOST.md) · [Obsidian 插件](https://github.com/weaiw/inFlow-sync-obsidian)
+[English README](README.md) · [部署指南](deploy/cloud/README.md) · [Obsidian 插件](https://github.com/weaiw/inFlow-sync-obsidian)
 
 </div>
 
@@ -185,72 +185,56 @@ inFlow AI 是**唯一**同时拥有这些能力的产品:深度中文平台支�
 
 ### 前置要求
 
-**方式一：Docker 部署（推荐生产环境）**
+inFlow 的部署形态为两个物理独立的单元:
 
-- **Docker** ≥ 24.0,带 Compose v2(用 `docker compose ...`,不是 `docker-compose`)
-- 大约 **4 GB 内存**
-- 大约 **5 GB 磁盘**
+- **云端单元**(`deploy/cloud/`):服务器代码直跑 backend + wechat-bot,仅基础设施(postgres / redis / nginx / frontend)走容器
+- **本地 worker**(`deploy/worker/`,可选):Mac 直连云端 PostgreSQL 轮询认领任务,承接播客等重计算 pipeline
 
-**方式二：本地开发（无需 Docker）**
+**云端单元**
 
-- **Python 3.10+**、**Node.js 18+**、**PostgreSQL 16**（需 pgvector 扩展）
-- macOS 可用 Homebrew 安装依赖
+- **Python 3.10+**(跑 backend / bot)、**Docker** ≥ 24.0 带 Compose v2(仅跑 infra 容器)
+- 约 **4 GB 内存**、**5 GB 磁盘**
 
-就这些。Docker 方式宿主机不需要 Python 或 Node；本地开发方式不需要 Docker。
+**本地 worker(可选)**
 
-### 步骤
+- macOS + **Python 3.10+**、ffmpeg;可访问外网 AI API(Groq 等)
+- 详见 [`deploy/worker/README.md`](deploy/worker/README.md)
+
+### 步骤(云端)
 
 ```bash
 # 1. 克隆
-git clone https://github.com/weaiw/ inFlow-ai.git
-cd  inFlow-ai
+git clone <repo-url> && cd inFlow-ai
 
-# 2. 配置密钥
-cp .env.example .env
-# 编辑 .env,至少设置:
-#   POSTGRES_PASSWORD=$(openssl rand -base64 24)
-#   SECRET_KEY=$(openssl rand -base64 48)
+# 2. 后端依赖(一次性)
+cd 03-src/backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && cd ../..
 
-# 3.(可选)预填 LLM 配置,也可以等启动后在网页 UI 里设
-cp backend/app/config_store.example.json backend/app/config_store.json
+# 3. 启动:自动生成 .env 密钥、起 infra 容器、直跑 backend / wechat-bot
+./deploy/cloud/start-server.sh
 
-# 4. 启动
-
-**本地开发（无需 Docker）：**
-```bash
-./start-local.sh      # 自动初始化数据库、安装依赖、启动前后端
-# 访问 http://localhost:3000
-# 停止: ./stop-local.sh
-```
-
-**Docker 部署：**
-```bash
-./start.sh            # 推荐：自动处理端口占用并启动
-# 或手动: docker compose up -d
-```
-
-# 5. 打开
-open http://localhost        # Docker 方式
-# open http://localhost:3000  # 本地开发方式
+# 4. 打开
+open http://127.0.0.1:8080
 ```
 
 首次启动会自动创建超管账号,密码在 backend 日志里:
 
 ```bash
-docker compose logs backend | grep -i admin
+grep -i admin "04-log/backend/$(date +%F).log"
 ```
 
-完整自部署指南 + 故障排查:**[`docs/SELF_HOST.md`](docs/SELF_HOST.md)**。
+日常更新:`git pull && ./deploy/cloud/start-server.sh --restart`。
+容器命令、数据库备份、故障排查见 **[`deploy/cloud/README.md`](deploy/cloud/README.md)**。
 
-### 云端部署
+### 本地 worker(可选)
 
-任何支持 Docker 的虚拟机都行。已实测:
-- **腾讯云 Lighthouse / CVM**(国内用户首选)
-- AWS EC2 t3.medium
-- DigitalOcean 4GB
-- Hetzner CX22
+```bash
+# 一次性:填云端 PG 连接 / SFTP / API Key
+cp deploy/worker/.env.local-worker.example 03-src/backend/.env.local-worker
 
-HTTPS 自己用 **Caddy / Traefik / Nginx** 反代,或者直接挂 Cloudflare Tunnel。
+./deploy/worker/start-worker.sh   # 启动并跟踪日志
+```
+
+实操手册:**[`02-docs/20260820_12_本地Worker部署实操指南.md`](02-docs/20260820_12_本地Worker部署实操指南.md)**。
 
 ---
 
@@ -387,7 +371,7 @@ HTTPS 自己用 **Caddy / Traefik / Nginx** 反代,或者直接挂 Cloudflare Tu
 
 ## 文档
 
-- [`docs/SELF_HOST.md`](docs/SELF_HOST.md) — 完整自部署指南 + 故障排查
+- [`deploy/cloud/README.md`](deploy/cloud/README.md) · [`deploy/worker/README.md`](deploy/worker/README.md) — 云端 / 本地 worker 部署
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — 贡献指南
 - API 文档:`/api/docs`(FastAPI 自动生成)
 
@@ -475,7 +459,7 @@ v1.1 加 PWA,可以"添加到 iOS / Android 主屏幕"用得像原生 App。
 <details>
 <summary><strong>不会写代码能部署吗?</strong></summary>
 
-会用 Docker 基本命令就行。[`docs/SELF_HOST.md`](docs/SELF_HOST.md) 一步步带你走。
+会用终端基本命令就行。[`deploy/cloud/README.md`](deploy/cloud/README.md) 一步步带你走。
 遇到问题开 issue,社区一般一天内会回。
 </details>
 

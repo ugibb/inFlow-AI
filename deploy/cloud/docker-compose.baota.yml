@@ -3,7 +3,7 @@
 #
 # 将容器 Nginx 绑定到本机 127.0.0.1:8080，避免与宝塔面板 Nginx（占用 80/443）冲突。
 # 对外 HTTPS 由宝塔「网站 → 反向代理」转发到 127.0.0.1:8080。
-# wechat-bot：微信绑定后的消息长轮询服务（deploy-baota.sh 会自动配置 SERVICE_TOKEN_WECHAT_BOT）。
+# wechat-bot：微信绑定后的消息长轮询服务（deploy/cloud/start-server.sh 会自动配置 SERVICE_TOKEN_WECHAT_BOT）。
 
 services:
   nginx:

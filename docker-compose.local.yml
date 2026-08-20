@@ -1,7 +1,0 @@
-# 本地 Docker 部署端口映射（与宝塔 baota.yml 二选一，勿同时使用）
-# 用法: docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
-
-services:
-  nginx:
-    ports:
-      - "80:80"

@@ -189,13 +189,12 @@ class inFlowClient:
                 "❌ 添加失败：后端未认可 bot 凭证。"
                 "请确认 .env 中 SERVICE_TOKENS 与 SERVICE_TOKEN_WECHAT_BOT 一致，"
                 "且 SERVICE_TOKENS 含「token:weaiw」。"
-                "本地：./stop-local.sh && ./start-local.sh；"
-                "Docker：docker compose up -d --force-recreate backend wechat-bot。"
+                "云端：./deploy/cloud/stop-server.sh && ./deploy/cloud/start-server.sh --restart。"
             ), None, None
         if r.status_code == 503:
             return False, (
                 "❌ 添加失败：无法连接本地后端（可能被系统代理拦截）。"
-                "请执行 ./stop-local.sh && ./start-local.sh 重启服务后重试。"
+                "请执行 ./deploy/cloud/stop-server.sh && ./deploy/cloud/start-server.sh 重启服务后重试。"
             ), None, None
         try:
             detail = r.json().get("detail", "")
@@ -1178,7 +1177,7 @@ async def _async_main():
 
 def main():
     settings = get_settings()
-    # 与 backend 共用 04-log/backend/日期.log，便于 start-local.sh --logs 一处查看
+    # 与 backend 共用 04-log/backend/日期.log，便于 ./deploy/cloud/start-server.sh --logs 一处查看
     setup_logging(
         log_dir=settings.get_log_dir_path(),
         file_level=settings.log_level,

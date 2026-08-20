@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# 停止直跑 backend / wechat-bot（基础设施容器不停止；停容器用 ./stop-docker.sh）
+# 停止直跑 backend / wechat-bot（基础设施容器不停止）
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PID_DIR="${SCRIPT_DIR}/.server"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+PID_DIR="${REPO_ROOT}/.server"
 
 stop_pidfile() {
   local pidfile="$1" name="$2"
@@ -40,4 +41,4 @@ if pgrep -f 'app.extensions.wechat.bot' >/dev/null; then
   pkill -f 'app.extensions.wechat.bot' || true
 fi
 
-echo "[INFO] 直跑进程已停止；基础设施容器仍运行（./stop-docker.sh 停止容器）"
+echo "[INFO] 直跑进程已停止；基础设施容器仍运行（停容器：docker compose -f docker-compose.yml -f deploy/cloud/docker-compose.baota.yml down）"

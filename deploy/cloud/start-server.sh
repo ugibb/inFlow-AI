@@ -1,33 +1,35 @@
 #!/usr/bin/env bash
-# inFlow AI — 云端直接代码部署一键启动（对标 ./start-docker.sh / ./start-local.sh）
+# inFlow AI — 云端（腾讯云）代码直跑部署一键启动（deploy/cloud/）
 #
 # 部署形态：保留 infra 容器（postgres / redis / nginx / frontend），
 #            backend 与 wechat-bot 直接跑在宿主机（uvicorn / python -m bot），
 #            日志写 04-log/backend、04-log/wechat-bot，PID 管理在 .server/。
 #            好处：改代码 git pull 后只需重启两个直跑进程，日志 tail 文本文件即可定位问题。
 #
-# 用法:
-#   ./start-server.sh              启动/重建基础设施容器 + 直跑 backend/bot，并跟踪日志
-#   ./start-server.sh --detach     仅后台启动，不跟踪日志
-#   ./start-server.sh --logs       只跟踪日志（服务已在跑，不重建）
-#   ./start-server.sh --restart    改 .env / 拉代码后重建（默认行为就是重建，flag 为兼容 start-docker.sh）
-#   ./start-server.sh --verify     启动后额外验证健康状态
-#   ./stop-server.sh               停止直跑 backend/bot（容器不停止）
+# 用法（在仓库根执行）:
+#   ./deploy/cloud/start-server.sh              启动/重建基础设施容器 + 直跑 backend/bot，并跟踪日志
+#   ./deploy/cloud/start-server.sh --detach     仅后台启动，不跟踪日志
+#   ./deploy/cloud/start-server.sh --logs       只跟踪日志（服务已在跑，不重建）
+#   ./deploy/cloud/start-server.sh --restart    改 .env / 拉代码后重建（默认行为就是重建）
+#   ./deploy/cloud/start-server.sh --verify     启动后额外验证健康状态
+#   ./deploy/cloud/stop-server.sh               停止直跑 backend/bot（容器不停止）
 #
 # 首次运行会自动：复制 .env.example、生成密码/密钥、配置微信 bot token。
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+cd "$REPO_ROOT"
 
-COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.baota.yml)
-BACKEND_DIR="${SCRIPT_DIR}/03-src/backend"
-PID_DIR="${SCRIPT_DIR}/.server"
+# 第一个 -f 必须是仓库根的 docker-compose.yml：compose 相对路径以其所在目录（仓库根）解析
+COMPOSE=(docker compose -f docker-compose.yml -f deploy/cloud/docker-compose.baota.yml)
+BACKEND_DIR="${REPO_ROOT}/03-src/backend"
+PID_DIR="${REPO_ROOT}/.server"
 BACKEND_PID_FILE="${PID_DIR}/backend.pid"
 BOT_PID_FILE="${PID_DIR}/wechat-bot.pid"
-CONFIG_STORE="${SCRIPT_DIR}/03-src/backend/app/config_store.json"
-CONFIG_EXAMPLE="${SCRIPT_DIR}/03-src/backend/app/config_store.example.json"
+CONFIG_STORE="${REPO_ROOT}/03-src/backend/app/config_store.json"
+CONFIG_EXAMPLE="${REPO_ROOT}/03-src/backend/app/config_store.example.json"
 
 FOLLOW_LOGS=true
 LOGS_ONLY=false
@@ -37,14 +39,14 @@ for arg in "$@"; do
   case "$arg" in
     --detach|-d) FOLLOW_LOGS=false ;;
     --logs) FOLLOW_LOGS=true; LOGS_ONLY=true ;;
-    --restart) : ;;  # 默认即重建，flag 为兼容 start-docker.sh
+    --restart) : ;;  # 默认即重建，flag 为语义明确保留
     --verify) VERIFY_KEYS=true ;;
     -h|--help)
       sed -n '2,18p' "$0" | sed 's/^# \?//'
       exit 0
       ;;
     *)
-      echo "[ERROR] 未知参数: $arg（./start-server.sh --help）" >&2
+      echo "[ERROR] 未知参数: $arg（./deploy/cloud/start-server.sh --help）" >&2
       exit 1
       ;;
   esac
@@ -120,7 +122,7 @@ bootstrap_pipeline_dir() {
   pipeline_dir=$(env_get INFLOW_PIPELINE_DATA_DIR)
   local prod_dir="/www/data/inflow/pipeline"
 
-  if [[ "$SCRIPT_DIR" == /www/wwwroot/* ]] || [[ -d /www/server/panel ]]; then
+  if [[ "$REPO_ROOT" == /www/wwwroot/* ]] || [[ -d /www/server/panel ]]; then
     if [ -z "$pipeline_dir" ] \
       || [[ "$pipeline_dir" == ./03-src/* ]] \
       || [[ "$pipeline_dir" == */03-src/backend/data ]]; then
@@ -208,7 +210,7 @@ stop_pidfile() {
 # ── 只跟日志，不重建 ──────────────────────────────────────────────
 if [ "$LOGS_ONLY" = true ]; then
   TODAY="$(date +%F)"
-  exec tail -F "${SCRIPT_DIR}/04-log/backend/${TODAY}.log"
+  exec tail -F "${REPO_ROOT}/04-log/backend/${TODAY}.log"
 fi
 
 # ── 前置检查 ──────────────────────────────────────────────────────
@@ -242,13 +244,13 @@ if [ -n "${INFLOW_PIPELINE_DATA_DIR:-}" ]; then
   local_data_abs="$INFLOW_PIPELINE_DATA_DIR"
   case "$local_data_abs" in
     /*) : ;;
-    *) local_data_abs="${SCRIPT_DIR}/${local_data_abs#./}" ;;
+    *) local_data_abs="${REPO_ROOT}/${local_data_abs#./}" ;;
   esac
   export DATA_ROOT="$local_data_abs"
   info "DATA_ROOT=$local_data_abs"
 fi
 
-mkdir -p "${SCRIPT_DIR}/04-log/backend" "${SCRIPT_DIR}/04-log/wechat-bot" "${PID_DIR}"
+mkdir -p "${REPO_ROOT}/04-log/backend" "${REPO_ROOT}/04-log/wechat-bot" "${PID_DIR}"
 TODAY="$(date +%F)"
 
 # ── 基础设施容器（backend / wechat-bot 已在 compose 注释，直跑替代）──
@@ -264,7 +266,7 @@ info "启动 backend（直跑 uvicorn :8000）…"
 cd "${BACKEND_DIR}"
 source .venv/bin/activate
 nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 \
-  >> "${SCRIPT_DIR}/04-log/backend/${TODAY}.log" 2>&1 &
+  >> "${REPO_ROOT}/04-log/backend/${TODAY}.log" 2>&1 &
 echo $! > "${BACKEND_PID_FILE}"
 info "  backend PID $(cat "${BACKEND_PID_FILE}")（日志 04-log/backend/${TODAY}.log）"
 
@@ -274,17 +276,17 @@ if [ -n "${SERVICE_TOKEN_WECHAT_BOT:-}" ]; then
   export inFlow_TOKEN="${SERVICE_TOKEN_WECHAT_BOT}"
   export inFlow_PUBLIC_BASE="${inFlow_PUBLIC_BASE:-http://127.0.0.1:8080}"
   # bot 日志独立目录（bot.py 用 get_log_dir_path()，绝对路径直接生效）
-  export LOG_DIR="${SCRIPT_DIR}/04-log/wechat-bot"
+  export LOG_DIR="${REPO_ROOT}/04-log/wechat-bot"
   info "启动 wechat-bot（直跑 python -m app.extensions.wechat.bot）…"
   nohup python -m app.extensions.wechat.bot \
-    >> "${SCRIPT_DIR}/04-log/wechat-bot/${TODAY}.log" 2>&1 &
+    >> "${REPO_ROOT}/04-log/wechat-bot/${TODAY}.log" 2>&1 &
   echo $! > "${BOT_PID_FILE}"
   info "  wechat-bot PID $(cat "${BOT_PID_FILE}")（日志 04-log/wechat-bot/${TODAY}.log）"
 else
   warn "未配置 SERVICE_TOKEN_WECHAT_BOT，跳过 wechat-bot"
 fi
 
-cd "${SCRIPT_DIR}"
+cd "${REPO_ROOT}"
 
 # ── 健康检查（nginx → host.docker.internal → backend:8000）───────
 for i in $(seq 1 60); do
@@ -301,9 +303,9 @@ echo "  本机: http://127.0.0.1:8080"
 echo "  公网: 宝塔反向代理 → 127.0.0.1:8080"
 echo "  后端日志: 04-log/backend/$(date +%F).log"
 echo "  Bot 日志: 04-log/wechat-bot/$(date +%F).log"
-echo "  改 .env / 拉代码后: ./start-server.sh --restart"
-echo "  只看日志:           ./start-server.sh --logs"
-echo "  停止直跑:           ./stop-server.sh"
+echo "  改 .env / 拉代码后: ./deploy/cloud/start-server.sh --restart"
+echo "  只看日志:           ./deploy/cloud/start-server.sh --logs"
+echo "  停止直跑:           ./deploy/cloud/stop-server.sh"
 echo ""
 
 if [ "$VERIFY_KEYS" = true ]; then
@@ -316,6 +318,6 @@ if [ "$VERIFY_KEYS" = true ]; then
 fi
 
 if [ "$FOLLOW_LOGS" = true ]; then
-  info "跟踪 backend 日志中（Ctrl+C 退出跟踪，服务继续后台运行；停止用 ./stop-server.sh）"
-  tail -F "${SCRIPT_DIR}/04-log/backend/${TODAY}.log"
+  info "跟踪 backend 日志中（Ctrl+C 退出跟踪，服务继续后台运行；停止用 ./deploy/cloud/stop-server.sh）"
+  tail -F "${REPO_ROOT}/04-log/backend/${TODAY}.log"
 fi

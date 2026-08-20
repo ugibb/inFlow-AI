@@ -3,7 +3,7 @@ inFlow AI 统一日志模块。
 
 - 仅写入按日文件：LOG_DIR/YYYY-MM-DD.log（DEBUG 及以上）
 - 格式：时间戳 | 级别 | 模块名 | 消息
-- 进程 stdout/stderr（uvicorn 启动信息等）由 start-local.sh 追加到同一按日文件
+- 进程 stdout/stderr（uvicorn 启动信息等）由启动脚本（deploy/cloud/start-server.sh、deploy/worker/start-worker.sh）追加到同一按日文件
 """
 from __future__ import annotations
 
