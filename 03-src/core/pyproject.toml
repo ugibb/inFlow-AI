@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inflow-core"
+version = "1.0.0"
+description = "inFlow shared engine: schema + full ingest-to-publish pipeline"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+include = ["inflow_core*"]
+
+[tool.setuptools.package-data]
+# prompts 模板/主题、migrations、config_store 示例随包分发
+"inflow_core.prompts" = ["**/*.md", "**/*.j2", "**/*.json", "**/*.html", ".gitignore"]
+"inflow_core.core.migrations" = ["**/*.sql", "**/*.py"]
+"inflow_core" = ["config_store.example.json"]

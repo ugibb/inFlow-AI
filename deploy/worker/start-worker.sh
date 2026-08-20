@@ -5,7 +5,7 @@
 # 用法: ./deploy/worker/start-worker.sh [--detach]
 #   默认    启动 worker 并 tail -F worker 日志（04-log/worker/YYYY-MM-DD.log）
 #   --detach / -d  仅后台启动，不跟踪日志
-# 停止：./deploy/worker/stop-worker.sh（或 pkill -f 'app.local_worker'）
+# 停止：./deploy/worker/stop-worker.sh（或 pkill -f 'inflow_worker'）
 
 set -euo pipefail
 
@@ -25,7 +25,7 @@ for arg in "$@"; do
       echo "  默认    启动 worker 并跟踪日志（04-log/worker/YYYY-MM-DD.log）"
       echo "  --detach / -d  仅后台启动，不跟踪日志"
       echo ""
-      echo "  配置：03-src/backend/.env.local-worker（DATABASE_URL / SFTP_HOST / SFTP_PIPELINE_DIR）"
+      echo "  配置：03-src/worker/.env.local-worker（DATABASE_URL / SFTP_HOST / SFTP_PIPELINE_DIR）"
       exit 0
       ;;
     *)
@@ -35,10 +35,10 @@ for arg in "$@"; do
   esac
 done
 
-BACKEND_DIR="${REPO_ROOT}/03-src/backend"
+WORKER_DIR="${REPO_ROOT}/03-src/worker"
 WORKER_LOG_DIR="${REPO_ROOT}/04-log/worker"
 PID_FILE="${REPO_ROOT}/.worker.pid"
-ENV_WORKER="${BACKEND_DIR}/.env.local-worker"
+ENV_WORKER="${WORKER_DIR}/.env.local-worker"
 
 info()  { echo "[INFO]  $*"; }
 warn()  { echo "[WARN]  $*"; }
@@ -50,7 +50,7 @@ load_env_file() {
   [ -f "$env_file" ] || return 0
 
   local python_bin="python3"
-  for candidate in "${BACKEND_DIR}/.venv/bin/python" python3.12 python3.11 python3; do
+  for candidate in "${WORKER_DIR}/.venv/bin/python" python3.12 python3.11 python3; do
     if command -v "$candidate" &>/dev/null || [ -x "$candidate" ]; then
       python_bin="$candidate"
       break
@@ -95,9 +95,9 @@ if [ ! -f "${ENV_WORKER}" ]; then
   error "请从方案文档第六节复制模板，填入云端 PG 连接与 SFTP 配置后重试"
   exit 1
 fi
-if [ ! -d "${BACKEND_DIR}/.venv" ]; then
-  error "未找到 backend venv（${BACKEND_DIR}/.venv），请先创建："
-  error "  cd ${BACKEND_DIR} && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+if [ ! -d "${WORKER_DIR}/.venv" ]; then
+  error "未找到 worker venv（${WORKER_DIR}/.venv），请先创建："
+  error "  cd ${WORKER_DIR} && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
   exit 1
 fi
 if ! command -v sftp &>/dev/null; then
@@ -105,15 +105,15 @@ if ! command -v sftp &>/dev/null; then
   exit 1
 fi
 
-if ! "${BACKEND_DIR}/.venv/bin/python" -m playwright --version &>/dev/null; then
+if ! "${WORKER_DIR}/.venv/bin/python" -m playwright --version &>/dev/null; then
   warn "Playwright 未安装，compose 渲染 PNG 将失败："
-  warn "  ${BACKEND_DIR}/.venv/bin/python -m playwright install chromium"
+  warn "  ${WORKER_DIR}/.venv/bin/python -m playwright install chromium"
 fi
 if ! command -v ffmpeg &>/dev/null; then
   warn "未找到 ffmpeg（音频转码/下载可能用到）：brew install ffmpeg"
 fi
 
-# ── 加载 worker 配置到环境变量（覆盖 backend/.env 的本地值）────
+# ── 加载 worker 配置到环境变量 ────────────────────────────────────
 load_env_file "${ENV_WORKER}"
 export LOG_TO_STDOUT="1"   # 前台运行也可在终端看日志
 
@@ -136,9 +136,8 @@ info "启动本地 worker…"
 info "  日志: ${LOG_FILE}"
 info "  DB:   ${DATABASE_URL##*@}"
 
-cd "${BACKEND_DIR}"
-source .venv/bin/activate
-python -m app.local_worker >> "${LOG_FILE}" 2>&1 &
+cd "${WORKER_DIR}"
+.venv/bin/python -m inflow_worker >> "${LOG_FILE}" 2>&1 &
 WORKER_PID=$!
 echo "${WORKER_PID}" > "${PID_FILE}"
 info "worker 已启动（PID ${WORKER_PID}）"

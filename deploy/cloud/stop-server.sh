@@ -32,13 +32,13 @@ stop_pidfile "${PID_DIR}/backend.pid" "backend"
 stop_pidfile "${PID_DIR}/wechat-bot.pid" "wechat-bot"
 
 # 兜底：按进程名
-if pgrep -f 'uvicorn app.main:app' >/dev/null; then
+if pgrep -f 'uvicorn inflow_server.main:app' >/dev/null; then
   echo "[INFO] 按进程名停止 backend"
-  pkill -f 'uvicorn app.main:app' || true
+  pkill -f 'uvicorn inflow_server.main:app' || true
 fi
-if pgrep -f 'app.extensions.wechat.bot' >/dev/null; then
+if pgrep -f 'inflow_server.extensions.wechat.bot' >/dev/null; then
   echo "[INFO] 按进程名停止 wechat-bot"
-  pkill -f 'app.extensions.wechat.bot' || true
+  pkill -f 'inflow_server.extensions.wechat.bot' || true
 fi
 
 echo "[INFO] 直跑进程已停止；基础设施容器仍运行（停容器：docker compose -f docker-compose.yml -f deploy/cloud/docker-compose.baota.yml down）"

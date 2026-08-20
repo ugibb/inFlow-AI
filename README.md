@@ -195,7 +195,7 @@ inFlow ships as two physically separated deployment units:
 git clone <repo-url> && cd inFlow-ai
 
 # 2. Backend dependencies (one-time)
-cd 03-src/backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && cd ../..
+cd 03-src/server && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && cd ../..
 
 # 3. Start: generates .env secrets, brings up infra containers, runs backend / wechat-bot
 ./deploy/cloud/start-server.sh

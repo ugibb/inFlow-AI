@@ -7,6 +7,7 @@
 .venv/
 **/.venv/
 **/__pycache__/
+**/.pytest_cache/
 **/*.pyc
 
 # Node / Next.js
@@ -19,12 +20,13 @@
 * copy.md
 
 # Backend local config (UI runtime overrides; secrets go in .env)
-03-src/backend/app/config_store.json
+03-src/core/inflow_core/config_store.json
 
 # Local test/sample data (large media files)
 02-docs/data/
 02-docs/data-/
-03-src/backend/data/
+03-src/worker/data/
+03-src/server/data/
 
 # OS
 .DS_Store
@@ -50,7 +52,5 @@ log/
 _archive/
 项目记忆.md
 
-# Built plugin artifacts (re-built from source)
-03-src/backend/app/static/obsidian-plugin/main.js
-03-src/backend/app/static/obsidian-plugin/manifest.json
-03-src/backend/app/static/obsidian-plugin/styles.css
+# Python 打包产物（pip -e 生成）
+*.egg-info/

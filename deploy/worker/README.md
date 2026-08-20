@@ -9,13 +9,12 @@ inFlow 的本地计算单元：直连**云端 PostgreSQL**（任务总线）轮�
 ## 前置依赖（一次性）
 
 ```bash
-cd 03-src/backend && python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+cd 03-src/worker && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 python -m playwright install chromium   # compose 渲染 PNG
 brew install ffmpeg                      # 音频转码/下载
 ```
 
-配置：复制 `deploy/worker/.env.local-worker.example` 到 `03-src/backend/.env.local-worker`，填入云端 PG 连接、SFTP 与 API Key。
+配置：复制 `deploy/worker/.env.local-worker.example` 到 `03-src/worker/.env.local-worker`，填入云端 PG 连接、SFTP 与 API Key。
 
 云端侧：本地 Mac 的 `~/.ssh/id_ed25519.pub` 加入云端 `authorized_keys`；腾讯云安全组放行 5432（仅本机 IP）。
 

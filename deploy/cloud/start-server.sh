@@ -24,12 +24,12 @@ cd "$REPO_ROOT"
 
 # 第一个 -f 必须是仓库根的 docker-compose.yml：compose 相对路径以其所在目录（仓库根）解析
 COMPOSE=(docker compose -f docker-compose.yml -f deploy/cloud/docker-compose.baota.yml)
-BACKEND_DIR="${REPO_ROOT}/03-src/backend"
+SERVER_DIR="${REPO_ROOT}/03-src/server"
 PID_DIR="${REPO_ROOT}/.server"
 BACKEND_PID_FILE="${PID_DIR}/backend.pid"
 BOT_PID_FILE="${PID_DIR}/wechat-bot.pid"
-CONFIG_STORE="${REPO_ROOT}/03-src/backend/app/config_store.json"
-CONFIG_EXAMPLE="${REPO_ROOT}/03-src/backend/app/config_store.example.json"
+CONFIG_STORE="${REPO_ROOT}/03-src/core/inflow_core/config_store.json"
+CONFIG_EXAMPLE="${REPO_ROOT}/03-src/core/inflow_core/config_store.example.json"
 
 FOLLOW_LOGS=true
 LOGS_ONLY=false
@@ -116,7 +116,7 @@ bootstrap_env() {
   bootstrap_pipeline_dir
 }
 
-# 生产环境自动使用独立 pipeline 目录，避免误挂到 03-src/backend/data
+# 生产环境自动使用独立 pipeline 目录，避免误用源码树内相对路径
 bootstrap_pipeline_dir() {
   local pipeline_dir
   pipeline_dir=$(env_get INFLOW_PIPELINE_DATA_DIR)
@@ -125,7 +125,8 @@ bootstrap_pipeline_dir() {
   if [[ "$REPO_ROOT" == /www/wwwroot/* ]] || [[ -d /www/server/panel ]]; then
     if [ -z "$pipeline_dir" ] \
       || [[ "$pipeline_dir" == ./03-src/* ]] \
-      || [[ "$pipeline_dir" == */03-src/backend/data ]]; then
+      || [[ "$pipeline_dir" == */03-src/backend/data ]] \
+      || [[ "$pipeline_dir" == */03-src/server/data ]]; then
       pipeline_dir="$prod_dir"
       env_set INFLOW_PIPELINE_DATA_DIR "$pipeline_dir"
       warn "生产环境已自动设置 INFLOW_PIPELINE_DATA_DIR=$pipeline_dir"
@@ -139,8 +140,8 @@ bootstrap_pipeline_dir() {
       fi
     fi
   elif [ -z "$pipeline_dir" ]; then
-    env_set INFLOW_PIPELINE_DATA_DIR "./03-src/backend/data"
-    info "本地开发使用 INFLOW_PIPELINE_DATA_DIR=./03-src/backend/data"
+    env_set INFLOW_PIPELINE_DATA_DIR "./03-src/server/data"
+    info "本地开发使用 INFLOW_PIPELINE_DATA_DIR=./03-src/server/data"
   fi
 }
 
@@ -150,7 +151,7 @@ load_env_file() {
   [ -f "$env_file" ] || return 0
 
   local python_bin="python3"
-  for candidate in "${BACKEND_DIR}/.venv/bin/python" python3.12 python3.11 python3; do
+  for candidate in "${SERVER_DIR}/.venv/bin/python" python3.12 python3.11 python3; do
     if command -v "$candidate" &>/dev/null || [ -x "$candidate" ]; then
       python_bin="$candidate"
       break
@@ -218,9 +219,9 @@ if ! command -v docker &>/dev/null || ! docker compose version &>/dev/null; then
   error "需要 Docker + Compose v2（宝塔：软件商店 → Docker 管理器）"
   exit 1
 fi
-if [ ! -d "${BACKEND_DIR}/.venv" ]; then
-  error "未找到 backend venv（${BACKEND_DIR}/.venv），请先创建："
-  error "  cd ${BACKEND_DIR} && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
+if [ ! -d "${SERVER_DIR}/.venv" ]; then
+  error "未找到 server venv（${SERVER_DIR}/.venv），请先创建："
+  error "  cd ${SERVER_DIR} && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
   exit 1
 fi
 
@@ -263,9 +264,8 @@ stop_pidfile "${BOT_PID_FILE}" "wechat-bot"
 
 # ── backend 直跑 ─────────────────────────────────────────────────
 info "启动 backend（直跑 uvicorn :8000）…"
-cd "${BACKEND_DIR}"
-source .venv/bin/activate
-nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 \
+cd "${SERVER_DIR}"
+nohup .venv/bin/uvicorn inflow_server.main:app --host 0.0.0.0 --port 8000 --workers 1 \
   >> "${REPO_ROOT}/04-log/backend/${TODAY}.log" 2>&1 &
 echo $! > "${BACKEND_PID_FILE}"
 info "  backend PID $(cat "${BACKEND_PID_FILE}")（日志 04-log/backend/${TODAY}.log）"
@@ -277,8 +277,8 @@ if [ -n "${SERVICE_TOKEN_WECHAT_BOT:-}" ]; then
   export inFlow_PUBLIC_BASE="${inFlow_PUBLIC_BASE:-http://127.0.0.1:8080}"
   # bot 日志独立目录（bot.py 用 get_log_dir_path()，绝对路径直接生效）
   export LOG_DIR="${REPO_ROOT}/04-log/wechat-bot"
-  info "启动 wechat-bot（直跑 python -m app.extensions.wechat.bot）…"
-  nohup python -m app.extensions.wechat.bot \
+  info "启动 wechat-bot（直跑 python -m inflow_server.extensions.wechat.bot）…"
+  nohup "${SERVER_DIR}/.venv/bin/python" -m inflow_server.extensions.wechat.bot \
     >> "${REPO_ROOT}/04-log/wechat-bot/${TODAY}.log" 2>&1 &
   echo $! > "${BOT_PID_FILE}"
   info "  wechat-bot PID $(cat "${BOT_PID_FILE}")（日志 04-log/wechat-bot/${TODAY}.log）"

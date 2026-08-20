@@ -1,0 +1,35 @@
+# inflow-core 引擎依赖（server / worker 共用）
+# 说明：core 的 dependencies / ingest router 属 API 薄层，故含 fastapi（不含 uvicorn）
+fastapi==0.115.0
+sqlalchemy[asyncio]==2.0.35
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+pgvector==0.3.3
+httpx==0.27.2
+h2==4.1.0
+curl-cffi>=0.14.0
+pydantic==2.9.2
+pydantic-settings==2.5.2
+beautifulsoup4==4.12.3
+lxml==5.3.0
+lxml_html_clean>=0.4.0  # trafilatura/justext 在 lxml>=5.2 需要(lxml.html.clean 已拆为独立包)
+trafilatura>=2.0.0,<3  # 通用网页正文提取(质量更稳,正文/视频号等 JS 页配合 Playwright)
+markdownify==0.13.1
+readability-lxml==0.8.1
+jinja2==3.1.4
+alembic==1.13.3
+markitdown[all]
+fastembed>=0.8.0
+playwright>=1.40.0,<1.57
+douyin-tiktok-scraper>=1.2.0
+bilibili-api-python>=17.0.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1  # passlib 1.7.4 不兼容 bcrypt>=4.1（缺少 __about__）
+json-repair>=0.30.0
+faster-whisper>=1.0.0
+yt-dlp>=2024.0.0
+groq
+aliyun-python-sdk-core>=2.14.0
+oss2>=2.18.0
+pytest>=8.0.0

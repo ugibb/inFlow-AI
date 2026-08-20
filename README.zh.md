@@ -207,7 +207,7 @@ inFlow 的部署形态为两个物理独立的单元:
 git clone <repo-url> && cd inFlow-ai
 
 # 2. 后端依赖(一次性)
-cd 03-src/backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && cd ../..
+cd 03-src/server && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && cd ../..
 
 # 3. 启动:自动生成 .env 密钥、起 infra 容器、直跑 backend / wechat-bot
 ./deploy/cloud/start-server.sh
@@ -229,7 +229,7 @@ grep -i admin "04-log/backend/$(date +%F).log"
 
 ```bash
 # 一次性:填云端 PG 连接 / SFTP / API Key
-cp deploy/worker/.env.local-worker.example 03-src/backend/.env.local-worker
+cp deploy/worker/.env.local-worker.example 03-src/worker/.env.local-worker
 
 ./deploy/worker/start-worker.sh   # 启动并跟踪日志
 ```

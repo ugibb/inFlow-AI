@@ -1,0 +1,5 @@
+# inflow-worker 本地 worker 依赖
+# 本体仅 settings/claims/runner（pydantic-settings + sqlalchemy），
+# pipeline 全部复用 inflow-core 引擎：-r 引入引擎依赖，-e 安装引擎本体
+-r ../core/requirements.txt
+-e ../core

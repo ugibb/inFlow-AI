@@ -1,0 +1,6 @@
+# inflow-server 云端服务依赖
+# -r 引入共享引擎 inflow-core 的全部依赖；-e 以可编辑方式安装引擎本体
+-r ../core/requirements.txt
+-e ../core
+uvicorn[standard]==0.30.6
+python-multipart==0.0.12  # FastAPI 文件上传/表单

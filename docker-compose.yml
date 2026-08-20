@@ -27,7 +27,7 @@ services:
       - "0.0.0.0:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./03-src/backend/app/core/migrations:/docker-entrypoint-initdb.d:ro
+      - ./03-src/core/inflow_core/core/migrations:/docker-entrypoint-initdb.d:ro
     restart: unless-stopped
 
   redis:
@@ -38,56 +38,9 @@ services:
       - "127.0.0.1:6379:6379"
     restart: unless-stopped
 
-  # ── backend（直接代码部署模式已注释）──────────────────────────────
-  # backend 改为宿主直跑：./start-server.sh（uvicorn app.main:app --port 8000）。
-  # 需要切回 Docker 容器方式时，取消本段注释，并：
-  #   1. 恢复 nginx.conf 的 $upstream_backend="http://backend:8000"（去掉 host.docker.internal）
-  #   2. 恢复 frontend / nginx 对 backend 的 depends_on
-  #   3. 恢复 baota.yml 的 wechat-bot 服务
-  # backend:
-  #   build:
-  #     context: ./03-src/backend
-  #     dockerfile: Dockerfile
-  #   container_name: inflow-backend
-  #   image: inflow-backend:latest
-  #   env_file:
-  #     - .env
-  #   command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
-  #   environment:
-  #     DATABASE_URL: postgresql+asyncpg://inflow:${POSTGRES_PASSWORD}@postgres:5432/inflow
-  #     DATABASE_URL_SYNC: postgresql://inflow:${POSTGRES_PASSWORD}@postgres:5432/inflow
-  #     REDIS_URL: redis://redis:6379/0
-  #     SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
-  #     LOG_DIR: log
-  #     LOG_TO_STDOUT: "1"
-  #     inFlow_ENV: production
-  #   depends_on:
-  #     - postgres
-  #     - redis
-  #   volumes:
-  #     # Persist user-configured LLM/embedding settings across container restarts
-  #     - ./03-src/backend/app/config_store.json:/app/app/config_store.json
-  #     # Pipeline artifacts — host path from INFLOW_PIPELINE_DATA_DIR (see .env.example)
-  #     - ${INFLOW_PIPELINE_DATA_DIR:-./03-src/backend/data}:/app/data
-  #   restart: unless-stopped
-
-  # OPTIONAL: WeChat bot worker — uncomment if you have wechat bot credentials set up.
-  # Requires SERVICE_TOKEN_WECHAT_BOT in .env and wechat_accounts seeded via the API.
-  # wechat-bot:
-  #   image: inflow-backend:latest
-  #   container_name: inflow-wechat-bot
-  #   command: python -m app.extensions.wechat.bot
-  #   environment:
-  #     DATABASE_URL: postgresql+asyncpg://inflow:${POSTGRES_PASSWORD}@postgres:5432/inflow
-  #     inFlow_BASE: http://backend:8000
-  #     inFlow_TOKEN: ${SERVICE_TOKEN_WECHAT_BOT:-}
-  #   depends_on:
-  #     - backend
-  #     - postgres
-  #   volumes:
-  #     - ./03-src/backend/app/config_store.json:/app/app/config_store.json
-  #     - ${INFLOW_PIPELINE_DATA_DIR:-./03-src/backend/data}:/app/data
-  #   restart: unless-stopped
+  # ── backend / wechat-bot：Docker 形态已于 2026-08-20 移除 ──────────
+  # backend 与 wechat-bot 由 deploy/cloud/start-server.sh 宿主机直跑。
+  # 历史容器配置（build context / 挂载 / command）可从 git 历史找回。
 
   frontend:
     build:

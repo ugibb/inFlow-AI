@@ -18,6 +18,7 @@ inFlow 的云端部署单元：**infra 容器**（postgres / redis / nginx / fro
 | `./deploy/cloud/stop-server.sh` | 停止直跑 backend/bot（infra 容器不停） |
 
 配置：仓库根 `.env`（首次运行自动从 `.env.example` 生成并补齐密码/token）。
+依赖（一次性）：`cd 03-src/server && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`（首行经 `-e ../core` 安装共享引擎）。
 日志：`04-log/backend/`、`04-log/wechat-bot/`（按日期分文件）。PID：`.server/`。
 
 ## 日常更新流程
@@ -57,5 +58,5 @@ docker exec inflow-db pg_dump -U inflow inflow > /www/backup/inflow_$(date +%F).
 ## 架构说明
 
 - `docker-compose.yml`（仓库根）+ 本目录 `docker-compose.baota.yml` 组合使用；**第一个 `-f` 必须是仓库根文件**（compose 相对路径以其所在目录解析）
-- 仓库根 `docker-compose.yml` 与 `.env.example` 同时是后端定位仓库根的 marker（`app/core/paths.py`），不可移动
+- 仓库根 `docker-compose.yml` 与 `.env.example` 同时是后端定位仓库根的 marker（`03-src/core/inflow_core/core/paths.py`），不可移动
 - 云端 `.env` 中 `EXTERNAL_PROCESSING=true` 开启 URL 任务分流给本地 worker

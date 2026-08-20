@@ -23,9 +23,9 @@ if [ -f "${PID_FILE}" ]; then
   fi
 else
   # 兜底：按进程名
-  if pgrep -f 'app.local_worker' >/dev/null; then
-    echo "[INFO] 未找到 PID 文件，按进程名停止 app.local_worker"
-    pkill -f 'app.local_worker'
+  if pgrep -f 'inflow_worker' >/dev/null; then
+    echo "[INFO] 未找到 PID 文件，按进程名停止 inflow_worker"
+    pkill -f 'inflow_worker'
   else
     echo "[INFO] 没有正在运行的 worker"
   fi

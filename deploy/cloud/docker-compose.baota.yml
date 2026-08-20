@@ -32,7 +32,7 @@ services:
   #     - backend
   #     - postgres
   #   volumes:
-  #     - ./03-src/backend/app/config_store.json:/app/app/config_store.json
+  #     - ./03-src/core/inflow_core/config_store.json:/app/app/config_store.json
   #     # Must match backend — shared pipeline data on host
-  #     - ${INFLOW_PIPELINE_DATA_DIR:-./03-src/backend/data}:/app/data
+  #     - ${INFLOW_PIPELINE_DATA_DIR:-./03-src/server/data}:/app/data
   #   restart: unless-stopped
