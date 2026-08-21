@@ -187,8 +187,8 @@ inFlow AI 是**唯一**同时拥有这些能力的产品:深度中文平台支�
 
 inFlow 的部署形态为两个物理独立的单元:
 
-- **云端单元**(`deploy/cloud/`):服务器代码直跑 backend + wechat-bot,仅基础设施(postgres / redis / nginx / frontend)走容器
-- **本地 worker**(`deploy/worker/`,可选):Mac 直连云端 PostgreSQL 轮询认领任务,承接播客等重计算 pipeline
+- **云端单元**(本仓库,`deploy/cloud/`):服务器代码直跑 backend + wechat-bot,仅基础设施(postgres / redis / nginx / frontend)走容器;共享引擎 `03-src/core` 也由本仓库分发
+- **本地 worker**(**独立仓库** [ugibb/inflow-worker](https://github.com/ugibb/inflow-worker),可选):Mac 直连云端 PostgreSQL 轮询认领任务,承接播客等重计算 pipeline;引擎经 pip git 子目录依赖取自本仓库 `03-src/core`
 
 **云端单元**
 
@@ -198,7 +198,7 @@ inFlow 的部署形态为两个物理独立的单元:
 **本地 worker(可选)**
 
 - macOS + **Python 3.10+**、ffmpeg;可访问外网 AI API(Groq 等)
-- 详见 [`deploy/worker/README.md`](deploy/worker/README.md)
+- 详见独立仓库 **[ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)** 的 README
 
 ### 步骤(云端)
 
@@ -227,14 +227,18 @@ grep -i admin "04-log/backend/$(date +%F).log"
 
 ### 本地 worker(可选)
 
-```bash
-# 一次性:填云端 PG 连接 / SFTP / API Key
-cp deploy/worker/.env.local-worker.example 03-src/worker/.env.local-worker
+worker 已拆为独立工程 **[ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)**(引擎以 pip git 子目录依赖取自本仓库 `03-src/core`):
 
-./deploy/worker/start-worker.sh   # 启动并跟踪日志
+```bash
+git clone git@github.com:ugibb/inflow-worker.git && cd inflow-worker
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python -m playwright install chromium
+
+cp .env.local-worker.example .env.local-worker   # 填云端 PG 连接 / SFTP / API Key
+./start-worker.sh   # 启动并跟踪日志
 ```
 
-实操手册:**[`02-docs/20260820_12_本地Worker部署实操指南.md`](02-docs/20260820_12_本地Worker部署实操指南.md)**。
+引擎升级(本仓库 `03-src/core` 更新后):`./start-worker.sh --upgrade`。
 
 ---
 
@@ -371,7 +375,7 @@ cp deploy/worker/.env.local-worker.example 03-src/worker/.env.local-worker
 
 ## 文档
 
-- [`deploy/cloud/README.md`](deploy/cloud/README.md) · [`deploy/worker/README.md`](deploy/worker/README.md) — 云端 / 本地 worker 部署
+- [`deploy/cloud/README.md`](deploy/cloud/README.md) — 云端部署;本地 worker 部署见独立仓库 [ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — 贡献指南
 - API 文档:`/api/docs`(FastAPI 自动生成)
 

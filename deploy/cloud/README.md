@@ -2,9 +2,10 @@
 
 ## 定位
 
-inFlow 的云端部署单元：**infra 容器**（postgres / redis / nginx / frontend，由 docker compose 管理）+ **宿主机直跑进程**（backend uvicorn :8000、wechat-bot）。重计算 pipeline 由本地 worker 承接（见 `deploy/worker/`），云端只负责入口 / 存储 / 展示 / 推送。
+inFlow 的云端部署单元：**infra 容器**（postgres / redis / nginx / frontend，由 docker compose 管理）+ **宿主机直跑进程**（backend uvicorn :8000、wechat-bot）。重计算 pipeline 由本地 worker 承接（独立仓库 [ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)），云端只负责入口 / 存储 / 展示 / 推送。
 
 > Docker 全容器部署形态已于 2026-08-20 移除（历史方案见 `02-docs/DEPLOY_BAOTA*.md` 废弃横幅，脚本可从 git 历史找回）。
+> 本地 worker 已于 2026-08-21 拆为独立工程，不再位于本仓库（原 `deploy/worker/`、`03-src/worker/` 可从 git 历史找回）。
 
 ## 脚本
 

@@ -175,8 +175,8 @@ inFlow AI is the **only** option that combines: deep Chinese platform support ·
 
 inFlow ships as two physically separated deployment units:
 
-- **Cloud unit** (`deploy/cloud/`): backend + wechat-bot run directly on the host; only infrastructure (postgres / redis / nginx / frontend) runs in containers
-- **Local worker** (`deploy/worker/`, optional): a Mac polling the cloud PostgreSQL directly, taking over heavy compute pipelines such as podcast transcription
+- **Cloud unit** (this repo, `deploy/cloud/`): backend + wechat-bot run directly on the host; only infrastructure (postgres / redis / nginx / frontend) runs in containers. The shared engine `03-src/core` is also distributed from this repo
+- **Local worker** (**separate repo** [ugibb/inflow-worker](https://github.com/ugibb/inflow-worker), optional): a Mac polling the cloud PostgreSQL directly, taking over heavy compute pipelines such as podcast transcription; it pip-installs the engine from this repo's `03-src/core` via a git subdirectory dependency
 
 **Cloud unit**
 
@@ -186,7 +186,7 @@ inFlow ships as two physically separated deployment units:
 **Local worker (optional)**
 
 - macOS with **Python 3.10+** and ffmpeg; access to external AI APIs (Groq etc.)
-- See [`deploy/worker/README.md`](deploy/worker/README.md)
+- See the separate repo **[ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)**
 
 ### Steps (cloud)
 
@@ -212,6 +212,21 @@ grep -i admin "04-log/backend/$(date +%F).log"
 
 Day-to-day updates: `git pull && ./deploy/cloud/start-server.sh --restart`.
 Container commands, DB backups and troubleshooting live in **[`deploy/cloud/README.md`](deploy/cloud/README.md)**.
+
+### Local worker (optional)
+
+The worker lives in its own repo, **[ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)** (the engine is pip-installed from this repo's `03-src/core` via a git subdirectory dependency):
+
+```bash
+git clone git@github.com:ugibb/inflow-worker.git && cd inflow-worker
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python -m playwright install chromium
+
+cp .env.local-worker.example .env.local-worker   # cloud PG / SFTP / API keys
+./start-worker.sh   # start and follow logs
+```
+
+Engine upgrades (after `03-src/core` changes land here): `./start-worker.sh --upgrade`.
 
 ---
 
@@ -348,7 +363,7 @@ The plugin auto-detects already-synced articles via dual-OR (sync_state.json ∪
 
 ## Documentation
 
-- [`deploy/cloud/README.md`](deploy/cloud/README.md) · [`deploy/worker/README.md`](deploy/worker/README.md) — cloud / worker deployment
+- [`deploy/cloud/README.md`](deploy/cloud/README.md) — cloud deployment; local worker deployment lives in the separate repo [ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — How to contribute
 - API docs at `/api/docs` (auto-generated from FastAPI)
 

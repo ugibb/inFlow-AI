@@ -25,7 +25,6 @@
 # Local test/sample data (large media files)
 02-docs/data/
 02-docs/data-/
-03-src/worker/data/
 03-src/server/data/
 
 # OS
@@ -43,10 +42,8 @@ logs/
 log/
 04-log/
 
-# PID files（start-server.sh / start-worker.sh 进程管理）
+# PID files（start-server.sh 进程管理；worker 已拆独立仓库）
 .server/
-.worker.pid
-.worker.pid.*
 
 # Project local artifacts
 _archive/
