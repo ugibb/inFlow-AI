@@ -7,6 +7,12 @@ name = "inflow-core"
 version = "1.0.0"
 description = "inFlow shared engine: schema + full ingest-to-publish pipeline"
 requires-python = ">=3.10"
+# 依赖动态取自 requirements.txt（单一事实来源）：pip git 子目录安装的
+# 独立工程（inflow-worker）与 server/worker 的 -r 引用读到同一份清单。
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.packages.find]
 include = ["inflow_core*"]
