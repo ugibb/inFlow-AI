@@ -220,8 +220,9 @@ if ! command -v docker &>/dev/null || ! docker compose version &>/dev/null; then
   exit 1
 fi
 if [ ! -d "${SERVER_DIR}/.venv" ]; then
-  error "未找到 server venv（${SERVER_DIR}/.venv），请先创建："
-  error "  cd ${SERVER_DIR} && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
+  error "未找到 server venv（${SERVER_DIR}/.venv），请先创建（依赖瘦身版，两步）："
+  error "  cd ${SERVER_DIR} && python3 -m venv .venv"
+  error "  .venv/bin/pip install -r requirements.txt && .venv/bin/pip install --no-deps -e ../core"
   exit 1
 fi
 

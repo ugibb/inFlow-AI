@@ -103,33 +103,6 @@ async def _maybe_push_proactive_relation(db, article_id):
     )
 
 
-async def _run_asr_and_update(article_id: UUID, audio_url: str):
-    """Background task: run ASR on audio URL and update article."""
-    import logging
-    logger = logging.getLogger("inFlow.asr")
-    from inflow_core.core.database import async_session
-    from inflow_core.parse.audio.service import transcription_service
-
-    async with async_session() as db:
-        try:
-            article = await db.get(Article, article_id)
-            if not article:
-                return
-            logger.info(f"ASR bg: starting for {article_id}")
-            asr_text = await transcription_service.transcribe_url(
-                audio_url, referer='https://www.bilibili.com'
-            )
-            if asr_text:
-                article.raw_content += f"\n\n## 视频字幕（ASR 转录）\n\n{asr_text}"
-                article.word_count = len(article.raw_content)
-                await db.commit()
-                logger.info(f"ASR bg: success, {len(asr_text)} chars")
-            else:
-                logger.warning(f"ASR bg: no text returned for {article_id}")
-        except Exception as e:
-            logger.exception(f"ASR bg: failed for {article_id}: {e}")
-
-
 async def process_article_background(article_id: UUID, raw_content: str, raw_html: str, url: str, db_session_factory):
     """Background task: AI process a newly added article."""
     import logging
@@ -760,19 +733,33 @@ async def capture_article_deep_read_screenshot(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Response:
-    """Playwright screenshot of the current deep-read HTML (matches pipeline card quality)."""
+    """返回 worker 回传的 deep-read 卡片 PNG（云端不再本地渲染 Playwright 截图）。
+
+    兼容旧契约：请求体仍带 html（前端零改动），但云端只按 job 定位
+    data/03_display/…/{job_id}.png 直接回读；文件缺失=尚未回传，404。
+    """
     article = await db.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     if not current_user.is_super_admin and article.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Article not found")
 
-    from inflow_core.compose.card_renderer import screenshot_html_content
+    from pathlib import Path
+    from inflow_core.core.shared.storage.conventions import display_card_png_path
+
+    r = await db.execute(select(IngestJob).where(IngestJob.article_id == article_id).limit(1))
+    job = r.scalar_one_or_none()
+    if not job or not job.raw_file_path:
+        raise HTTPException(status_code=404, detail="Deep read not available")
+
+    png_path = Path(display_card_png_path(job.raw_file_path, job.id))
+    if not png_path.is_file():
+        raise HTTPException(status_code=404, detail="Card PNG not yet returned by worker")
 
     try:
-        png_bytes = await screenshot_html_content(body.html)
+        png_bytes = png_path.read_bytes()
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Screenshot failed: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Failed to read card PNG: {exc}") from exc
 
     return Response(content=png_bytes, media_type="image/png")
 
@@ -798,6 +785,20 @@ async def regenerate_article_ai(
     if not job or not job.raw_file_path:
         raise HTTPException(status_code=404, detail="Source data not available for regeneration")
 
+    if job.external_processing:
+        # 分流 job：云端只重置状态（parsing 起，ASR 文件复用不重转录），
+        # 由本地 worker 认领重跑 parse → compose → index，卡片经 SFTP 回传。
+        from inflow_core.core.pipeline.state_machine import resume_for_retry
+
+        ok = await resume_for_retry(db, job_id=job.id, from_step="parsing")
+        if not ok:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Job is not in a retryable state (current: {job.status})",
+            )
+        return {"status": "started", "article_id": str(article_id)}
+
+    # 历史 non-external job：保留原云端重生成路径（serve legacy 数据）
     background_tasks.add_task(
         _run_regenerate_ai,
         job_id=job.id,

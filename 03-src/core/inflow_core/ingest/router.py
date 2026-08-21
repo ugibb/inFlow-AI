@@ -523,6 +523,13 @@ async def retry_job(
             detail="Maximum retries exceeded or invalid from_step. Check the job manually.",
         )
 
+    # 历史 non-external job：重试统一交给本地 worker（云端 venv 已无重依赖，
+    # 云端裸跑 capture/parse 必 ImportError）。run_job_resume 对 external job
+    # 不调度，worker 认领重置后的状态续跑。
+    if not job.external_processing:
+        job.external_processing = True
+        await db.commit()
+
     # Restore article fetch_status to ingesting so the read page resumes polling
     if job.article_id:
         article = await db.get(Article, job.article_id)

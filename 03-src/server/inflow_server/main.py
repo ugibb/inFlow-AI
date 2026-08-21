@@ -1,11 +1,9 @@
 """inFlow AI — read-later + AI knowledge base for the Chinese internet"""
-from typing import Optional
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
-import asyncio
 import httpx
 
 from inflow_core.core.config import get_settings
@@ -37,199 +35,27 @@ configure_quiet_module_loggers()
 logger = get_logger("main")
 
 
-async def _transcribe_youtube(url: str) -> Optional[str]:
-    """Extract audio from YouTube via yt-dlp and transcribe with Whisper."""
-    import subprocess, tempfile, os
-
-    # Read proxy from plugins config
-    try:
-        from inflow_core.core.config_manager import get_plugins_config
-        plugins = get_plugins_config()
-        proxy = plugins.get('proxy', '') if plugins else ''
-    except Exception:
-        proxy = ''
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        audio_path = os.path.join(tmpdir, 'audio.mp3')
-        try:
-            ytdlp_args = [
-                'yt-dlp', '-x', '--audio-format', 'mp3',
-                '--audio-quality', '32K',
-                '--no-playlist', '--no-warnings',
-            ]
-            if proxy:
-                ytdlp_args += ['--proxy', proxy]
-            ytdlp_args += ['-o', audio_path, url]
-            proc = await asyncio.create_subprocess_exec(
-                *ytdlp_args,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=180)
-            if proc.returncode != 0 or not os.path.exists(audio_path):
-                logger.warning(f"YouTube ASR: yt-dlp audio download failed: {stderr[:200]}")
-                return None
-
-            from inflow_core.parse.audio.service import transcription_service
-            from pathlib import Path
-            logger.info(f"YouTube ASR: audio downloaded, starting whisper...")
-            return await transcription_service._transcribe_local(Path(audio_path))
-        except asyncio.TimeoutError:
-            logger.warning(f"YouTube ASR: audio download timeout")
-            return None
-        except Exception as e:
-            logger.error(f"YouTube ASR: failed: {e}")
-            return None
-
-
-async def auto_backfill_asr():
-    """Background task: scan for articles with ASR_PENDING marker and transcribe."""
-    import re
-    from inflow_core.core.database import async_session
-    from sqlalchemy import select
-    from inflow_core.core.models.article import Article
-
-    await asyncio.sleep(30)
-    # logger.info("ASR scanner: starting scan loop")
-
-    while True:
-        try:
-            async with async_session() as db:
-                result = await db.execute(
-                    select(Article).where(Article.raw_content.contains('<!-- ASR_PENDING:'))
-                )
-                articles = result.scalars().all()
-
-                for article in articles:
-                    match = re.search(r'<!-- ASR_PENDING:\s*(\S+) -->', article.raw_content or '<!-- ASR_PENDING: -->')
-                    if not match:
-                        continue
-                    audio_url = match.group(1)
-                    marker = match.group(0)
-
-                    # Claim this article by replacing marker with RUNNING to prevent double-processing
-                    article.raw_content = article.raw_content.replace(marker, '<!-- ASR_RUNNING -->')
-                    await db.commit()
-
-                    try:
-                        from inflow_core.parse.audio.service import transcription_service
-                        logger.info(f"ASR: transcribing {article.id} ({article.title[:40]}...)")
-                        
-                        # For YouTube URLs, extract audio via yt-dlp first
-                        if 'youtube.com' in audio_url or 'youtu.be' in audio_url:
-                            asr_text = await _transcribe_youtube(audio_url)
-                        else:
-                            asr_text = await transcription_service.transcribe_url(
-                                audio_url, referer='https://www.bilibili.com'
-                            )
-                        if asr_text:
-                            article.raw_content = article.raw_content.replace(
-                                '<!-- ASR_RUNNING -->', f'\n\n## 视频字幕（ASR 转录）\n\n{asr_text}'
-                            ).replace(
-                                '*（后台语音转录中，稍后自动更新…）*', ''
-                            )
-                            article.word_count = len(article.raw_content)
-                            await db.commit()
-                            logger.info(f"ASR: done {article.id} ({len(asr_text)} chars)")
-                        else:
-                            article.raw_content = article.raw_content.replace(
-                                '<!-- ASR_RUNNING -->', ''
-                            ).replace(
-                                '*（后台语音转录中，稍后自动更新…）*',
-                                '*（该视频未提供字幕，ASR 转录亦不可用）*'
-                            )
-                            await db.commit()
-                            logger.warning(f"ASR: empty result for {article.id}, marker removed")
-                    except Exception as e:
-                        # Rollback marker to PENDING so another try can pick it up
-                        article.raw_content = article.raw_content.replace(
-                            '<!-- ASR_RUNNING -->', marker
-                        )
-                        await db.commit()
-                        logger.error(f"ASR: failed for {article.id}, re-queued: {e}")
-        except Exception as e:
-            logger.error(f"ASR scan error: {e}")
-
-        await asyncio.sleep(30)  # Scan every 30 seconds
-
-
-async def auto_backfill_embeddings():
-    """Background task: periodically check for articles without embeddings and backfill them."""
-    # Wait for everything to be fully initialized before first run
-    await asyncio.sleep(60)
-    
-    while True:
-        try:
-            from inflow_core.core.database import async_session
-            from sqlalchemy import select
-            from inflow_core.core.models.article import Article
-            from inflow_core.core.shared.ai_service import llm_service
-            
-            async with async_session() as db:
-                result = await db.execute(select(Article).where(Article.embedding.is_(None)))
-                articles = result.scalars().all()
-                
-                if articles:
-                    for article in articles:
-                        try:
-                            # bge-large-zh-v1.5 上下文窗口 512 token（中文约 1 字 ≈ 1 token）
-                            # 用 title + summary 做嵌入已足够语义搜索，不拼 plain_text 避免超长
-                            title_part = (article.title or "")[:100]
-                            summary_part = (article.summary or "")[:350]
-                            content = f"{title_part}. {summary_part}".strip(". ")
-                            if not content:
-                                content = (article.plain_text or article.raw_content or "")[:400]
-                            embedding = await llm_service.get_embedding(content)
-                            article.embedding = embedding
-                        except Exception as e:
-                            logger.error(f"Auto-backfill: embedding failed for {article.id}: {e}")
-
-                    await db.commit()
-        except Exception as e:
-            logger.error(f"Auto-backfill scan error: {e}", exc_info=True)
-        
-        # Scan every 5 minutes
-        await asyncio.sleep(300)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup and shutdown events."""
-    # Startup
+    """Startup and shutdown events.
+
+    云端定位 = 功能交互及展示：不在启动时做任何重计算
+    （无 whisper 预热 / 无 ASR·embedding 补扫 / 无遗留 job 回收——
+    url/upload/paste 三入口全部交给本地 worker，云端只登记）。
+    """
+    # Startup：建表 + 跑迁移（含 019 staging 列）
     await init_db()
-
-    # Preload whisper model at startup (avoid timeout on first ASR request)
-    import os
-    import concurrent.futures
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    if os.environ.get("inFlow_ENV", "").lower() != "production":
-        from inflow_core.parse.audio.service import preload_whisper
-        asyncio.get_running_loop().run_in_executor(executor, preload_whisper)
-
-    # Recover captured-but-unprocessed jobs from previous server run
-    from inflow_core.ingest.orchestrator import recover_captured_jobs
-    await recover_captured_jobs()
 
     if settings.external_processing:
         get_logger("main").warning(
-            "EXTERNAL_PROCESSING=true：URL ingest 将全部交给本地 worker 承接，"
-            "云端只登记不处理。请确认本地 worker（start-worker.sh）已部署并运行，"
-            "否则新提交的 URL 会永久停在 pending。"
+            "EXTERNAL_PROCESSING=true：url/upload/paste 三入口全部交给本地 worker 承接，"
+            "云端只登记（upload/paste 收件落盘 00_staging）。请确认本地 worker"
+            "（start-worker.sh）已部署并运行，否则新 job 会停在 pending。"
         )
-
-    # Start auto-backfill background task
-    backfill_task = asyncio.create_task(auto_backfill_embeddings())
-    # logger.info("Auto-backfill background task started (scans every 5 minutes)")
-
-    # Start background ASR transcription task
-    asr_task = asyncio.create_task(auto_backfill_asr())
-    # logger.info("ASR background task started (scans every 30 seconds)")
 
     get_logger("main").info("inFlow AI started successfully")
     yield
     # Shutdown
-    backfill_task.cancel()
-    asr_task.cancel()
     get_logger("main").info("inFlow AI shutting down")
 
 

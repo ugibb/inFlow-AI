@@ -1,6 +1,28 @@
-# inflow-server 云端服务依赖
-# -r 引入共享引擎 inflow-core 的全部依赖；-e 以可编辑方式安装引擎本体
--r ../core/requirements.txt
--e ../core
+# inflow-server 云端服务依赖（瘦身版）
+#
+# 云端定位 = 功能交互及展示：重计算（采集/转录/parse/compose/截图）全部由
+# 本地 worker 承接，云端 venv 不装 playwright/markitdown/fastembed/whisper 等。
+# 引擎本体用可编辑方式安装但不带依赖（core 依赖清单是 worker 的事实来源）：
+#   pip install -r requirements.txt
+#   pip install --no-deps -e ../core
 uvicorn[standard]==0.30.6
 python-multipart==0.0.12  # FastAPI 文件上传/表单
+fastapi
+sqlalchemy[asyncio]
+asyncpg        # 异步引擎（DATABASE_URL postgresql+asyncpg://）
+psycopg2-binary  # 同步引擎（迁移/alembic）
+pgvector       # embedding 向量列
+httpx
+h2             # httpx HTTP/2（微信等抓取走 server 侧的 parser_service）
+pydantic
+pydantic-settings
+beautifulsoup4
+lxml
+lxml_html_clean
+markdownify
+json-repair
+jinja2         # compose 卡片模板（模板本身在 core，渲染 API 由 server 调试用）
+alembic
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt==4.0.1  # passlib 1.7.4 不兼容 bcrypt>=4.1（缺少 __about__）
