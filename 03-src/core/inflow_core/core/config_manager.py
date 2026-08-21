@@ -26,7 +26,12 @@ from inflow_core.core.paths import get_env_file, get_project_root
 
 logger = logging.getLogger(__name__)
 
-CONFIG_FILE = Path(__file__).parent.parent / "config_store.json"
+# config_store.json 定位：默认随包（inflow_core/config_store.json）；
+# 独立部署的 worker（pip 安装 core）可通过 inFlow_CONFIG_STORE 指向自己的副本。
+CONFIG_FILE = Path(
+    os.environ.get("inFlow_CONFIG_STORE")
+    or (Path(__file__).parent.parent / "config_store.json")
+)
 PROJECT_ROOT = get_project_root()
 
 # 本地开发时从项目根目录加载 .env（确保 DEEPSEEK_API_KEY 等进入 os.environ）
