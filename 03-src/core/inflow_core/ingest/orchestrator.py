@@ -24,6 +24,7 @@ specified step, skipping already-completed work.
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Awaitable, Callable
 from uuid import UUID
 
@@ -46,6 +47,7 @@ from inflow_core.core.pipeline.steps import (
 )
 from inflow_core.core.pipeline.pipeline_log import PhaseLogger, log_task_start, sanitize_log_text
 from inflow_core.core.shared.storage import default_storage
+from inflow_core.core.shared.storage.conventions import staging_file_path
 
 logger = logging.getLogger("inFlow.ingest.orchestrator")
 settings = get_settings()
@@ -56,6 +58,20 @@ _AUDIO_PLATFORMS = frozenset({"xiaoyuzhou", "bilibili"})
 
 def _infer_content_type(platform: str | None) -> str:
     return "audio" if platform in _AUDIO_PLATFORMS else "article"
+
+
+def _write_staging_file(job_id: UUID, filename: str, content: bytes) -> str:
+    """upload/paste 全量分流：云端收件原子落盘 data/00_staging/，返回相对路径。
+
+    worker 认领 job 后经 SFTP 拉取该文件完成 capture（markitdown/parse 全在 worker）。
+    """
+    path = staging_file_path(settings.data_root, job_id, filename)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "wb") as fh:
+        fh.write(content)
+    os.replace(tmp_path, path)
+    return path
 
 
 # ------------------------------------------------------------------ #
@@ -408,6 +424,24 @@ async def ingest_upload(
     await db.flush()
     job_id = job.id
 
+    if settings.external_processing:
+        # 与 url 同款分流：云端只收件落盘 + 登记，markitdown/pipeline 全在 worker。
+        staging_rel = _write_staging_file(job_id, filename, content)
+        job.external_processing = True
+        job.staging_file_path = staging_rel
+        await db.commit()
+        log_task_start(
+            job_id=job_id,
+            article_id=article_id,
+            method="upload",
+            platform="upload",
+            file=filename,
+        )
+        logger.info(
+            "外部处理分流: job=%s → 交给本地 worker（upload 暂存 %s）", job_id, staging_rel
+        )
+        return job_id
+
     await transition(
         db,
         job_id=job_id,
@@ -470,6 +504,24 @@ async def ingest_text(
     db.add(job)
     await db.flush()
     job_id = job.id
+
+    if settings.external_processing:
+        # 与 url 同款分流：粘贴正文落盘暂存，worker 拉取后按 _run_text_capture 语义处理。
+        staging_rel = _write_staging_file(job_id, "note.md", text.encode("utf-8"))
+        job.external_processing = True
+        job.staging_file_path = staging_rel
+        await db.commit()
+        log_task_start(
+            job_id=job_id,
+            article_id=article_id,
+            method="paste",
+            platform="generic",
+            title=real_title,
+        )
+        logger.info(
+            "外部处理分流: job=%s → 交给本地 worker（paste 暂存 %s）", job_id, staging_rel
+        )
+        return job_id
 
     await transition(
         db,

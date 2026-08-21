@@ -6,6 +6,10 @@ naming stays consistent across steps.
 Directory structure under DATA_ROOT:
 
     data/
+    ├── 00_staging/
+    │   └── {job_id}/
+    │       └── {filename}               ← upload/paste 分流暂存（云端收件，worker 拉取）
+    │
     ├── 01_ingest/
     │   └── {platform}/
     │       └── {YYYYMMDD}/
@@ -71,6 +75,34 @@ def _swap_step(path: str, from_step: str, to_step: str) -> str:
     return path.replace(f"/{from_step}/", f"/{to_step}/").replace(
         f"{os.sep}{from_step}{os.sep}", f"{os.sep}{to_step}{os.sep}"
     )
+
+
+# ── 00_staging ────────────────────────────────────────────────────────────
+
+
+def staging_file_path(data_root: str, job_id: UUID, filename: str) -> str:
+    """云端收件暂存路径（upload/paste 全量分流）。
+
+    云端把上传文件/粘贴正文落盘到 ``data/00_staging/{job_id}/`` 并登记到
+    ``ingest_jobs.staging_file_path``；worker 认领后经 SFTP 拉取完成 capture。
+
+    Example: data/00_staging/{uuid}/notes.md
+    """
+    stem, ext = os.path.splitext(filename)
+    safe = _sanitize(stem) or "file"
+    return os.path.join(data_root, "00_staging", str(job_id), f"{safe}{ext.lower()}")
+
+
+def ext_staging_file_rel(staging_path: str) -> str:
+    """worker SFTP 拉取暂存文件用的云端侧路径（相对 $INFLOW_PIPELINE_DATA_DIR）。
+
+    镜像 ``ext_display_card_png_rel``：剥掉 ``data/`` 前缀。若云端 DATA_ROOT 为
+    绝对路径（生产直跑形态），登记值本就是云端绝对路径，原样返回——由 worker
+    侧按「/ 开头=云端绝对路径，否则拼 SFTP 根」归一。
+
+    Example: 00_staging/{uuid}/notes.md
+    """
+    return staging_path.removeprefix("data/")
 
 
 # ── 01_ingest ─────────────────────────────────────────────────────────────

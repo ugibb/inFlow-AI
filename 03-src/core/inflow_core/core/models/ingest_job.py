@@ -62,6 +62,8 @@ class IngestJob(Base):
     asr_file_path = Column(Text, nullable=True)     # set at: transcribed (audio only)
     parsed_file_path = Column(Text, nullable=True)  # set at: parsed
     index_file_path = Column(Text, nullable=True)   # set at: ready (chunks.json path)
+    # upload/paste 分流暂存（云端收件落盘 data/00_staging/...，worker 经 SFTP 拉取）
+    staging_file_path = Column(Text, nullable=True)  # set at: 登记（external 分流时）
 
     # Pipeline status
     status = Column(String(20), nullable=False, default="pending", index=True)

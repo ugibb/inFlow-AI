@@ -10,8 +10,6 @@ from inflow_core.core.utils.logger import get_logger
 # Use HuggingFace mirror for model downloads (fastembed models ~130MB)
 os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
-from fastembed import TextEmbedding
-
 settings = get_settings()
 logger = get_logger("core.shared.ai_service")
 
@@ -45,6 +43,9 @@ def _get_embedding_model():
         EMBEDDING_MODEL = None
     if EMBEDDING_MODEL is None:
         try:
+            # lazy import：云端 venv 不装 fastembed（依赖瘦身），仅 worker 本地模式需要
+            from fastembed import TextEmbedding
+
             logger.debug("Loading embedding model %s via fastembed...", model_name)
             EMBEDDING_MODEL = TextEmbedding(model_name=model_name)
             EMBEDDING_MODEL_NAME_LOADED = model_name

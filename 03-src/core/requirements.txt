@@ -23,7 +23,6 @@ alembic==1.13.3
 markitdown[all]
 fastembed>=0.8.0
 playwright>=1.40.0,<1.57
-douyin-tiktok-scraper>=1.2.0
 bilibili-api-python>=17.0.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
