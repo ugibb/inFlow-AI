@@ -260,7 +260,8 @@ cp .env.local-worker.example .env.local-worker   # 填云端 PG 连接 / SFTP / 
 | `./start-server.sh --logs` | 只跟踪 backend 日志 |
 | `./start-server.sh --restart` | 改 .env / git pull 后重建(默认行为即重建) |
 | `./start-server.sh --verify` | 启动后额外验证健康状态 |
-| `./stop-server.sh` | 停止直跑 backend/bot(infra 容器不停) |
+| `./start-server.sh --local` | Mac 本地调试:跳过 Docker,直跑 uvicorn(:8000) + next dev(:3000);macOS 未装 Docker 时自动进入 |
+| `./stop-server.sh` | 停止直跑 backend/bot/frontend(infra 容器不停) |
 
 - 配置:仓库根 `.env`(首次运行自动从 `.env.example` 生成并补齐密码/token)
 - 日志:`04-log/backend/`、`04-log/wechat-bot/`(按日期分文件);PID:`.server/`

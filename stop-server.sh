@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 停止直跑 backend / wechat-bot（基础设施容器不停止）
+# 停止直跑 backend / wechat-bot / frontend（基础设施容器不停止）
 set -euo pipefail
 
 # 脚本位于仓库根（2026-08-22 由 deploy/cloud/ 上移），REPO_ROOT 即脚本所在目录
@@ -30,6 +30,7 @@ stop_pidfile() {
 
 stop_pidfile "${PID_DIR}/backend.pid" "backend"
 stop_pidfile "${PID_DIR}/wechat-bot.pid" "wechat-bot"
+stop_pidfile "${PID_DIR}/frontend.pid" "frontend"
 
 # 兜底：按进程名
 if pgrep -f 'uvicorn inflow_server.main:app' >/dev/null; then
@@ -40,5 +41,10 @@ if pgrep -f 'inflow_server.extensions.wechat.bot' >/dev/null; then
   echo "[INFO] 按进程名停止 wechat-bot"
   pkill -f 'inflow_server.extensions.wechat.bot' || true
 fi
+# 本地调试前端（next dev）：杀 node 进程树（npm run dev 会再起 next 子进程）
+if pgrep -f 'next dev' >/dev/null; then
+  echo "[INFO] 按进程名停止前端（next dev）"
+  pkill -f 'next dev' || true
+fi
 
-echo "[INFO] 直跑进程已停止；基础设施容器仍运行（停容器：docker compose down）"
+echo "[INFO] 直跑进程已停止；基础设施容器仍运行（停容器：docker compose down；本地模式无容器）"

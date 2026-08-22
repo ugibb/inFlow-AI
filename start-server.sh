@@ -12,7 +12,8 @@
 #   ./start-server.sh --logs       只跟踪日志（服务已在跑，不重建）
 #   ./start-server.sh --restart    改 .env / 拉代码后重建（默认行为就是重建）
 #   ./start-server.sh --verify     启动后额外验证健康状态
-#   ./stop-server.sh               停止直跑 backend/bot（容器不停止）
+#   ./start-server.sh --local      Mac 本地调试：跳过 Docker，直跑 uvicorn(:8000) + next dev(:3000)
+#   ./stop-server.sh               停止直跑 backend/bot/frontend（容器不停止）
 #
 # 首次运行会自动：复制 .env.example、生成密码/密钥、配置微信 bot token。
 
@@ -25,15 +26,19 @@ cd "$REPO_ROOT"
 # infra 容器定义全部在仓库根 docker-compose.yml（原 baota 覆盖层已并入：nginx 绑 127.0.0.1:8080）
 COMPOSE=(docker compose)
 SERVER_DIR="${REPO_ROOT}/03-src/server"
+FRONTEND_DIR="${REPO_ROOT}/03-src/frontend"
 PID_DIR="${REPO_ROOT}/.server"
 BACKEND_PID_FILE="${PID_DIR}/backend.pid"
 BOT_PID_FILE="${PID_DIR}/wechat-bot.pid"
+FRONTEND_PID_FILE="${PID_DIR}/frontend.pid"
 CONFIG_STORE="${REPO_ROOT}/03-src/core/inflow_core/config_store.json"
 CONFIG_EXAMPLE="${REPO_ROOT}/03-src/core/inflow_core/config_store.example.json"
 
 FOLLOW_LOGS=true
 LOGS_ONLY=false
 VERIFY_KEYS=false
+# --local：Mac 本地调试模式（无 Docker；macOS 未装 Docker 时自动启用）
+LOCAL_MODE=false
 
 for arg in "$@"; do
   case "$arg" in
@@ -41,6 +46,7 @@ for arg in "$@"; do
     --logs) FOLLOW_LOGS=true; LOGS_ONLY=true ;;
     --restart) : ;;  # 默认即重建，flag 为语义明确保留
     --verify) VERIFY_KEYS=true ;;
+    --local) LOCAL_MODE=true ;;
     -h|--help)
       sed -n '2,18p' "$0" | sed 's/^# \?//'
       exit 0
@@ -59,7 +65,8 @@ error() { echo "[ERROR] $*" >&2; }
 env_set() {
   local key="$1" val="$2"
   if grep -q "^${key}=" .env 2>/dev/null; then
-    sed -i "s|^${key}=.*|${key}=${val}|" .env
+    # BSD sed（macOS）的 -i 必须带备份后缀；GNU sed 同样接受 -i.bak，两边通用
+    sed -i.bak "s|^${key}=.*|${key}=${val}|" .env && rm -f .env.bak
   else
     printf '%s=%s\n' "$key" "$val" >> .env
   fi
@@ -215,13 +222,15 @@ if [ "$LOGS_ONLY" = true ]; then
 fi
 
 # ── 前置检查 ──────────────────────────────────────────────────────
-if ! command -v docker &>/dev/null || ! docker compose version &>/dev/null; then
+# macOS 且未装 Docker：自动进入本地调试模式（生产在腾讯云 Linux，不会命中该分支）
+if [ "$LOCAL_MODE" = false ] && [ "$(uname -s)" = "Darwin" ] && ! command -v docker &>/dev/null; then
+  LOCAL_MODE=true
+  warn "macOS 未检测到 Docker——自动切换本地调试模式（等价 --local）"
+fi
+
+if [ "$LOCAL_MODE" = false ] && { ! command -v docker &>/dev/null || ! docker compose version &>/dev/null; }; then
   error "需要 Docker + Compose v2（宝塔：软件商店 → Docker 管理器）"
-  if [ "$(uname -s)" = "Darwin" ]; then
-    error "本脚本是云端（腾讯云）生产入口；Mac 本地调试无需 Docker，直接："
-    error "  backend: cd 03-src/server && .venv/bin/uvicorn inflow_server.main:app --host 127.0.0.1 --port 8000"
-    error "  前端:    cd 03-src/frontend && npm run dev   # next.config 将 /api 代理到 :8000"
-  fi
+  error "Mac 本地调试：./start-server.sh --local"
   exit 1
 fi
 if [ ! -d "${SERVER_DIR}/.venv" ]; then
@@ -239,14 +248,21 @@ if [ ! -f "$CONFIG_STORE" ] && [ -f "$CONFIG_EXAMPLE" ]; then
   info "已初始化 config_store.json"
 fi
 
-# ── 构造直跑环境（backend/bot 直连宿主回环的 postgres/redis 容器）──
-export DATABASE_URL="postgresql+asyncpg://inflow:${POSTGRES_PASSWORD}@127.0.0.1:5432/inflow"
-export DATABASE_URL_SYNC="postgresql://inflow:${POSTGRES_PASSWORD}@127.0.0.1:5432/inflow"
-export REDIS_URL="redis://127.0.0.1:6379/0"
+# ── 构造直跑环境 ──────────────────────────────────────────────────
+if [ "$LOCAL_MODE" = false ]; then
+  # 生产：backend/bot 直连宿主回环的 postgres/redis 容器
+  export DATABASE_URL="postgresql+asyncpg://inflow:${POSTGRES_PASSWORD}@127.0.0.1:5432/inflow"
+  export DATABASE_URL_SYNC="postgresql://inflow:${POSTGRES_PASSWORD}@127.0.0.1:5432/inflow"
+  export REDIS_URL="redis://127.0.0.1:6379/0"
+  export inFlow_ENV="${inFlow_ENV:-production}"
+else
+  # 本地调试：不覆盖 DSN，用 config 默认（Homebrew PG inflow:inFlow@localhost:5432）；
+  # 本地无 redis 时缓存功能按需降级，不影响启动
+  info "本地模式：数据库用 config 默认 DSN（Homebrew PG）"
+fi
 export LOG_TO_STDOUT="1"
 # 不设 LOG_DIR：默认 log_dir="04-log/backend" 由 get_log_dir_path 相对仓库根解析，
 # 即 <仓库>/04-log/backend，与本脚本日志重定向目标一致。
-export inFlow_ENV="${inFlow_ENV:-production}"
 if [ -n "${INFLOW_PIPELINE_DATA_DIR:-}" ]; then
   local_data_abs="$INFLOW_PIPELINE_DATA_DIR"
   case "$local_data_abs" in
@@ -257,46 +273,67 @@ if [ -n "${INFLOW_PIPELINE_DATA_DIR:-}" ]; then
   info "DATA_ROOT=$local_data_abs"
 fi
 
-mkdir -p "${REPO_ROOT}/04-log/backend" "${REPO_ROOT}/04-log/wechat-bot" "${PID_DIR}"
+mkdir -p "${REPO_ROOT}/04-log/backend" "${REPO_ROOT}/04-log/wechat-bot" "${REPO_ROOT}/04-log/frontend" "${PID_DIR}"
 TODAY="$(date +%F)"
 
 # ── 基础设施容器（backend / wechat-bot 已在 compose 注释，直跑替代）──
-info "启动基础设施容器（postgres / redis / nginx / frontend）…"
-"${COMPOSE[@]}" up -d --build --force-recreate frontend
-"${COMPOSE[@]}" up -d nginx postgres redis
+if [ "$LOCAL_MODE" = false ]; then
+  info "启动基础设施容器（postgres / redis / nginx / frontend）…"
+  "${COMPOSE[@]}" up -d --build --force-recreate frontend
+  "${COMPOSE[@]}" up -d nginx postgres redis
+fi
 
 stop_pidfile "${BACKEND_PID_FILE}" "backend"
 stop_pidfile "${BOT_PID_FILE}" "wechat-bot"
+stop_pidfile "${FRONTEND_PID_FILE}" "frontend"
 
 # ── backend 直跑 ─────────────────────────────────────────────────
+UVI_HOST="0.0.0.0"
+[ "$LOCAL_MODE" = true ] && UVI_HOST="127.0.0.1"
 info "启动 backend（直跑 uvicorn :8000）…"
 cd "${SERVER_DIR}"
-nohup .venv/bin/uvicorn inflow_server.main:app --host 0.0.0.0 --port 8000 --workers 1 \
+nohup .venv/bin/uvicorn inflow_server.main:app --host "${UVI_HOST}" --port 8000 --workers 1 \
   >> "${REPO_ROOT}/04-log/backend/${TODAY}.log" 2>&1 &
 echo $! > "${BACKEND_PID_FILE}"
 info "  backend PID $(cat "${BACKEND_PID_FILE}")（日志 04-log/backend/${TODAY}.log）"
 
-# ── wechat-bot 直跑（有 token 才起）──────────────────────────────
-if [ -n "${SERVICE_TOKEN_WECHAT_BOT:-}" ]; then
-  export inFlow_BASE="${inFlow_BASE:-http://127.0.0.1:8000}"
-  export inFlow_TOKEN="${SERVICE_TOKEN_WECHAT_BOT}"
-  export inFlow_PUBLIC_BASE="${inFlow_PUBLIC_BASE:-http://127.0.0.1:8080}"
-  # bot 日志独立目录（bot.py 用 get_log_dir_path()，绝对路径直接生效）
-  export LOG_DIR="${REPO_ROOT}/04-log/wechat-bot"
-  info "启动 wechat-bot（直跑 python -m inflow_server.extensions.wechat.bot）…"
-  nohup "${SERVER_DIR}/.venv/bin/python" -m inflow_server.extensions.wechat.bot \
-    >> "${REPO_ROOT}/04-log/wechat-bot/${TODAY}.log" 2>&1 &
-  echo $! > "${BOT_PID_FILE}"
-  info "  wechat-bot PID $(cat "${BOT_PID_FILE}")（日志 04-log/wechat-bot/${TODAY}.log）"
+if [ "$LOCAL_MODE" = true ]; then
+  # ── 前端 dev server（next dev :3000；next.config 将 /api 代理到 :8000）──
+  info "启动前端（next dev :3000）…"
+  cd "${FRONTEND_DIR}"
+  if [ -x node_modules/.bin/next ]; then
+    nohup node_modules/.bin/next dev >> "${REPO_ROOT}/04-log/frontend/${TODAY}.log" 2>&1 &
+  else
+    nohup npm run dev >> "${REPO_ROOT}/04-log/frontend/${TODAY}.log" 2>&1 &
+  fi
+  echo $! > "${FRONTEND_PID_FILE}"
+  info "  前端 PID $(cat "${FRONTEND_PID_FILE}")（日志 04-log/frontend/${TODAY}.log）"
+  cd "${REPO_ROOT}"
+  warn "本地模式跳过 wechat-bot"
 else
-  warn "未配置 SERVICE_TOKEN_WECHAT_BOT，跳过 wechat-bot"
+  # ── wechat-bot 直跑（有 token 才起）────────────────────────────
+  if [ -n "${SERVICE_TOKEN_WECHAT_BOT:-}" ]; then
+    export inFlow_BASE="${inFlow_BASE:-http://127.0.0.1:8000}"
+    export inFlow_TOKEN="${SERVICE_TOKEN_WECHAT_BOT}"
+    export inFlow_PUBLIC_BASE="${inFlow_PUBLIC_BASE:-http://127.0.0.1:8080}"
+    # bot 日志独立目录（bot.py 用 get_log_dir_path()，绝对路径直接生效）
+    export LOG_DIR="${REPO_ROOT}/04-log/wechat-bot"
+    info "启动 wechat-bot（直跑 python -m inflow_server.extensions.wechat.bot）…"
+    nohup "${SERVER_DIR}/.venv/bin/python" -m inflow_server.extensions.wechat.bot \
+      >> "${REPO_ROOT}/04-log/wechat-bot/${TODAY}.log" 2>&1 &
+    echo $! > "${BOT_PID_FILE}"
+    info "  wechat-bot PID $(cat "${BOT_PID_FILE}")（日志 04-log/wechat-bot/${TODAY}.log）"
+  else
+    warn "未配置 SERVICE_TOKEN_WECHAT_BOT，跳过 wechat-bot"
+  fi
+  cd "${REPO_ROOT}"
 fi
 
-cd "${REPO_ROOT}"
-
-# ── 健康检查（nginx → host.docker.internal → backend:8000）───────
+# ── 健康检查（生产经 nginx:8080；本地直连 backend:8000）──────────
+HEALTH_URL="http://127.0.0.1:8080/api/health"
+[ "$LOCAL_MODE" = true ] && HEALTH_URL="http://127.0.0.1:8000/api/health"
 for i in $(seq 1 60); do
-  if curl -sf "http://127.0.0.1:8080/api/health" 2>/dev/null | grep -q '"status"'; then
+  if curl -sf "$HEALTH_URL" 2>/dev/null | grep -q '"status"'; then
     break
   fi
   [ "$i" -eq 60 ] && warn "健康检查超时，请查看 04-log/backend/${TODAY}.log"
@@ -304,14 +341,22 @@ for i in $(seq 1 60); do
 done
 
 echo ""
-info "inFlow AI 已运行（直接代码部署）"
-echo "  本机: http://127.0.0.1:8080"
-echo "  公网: 宝塔反向代理 → 127.0.0.1:8080"
-echo "  后端日志: 04-log/backend/$(date +%F).log"
-echo "  Bot 日志: 04-log/wechat-bot/$(date +%F).log"
-echo "  改 .env / 拉代码后: ./start-server.sh --restart"
-echo "  只看日志:           ./start-server.sh --logs"
-echo "  停止直跑:           ./stop-server.sh"
+if [ "$LOCAL_MODE" = true ]; then
+  info "inFlow AI 本地调试已运行"
+  echo "  前端:    http://127.0.0.1:3000（/api 代理 → :8000）"
+  echo "  backend: http://127.0.0.1:8000"
+  echo "  后端日志: 04-log/backend/${TODAY}.log；前端日志: 04-log/frontend/${TODAY}.log"
+  echo "  停止:    ./stop-server.sh"
+else
+  info "inFlow AI 已运行（直接代码部署）"
+  echo "  本机: http://127.0.0.1:8080"
+  echo "  公网: 宝塔反向代理 → 127.0.0.1:8080"
+  echo "  后端日志: 04-log/backend/$(date +%F).log"
+  echo "  Bot 日志: 04-log/wechat-bot/$(date +%F).log"
+  echo "  改 .env / 拉代码后: ./start-server.sh --restart"
+  echo "  只看日志:           ./start-server.sh --logs"
+  echo "  停止直跑:           ./stop-server.sh"
+fi
 echo ""
 
 if [ "$VERIFY_KEYS" = true ]; then
@@ -321,6 +366,7 @@ if [ "$VERIFY_KEYS" = true ]; then
   info "运行中进程:"
   ps -p "$(cat "${BACKEND_PID_FILE}")" -o pid,etime,cmd 2>/dev/null || true
   [ -f "${BOT_PID_FILE}" ] && ps -p "$(cat "${BOT_PID_FILE}")" -o pid,etime,cmd 2>/dev/null || true
+  [ -f "${FRONTEND_PID_FILE}" ] && ps -p "$(cat "${FRONTEND_PID_FILE}")" -o pid,etime,cmd 2>/dev/null || true
 fi
 
 if [ "$FOLLOW_LOGS" = true ]; then
