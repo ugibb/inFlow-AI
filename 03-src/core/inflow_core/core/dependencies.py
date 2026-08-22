@@ -30,7 +30,7 @@ _SERVICE_TOKENS: dict[str, str] = {
     for pair in os.getenv("SERVICE_TOKENS", "").split(",")
     if ":" in pair
 }
-# deploy/cloud/start-server.sh sets inFlow_TOKEN from this var; map to superadmin for X-Act-As-User.
+# start-server.sh（仓库根）sets inFlow_TOKEN from this var; map to superadmin for X-Act-As-User.
 _wechat_bot_token = os.getenv("SERVICE_TOKEN_WECHAT_BOT", "").strip()
 if _wechat_bot_token and _wechat_bot_token not in _SERVICE_TOKENS:
     _SERVICE_TOKENS[_wechat_bot_token] = os.getenv("WECHAT_BOT_ACT_AS_USER", "weaiw").strip() or "weaiw"

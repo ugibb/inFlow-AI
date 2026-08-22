@@ -1,7 +1,7 @@
 # Self-hosting inFlow AI
 
 > ⚠️ **本流程已废弃（2026-08-20）**：Docker 全容器部署形态与 `backend/` 目录已移除。
-> 当前部署见 [`deploy/cloud/README.md`](../deploy/cloud/README.md) 与 [`deploy/worker/README.md`](../deploy/worker/README.md)。
+> 当前部署见 [README「部署与运维」](../README.md#部署与运维云端)(云端)与独立仓库 [ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)(本地 worker)。
 
 
 A complete walkthrough for deploying inFlow AI on your own server (or laptop).

@@ -2,7 +2,7 @@
 
 
 > ⚠️ **本流程已废弃（2026-08-20）**：Docker 全容器部署形态已移除。
-> 当前部署形态为「云端代码直跑 + 本地 worker」两个单元，见 [`deploy/cloud/README.md`](../deploy/cloud/README.md) 与 [`deploy/worker/README.md`](../deploy/worker/README.md)。
+> 当前部署形态为「云端代码直跑 + 本地 worker」两个单元，见 [README「部署与运维」](../README.md#部署与运维云端)(云端)与独立仓库 [ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)(本地 worker)。
 > 本文档仅作历史参考；相关脚本可从 git 历史找回。
 
 > 环境：腾讯云 + 宝塔 + Docker  

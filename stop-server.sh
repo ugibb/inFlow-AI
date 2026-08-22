@@ -2,8 +2,8 @@
 # 停止直跑 backend / wechat-bot（基础设施容器不停止）
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# 脚本位于仓库根（2026-08-22 由 deploy/cloud/ 上移），REPO_ROOT 即脚本所在目录
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_DIR="${REPO_ROOT}/.server"
 
 stop_pidfile() {
@@ -41,4 +41,4 @@ if pgrep -f 'inflow_server.extensions.wechat.bot' >/dev/null; then
   pkill -f 'inflow_server.extensions.wechat.bot' || true
 fi
 
-echo "[INFO] 直跑进程已停止；基础设施容器仍运行（停容器：docker compose -f docker-compose.yml -f deploy/cloud/docker-compose.baota.yml down）"
+echo "[INFO] 直跑进程已停止；基础设施容器仍运行（停容器：docker compose down）"

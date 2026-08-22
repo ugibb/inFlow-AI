@@ -2,123 +2,136 @@
 
 # inFlow AI — 入流
 
-**Read-later + AI knowledge base, built for the Chinese internet.**
+**为中文互联网打造的稍后阅读 + AI 知识库。**
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
-[![Backend: FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688)](https://fastapi.tiangolo.com)
-[![Frontend: Next.js 14](https://img.shields.io/badge/Frontend-Next.js%2014-black)](https://nextjs.org)
-[![pgvector](https://img.shields.io/badge/Vector-pgvector-336791)](https://github.com/pgvector/pgvector)
-[![Responsive: PC · Pad · Mobile](https://img.shields.io/badge/Responsive-PC%20·%20Pad%20·%20Mobile-007aff)]()
-[![Status: active](https://img.shields.io/badge/status-active-success.svg)]()
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)]
+[![后端: FastAPI](https://img.shields.io/badge/后端-FastAPI-009688)](https://fastapi.tiangolo.com)
+[![前端: Next.js 14](https://img.shields.io/badge/前端-Next.js%2014-black)](https://nextjs.org)
+[![pgvector](https://img.shields.io/badge/向量-pgvector-336791)](https://github.com/pgvector/pgvector)
+[![全端兼容: PC · Pad · 移动端](https://img.shields.io/badge/全端兼容-PC%20·%20Pad%20·%20移动端-007aff)]()
+[![Status: active](https://img.shields.io/badge/状态-持续更新-success.svg)]()
 
-> 🔥 **这是 Simonlin 优化版** ([simonlin000/ inFlow-ai](https://github.com/simonlin000/ inFlow-ai)) — 在原版 [weaiw/ inFlow-ai](https://github.com/weaiw/ inFlow-ai) 基础上增加了 B 站/YouTube 视频 ASR 语音转录、DeepSeek V4-Pro 驱动、UI 配置化等关键能力。详见下方 [Simon Fork 变更](#simon-fork-变更-v11)。
-
-[中文 README](README.zh.md) · [Deploy guide](deploy/cloud/README.md) · [Obsidian plugin](https://github.com/weaiw/inFlow-sync-obsidian)
+[部署与运维](#部署与运维云端) · [Obsidian 插件](https://github.com/weaiw/inFlow-sync-obsidian)
 
 </div>
 
 ---
 
-## Why inFlow AI?
+## 为什么用 inFlow AI?
 
-You save 1000 articles. You re-read 5.
+你收藏了 1000 篇文章。你只重新读过 5 篇。
 
-The problem isn't that you have too much — it's that your tools treat "save" and "read" as the same action. WeChat 收藏 buries them. **收藏 ≠ reading.** That gap is the entire problem.
+问题不是你存太多——问题是现在的工具把"收藏"和"阅读"当成了同一件事。微信收藏把它们埋了。**收藏 ≠ 阅读。** 这个落差,就是全部问题的根源。
 
-**Pocket shut down in 2024. Omnivore shut down too.** Their users' carefully curated libraries vanished overnight.
+**Pocket 在 2024 年关停。Omnivore 也关停了。** 用户精心收藏的内容,一夜之间全没了。
 
-**inFlow AI is a self-hostable, AI-powered second brain** that turns "save for later" back into "actually read & remember." Built first-class for the Chinese internet (WeChat 公众号 / 知乎 / 抖音 / 小红书 / B 站 / 头条 / 掘金 / CSDN), with WeChat Bot ingress, automatic knowledge graph, and one-way Obsidian sync as built-in features.
+**inFlow AI 是一个可自部署的 AI 第二大脑**,把"先存下,晚点看"重新变回"真的读完、真的记住"。第一手为中文互联网而做(微信公众号 / 知乎 / 抖音 / 小红书 / B 站 / 头条 / 掘金 / CSDN),内置微信 Bot 入口 / 自动知识图谱 / Obsidian 单向同步。
 
-It's yours to host. It's yours to keep.
+它由你部署。也由你掌握。
 
 ---
 
-## Highlights
+## 核心亮点
 
 <table>
 <tr>
 <td width="50%" valign="top">
 
-#### 📥 Multi-platform capture
-WeChat 公众号 · **视频号 (WeChat Channels)** · 头条 · 抖音 · 小红书 · B 站 · Medium · CSDN · 掘金 — and any OpenGraph-aware URL.
-JS-rendered & no-parser pages (视频号, CSDN, Medium, …) are extracted via a *trafilatura → headless-Chromium render → BeautifulSoup* cascade for clean main-content.
-Ingestion via: browser bookmark, WeChat Bot, paste, upload (PDF/DOCX/EPUB/etc), one-sentence Spark generation.
+#### 📥 全平台采集
+微信公众号 · 头条 · 抖音 · 小红书 · B 站 · Medium · CSDN · 掘金,以及任何支持 OpenGraph 的网页。
+入库方式:浏览器一键收藏 · 微信 Bot 转发 · 粘贴正文 · 上传文件(PDF/DOCX/EPUB)· 一句话灵感 Spark 生成。
 
 </td>
 <td width="50%" valign="top">
 
-#### 🧠 AI does the work, not you
-Every article gets: AI-extracted title, 5-sentence summary, 3-5 key points, auto-tags, source-aware author extraction, 384-dim vector embedding, mind-map auto-generation. **B 站 / YouTube 视频自动字幕 + ASR 语音转录。**
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-#### 🔍 Semantic search + RAG Q&A
-Ask *"What did I read about prompt engineering?"* → get answer with citations to **your** library, not the public internet.
-
-</td>
-<td width="50%" valign="top">
-
-#### 🕸 Auto-grown knowledge graph
-Each new article finds its 3 closest siblings by semantic distance. Watch your knowledge connect itself.
+#### 🧠 AI 替你干活
+每篇文章自动生成:AI 提取标题 · 5 句话摘要 · 3-5 个关键点 · 自动标签 · 平台感知作者识别 · 1024 维向量嵌入 · 思维导图 · 视频转译。
 
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 
-#### 🛤 Learning paths
-One sentence → AI picks articles from your library, orders them, presents as a curriculum.
+#### 🔍 语义搜索 + RAG 问答
+问 *"我读过哪些关于提示词工程的文章?"* → 直接从**你的库**里给出答案 + 引用,而不是从公网搜。
 
 </td>
 <td width="50%" valign="top">
 
-#### 💬 WeChat Bot ingress
-Forward an article URL to your bot → it's in your library 5 seconds later, with summary, tags, and "related to your earlier reads" suggestions.
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-#### 📝 One-way Obsidian sync
-Companion plugin writes a Markdown snapshot to your vault. Never overwrites your local edits. Your data survives any future inFlow shutdown.
-
-</td>
-<td width="50%" valign="top">
-
-#### 🏢 Multi-tenant, production-grade
-JWT auth · per-user data isolation · revocable sync tokens · service-token impersonation for bots · admin user management.
+#### 🕸 自动生长的知识图谱
+每篇新文章自动找到最近的 3 篇语义相邻文章。眼看着自己的知识自己连成网。
 
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 
-#### 📂 Real knowledge-base craftsmanship
-Folder hierarchy · tag system · archive · favorite · recycle bin · weekly review reminder · related-articles recommender on every read view.
+#### 🛤 学习路径
+一句话描述方向 → AI 从你的库里挑文章、排序、组织成结构化学习路径。
 
 </td>
 <td width="50%" valign="top">
 
-#### 🌐 All content types
-Web links · clipboard paste · PDF · Word · Excel · PPT · EPUB · CSV · plain notes · Spark (1-sentence → full article AI generation).
+#### 💬 微信 Bot 入口
+转发文章 URL 给你的 bot → 5 秒内进库 + 自动摘要 + 自动打标签 + 推荐"和你以前看过的相关"。
 
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 
-#### 📱 Full-device responsive
-**PC · iPad · mobile** all work natively. Touch-optimized reader, gesture-friendly knowledge graph, mobile-first layouts. Use inFlow from any device, anywhere.
+#### 📝 一次性快照同步 Obsidian
+配套插件把你所有文章导出成本地 Markdown,**永不覆盖你的本地编辑**。哪天 inFlow 没了,你硬盘里的数据还在。
 
 </td>
 <td width="50%" valign="top">
 
-#### 🌗 Light / dark / system theme
-Auto-switching based on OS preference, or pin to your favorite mode. Eye-friendly serif reader font for long sessions.
+#### 🏢 多租户,生产级架构
+JWT 鉴权 · 数据按用户隔离 · 同步 Token 可一键撤销 · 服务 Token 支持 X-Act-As-User 代理 · 完整用户管理。
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+#### 📂 知识库基本功扎实
+文件夹层级 · 标签系统 · 归档 · 收藏 · 回收站 · 周期回顾提醒 · 每篇阅读底部相关推荐。
+
+</td>
+<td width="50%" valign="top">
+
+#### 🌐 万物可收
+网页链接 · 粘贴正文 · PDF · Word · Excel · PPT · EPUB · CSV · 自己写的笔记 · Spark 一句话生成全文。
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+#### 📱 全端兼容
+**PC · iPad · 移动端**全部原生适配。阅读器触控优化 · 知识图谱手势友好 · 移动端优先排版。在通勤 / 沙发 / 桌前任何场景都顺手。
+
+</td>
+<td width="50%" valign="top">
+
+#### 🌗 浅色 / 深色 / 跟随系统
+按系统偏好自动切换,也可固定模式。阅读字体长时间使用不疲劳。
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+#### 🪵 流水线实时日志
+
+处理进度透明可查——鼠标悬停任意正在执行的步骤,弹出实时运行日志浮层。长音频转录时可以看到逐段进度(`Groq 转录完成 [分段 15/16（0.9 MB）]（14s）`),不再对着转圈发呆。日志超 5 分钟无更新自动变橙标「可能卡住」提示。
+
+</td>
+<td width="50%" valign="top">
+
+#### 🎯 采集状态准确
+
+「采集完成」= **元数据 + 媒体文件全部就绪**。音频 / 播客内容会在采集阶段就把音频下载完,而不是等到转录步骤才开始下载,避免进度条误导。视频媒体文件在独立的预处理步骤下载,不阻塞采集。
 
 </td>
 </tr>
@@ -126,116 +139,162 @@ Auto-switching based on OS preference, or pin to your favorite mode. Eye-friendl
 
 ---
 
-## Screenshots
+## 截图
 
-> ⚠️ Add screenshots in `docs/screenshots/` — see open issues for placeholders.
+> ⚠️ 截图待补,放到 `docs/screenshots/` 即可。
 
-| Dashboard | Reader | Knowledge graph | Settings |
+| 主页 | 阅读器 | 知识图谱 | 设置 |
 |---|---|---|---|
-| _(placeholder)_ | _(placeholder)_ | _(placeholder)_ | _(placeholder)_ |
+| _(待补)_ | _(待补)_ | _(待补)_ | _(待补)_ |
 
 ---
 
-## Who is it for?
+## 适合谁用?
 
-- **Product managers and researchers** drowning in saved-but-never-read articles
-- **Engineers and lifelong learners** who want their weekly tabs to compound into knowledge
-- **Privacy-conscious users** who don't want their reading habits living in some startup's database
-- **People burned by Pocket / Omnivore shutdowns** wanting data sovereignty
-- **Content curators** building structured personal knowledge bases
-- **Self-hosters** who run their own infrastructure for fun and survival
-- **Cross-device readers** who switch between phone (commute) → iPad (couch) → laptop (desk) and want all three to feel native
+- **产品经理 / 研究者** —— 收藏夹堆成山,真正读过的不到 5%
+- **工程师 / 终身学习者** —— 希望每周收藏的标签最终能沉淀成体系
+- **隐私敏感的用户** —— 不想阅读习惯被存在某个创业公司服务器上
+- **被 Pocket / Omnivore 关停坑过的人** —— 想要数据主权
+- **内容策展者** —— 想搭建结构化个人知识库
+- **自部署爱好者** —— 喜欢自己跑自己基础设施的人
+- **跨设备阅读者** —— 手机通勤、iPad 沙发、笔记本桌前来回切,希望三端都顺手
 
 ---
 
-## Compared to alternatives
+## 与同类产品对比
 
 |  | inFlow AI | Pocket | Omnivore | Readwise | Hoarder/Karakeep | Memos |
 |---|---|---|---|---|---|---|
-| Open source | ✅ AGPL-3.0 | ❌ | ✅ (was) | ❌ | ✅ MIT | ✅ MIT |
-| Self-host | ✅ Docker | ❌ | ✅ (defunct) | ❌ | ✅ Docker | ✅ Docker |
-| **Chinese platforms** | **✅ 6+ deep parsers** | ❌ | Weak | ❌ | Weak | N/A |
-| AI summary | ✅ Any provider | ❌ Basic | ✅ | ✅ | ✅ | ❌ |
-| **Video ASR / transcription** | **✅ B站+YouTube** | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Knowledge graph | ✅ Auto | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Learning paths | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| WeChat Bot | ✅ Built-in | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Obsidian sync | ✅ Plugin | ❌ | ✅ | ✅ Paid | ❌ | ❌ |
-| **Responsive (PC/pad/mobile)** | ✅ All native | ✅ | Limited | ✅ | Limited | Limited |
-| Multi-tenant | ✅ | N/A | ✅ | N/A | Limited | Limited |
-| Status | ✅ Active | ⛔ **Shut down 2024** | ⛔ **Shut down 2024** | ✅ Paid | ✅ Active | ✅ Active |
+| 开源 | ✅ AGPL-3.0 | ❌ | ✅(曾经) | ❌ | ✅ MIT | ✅ MIT |
+| 自部署 | ✅ Docker | ❌ | ✅(项目关闭) | ❌ | ✅ Docker | ✅ Docker |
+| **中文平台支持** | **✅ 6+ 深度解析** | ❌ | 弱 | ❌ | 弱 | N/A |
+| AI 摘要 | ✅ 任意厂商 | ❌ 基础 | ✅ | ✅ | ✅ | ❌ |
+| 知识图谱 | ✅ 自动 | ❌ | ❌ | ❌ | ❌ | ❌ |
+| 学习路径 | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| 微信 Bot | ✅ 内置 | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Obsidian 同步 | ✅ 插件 | ❌ | ✅ | ✅ 付费 | ❌ | ❌ |
+| **全端响应式** | ✅ 原生 | ✅ | 一般 | ✅ | 一般 | 一般 |
+| 多租户 | ✅ | N/A | ✅ | N/A | 一般 | 一般 |
+| 项目状态 | ✅ 持续更新 | ⛔ **2024 关停** | ⛔ **2024 关停** | ✅ 付费在售 | ✅ 持续更新 | ✅ 持续更新 |
 
-inFlow AI is the **only** option that combines: deep Chinese platform support · WeChat Bot · auto knowledge graph · Obsidian sync · self-host · full-device responsive UI. If any one of those is critical to you, the alternatives don't cover it.
+inFlow AI 是**唯一**同时拥有这些能力的产品:深度中文平台支持 · 微信 Bot · 自动知识图谱 · Obsidian 同步 · 自部署 · 全端响应式 UI。任何一项是刚需,其它替代品都不能满足你。
 
 ---
 
-## Quick Start (5 minutes)
+## 快速开始(5 分钟)
 
-### Prerequisites
+### 前置要求
 
-inFlow ships as two physically separated deployment units:
+inFlow 的部署形态为两个物理独立的单元:
 
-- **Cloud unit** (this repo, `deploy/cloud/`): backend + wechat-bot run directly on the host; only infrastructure (postgres / redis / nginx / frontend) runs in containers. The shared engine `03-src/core` is also distributed from this repo
-- **Local worker** (**separate repo** [ugibb/inflow-worker](https://github.com/ugibb/inflow-worker), optional): a Mac polling the cloud PostgreSQL directly, taking over heavy compute pipelines such as podcast transcription; it pip-installs the engine from this repo's `03-src/core` via a git subdirectory dependency
+- **云端单元**(本仓库根,启停脚本 `./start-server.sh` / `./stop-server.sh`):服务器代码直跑 backend + wechat-bot,仅基础设施(postgres / redis / nginx / frontend)走容器;共享引擎 `03-src/core` 也由本仓库分发
+- **本地 worker**(**独立仓库** [ugibb/inflow-worker](https://github.com/ugibb/inflow-worker),可选):Mac 直连云端 PostgreSQL 轮询认领任务,承接播客等重计算 pipeline;引擎经 pip git 子目录依赖取自本仓库 `03-src/core`
 
-**Cloud unit**
+**云端单元**
 
-- **Python 3.10+** (runs backend / bot), **Docker** ≥ 24.0 with Compose v2 (infra containers only)
-- ~ **4 GB RAM**, ~ **5 GB disk**
+- **Python 3.10+**(跑 backend / bot)、**Docker** ≥ 24.0 带 Compose v2(仅跑 infra 容器)
+- 约 **4 GB 内存**、**5 GB 磁盘**
 
-**Local worker (optional)**
+**本地 worker(可选)**
 
-- macOS with **Python 3.10+** and ffmpeg; access to external AI APIs (Groq etc.)
-- See the separate repo **[ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)**
+- macOS + **Python 3.10+**、ffmpeg;可访问外网 AI API(Groq 等)
+- 详见独立仓库 **[ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)** 的 README
 
-### Steps (cloud)
+### 步骤(云端)
 
 ```bash
-# 1. Clone
+# 1. 克隆
 git clone <repo-url> && cd inFlow-ai
 
-# 2. Backend dependencies (one-time)
-cd 03-src/server && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && cd ../..
+# 2. 后端依赖(一次性,两步:精简清单 + 共享引擎)
+cd 03-src/server && python3 -m venv .venv \
+  && .venv/bin/pip install -r requirements.txt \
+  && .venv/bin/pip install --no-deps -e ../core && cd ../..
 
-# 3. Start: generates .env secrets, brings up infra containers, runs backend / wechat-bot
-./deploy/cloud/start-server.sh
+# 3. 启动:自动生成 .env 密钥、起 infra 容器、直跑 backend / wechat-bot
+./start-server.sh
 
-# 4. Open
+# 4. 打开
 open http://127.0.0.1:8080
 ```
 
-First-time setup creates an admin user. The credentials appear in backend logs:
+首次启动会自动创建超管账号,密码在 backend 日志里:
 
 ```bash
 grep -i admin "04-log/backend/$(date +%F).log"
 ```
 
-Day-to-day updates: `git pull && ./deploy/cloud/start-server.sh --restart`.
-Container commands, DB backups and troubleshooting live in **[`deploy/cloud/README.md`](deploy/cloud/README.md)**.
+日常更新:`git pull && ./start-server.sh --restart`。
+容器命令、数据库备份、部署细节见下文 **[部署与运维](#部署与运维云端)**。
 
-### Local worker (optional)
+### 本地 worker(可选)
 
-The worker lives in its own repo, **[ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)** (the engine is pip-installed from this repo's `03-src/core` via a git subdirectory dependency):
+worker 已拆为独立工程 **[ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)**(引擎以 pip git 子目录依赖取自本仓库 `03-src/core`):
 
 ```bash
 git clone git@github.com:ugibb/inflow-worker.git && cd inflow-worker
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m playwright install chromium
 
-cp .env.local-worker.example .env.local-worker   # cloud PG / SFTP / API keys
-./start-worker.sh   # start and follow logs
+cp .env.local-worker.example .env.local-worker   # 填云端 PG 连接 / SFTP / API Key
+./start-worker.sh   # 启动并跟踪日志
 ```
 
-Engine upgrades (after `03-src/core` changes land here): `./start-worker.sh --upgrade`.
+引擎升级(本仓库 `03-src/core` 更新后):`./start-worker.sh --upgrade`。
 
 ---
 
-## Architecture
+## 部署与运维(云端)
+
+云端单元 = **infra 容器**(postgres / redis / nginx / frontend,由 docker compose 管理)+ **宿主机直跑进程**(backend uvicorn :8000、wechat-bot)。重计算 pipeline 由本地 worker 承接(独立仓库 [ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)),云端只负责入口 / 存储 / 展示 / 推送。
+
+> Docker 全容器部署形态已于 2026-08-20 移除(历史方案见 `02-docs/DEPLOY_BAOTA*.md` 废弃横幅,脚本可从 git 历史找回)。
+> 本地 worker 已于 2026-08-21 拆为独立工程,不再位于本仓库(原 `deploy/worker/`、`03-src/worker/` 可从 git 历史找回)。
+
+### 启停脚本(在仓库根执行)
+
+| 命令 | 作用 |
+|---|---|
+| `./start-server.sh` | 启动/重建 infra 容器 + 直跑 backend/bot,跟踪日志 |
+| `./start-server.sh --detach` | 仅后台启动 |
+| `./start-server.sh --logs` | 只跟踪 backend 日志 |
+| `./start-server.sh --restart` | 改 .env / git pull 后重建(默认行为即重建) |
+| `./start-server.sh --verify` | 启动后额外验证健康状态 |
+| `./stop-server.sh` | 停止直跑 backend/bot(infra 容器不停) |
+
+- 配置:仓库根 `.env`(首次运行自动从 `.env.example` 生成并补齐密码/token)
+- 日志:`04-log/backend/`、`04-log/wechat-bot/`(按日期分文件);PID:`.server/`
+- 日常更新:`git pull && ./start-server.sh --restart`(生产路径 `/www/wwwroot/inflow-ai`)
+- url / upload / paste 三入口默认全量分流本地 worker(`EXTERNAL_PROCESSING=true`);worker 离线时任务保持 pending
+
+### infra 容器运维(原生命令)
+
+```bash
+docker compose ps                        # 容器状态
+docker compose logs --tail 100 postgres  # 某容器日志(backend/bot 是直跑进程,看 04-log/)
+docker compose restart nginx             # 重启单个 infra 容器
+docker compose down                      # 停全部 infra 容器(生产慎用)
+```
+
+数据库备份:
+
+```bash
+docker exec inflow-db pg_dump -U inflow inflow > /www/backup/inflow_$(date +%F).sql
+```
+
+### 部署注意
+
+- 容器 Nginx 绑定本机回环 `127.0.0.1:8080`(宝塔 Nginx 占 80/443,由宝塔反代转发);非宝塔环境可改 `docker-compose.yml` 中该端口映射
+- 仓库根 `docker-compose.yml` 与 `.env.example` 同时是后端定位仓库根的 marker(`03-src/core/inflow_core/core/paths.py`),不可移动
+
+---
+
+## 架构
 
 ```
         ┌──────────────────────────────────────────────────────┐
-        │       Any device — PC · iPad · mobile · browser       │
-        │   • Web app   • WeChat Bot   • Obsidian plugin        │
+        │      任意设备 — PC · iPad · 手机 · 浏览器             │
+        │   • 网页 App · 微信 Bot · Obsidian 插件               │
         └─────────────────────────┬────────────────────────────┘
                                   │
                           ┌───────▼───────┐
@@ -243,341 +302,273 @@ Engine upgrades (after `03-src/core` changes land here): `./start-worker.sh --up
                           └───┬────────┬──┘
                               │        │
                   ┌───────────▼──┐  ┌──▼────────────┐
-                  │  Frontend    │  │  Backend       │
-                  │  (Next.js 14)│  │  (FastAPI)     │
-                  │  Responsive  │  │  async         │
+                  │  前端        │  │  后端         │
+                  │  Next.js 14  │  │  FastAPI      │
+                  │  响应式      │  │  async        │
                   └──────────────┘  └───┬────────────┘
                                         │
                   ┌─────────────────────┼─────────────────────┐
                   │                     │                     │
         ┌─────────▼──────────┐ ┌────────▼───────┐  ┌──────────▼────────┐
-        │  PostgreSQL 16     │ │  Redis 7       │  │ External APIs     │
-        │  + pgvector        │ │  (cache)       │  │ LLM + embedding   │
+        │  PostgreSQL 16     │ │  Redis 7       │  │ 外部 API          │
+        │  + pgvector        │ │  (缓存)        │  │ LLM + 嵌入        │
         │  • articles        │ │                │  │ • DeepSeek        │
-        │  • embeddings 1024d│ │                │  │ • 讯飞 / OpenAI   │
+        │  • embeddings 1024 │ │                │  │ • 讯飞 / OpenAI   │
         │  • knowledge_edges │ │                │  │ • SiliconFlow     │
-        │  • users + tokens  │ │                │  │ • any compatible  │
+        │  • users + tokens  │ │                │  │ • 任意 兼容厂商   │
         └────────────────────┘ └────────────────┘  └───────────────────┘
 ```
 
-### Tech stack
+### 技术栈
 
-| Layer | Choice | Why |
-|-------|--------|-----|
-| Frontend | **Next.js 14** + TypeScript + Tailwind | App router, server components, responsive-first |
-| Backend | **FastAPI** + SQLAlchemy async + pydantic | Async-native, type-safe, auto OpenAPI docs |
-| Database | **PostgreSQL 16** + **pgvector** | One DB for both relational data and vector search |
-| Cache | **Redis 7** | Sessions, queues |
-| Crawler | **Playwright** + **curl_cffi** + httpx | Defeats Chinese anti-bot (TLS fingerprint, XHR intercept, JS VM bypass) |
-| LLM | Any **OpenAI-compatible** | DeepSeek, 讯飞星辰, OpenAI, SiliconFlow, MiniMax, 智谱, ... |
-| Embedding | **fastembed bge-small-en-v1.5** (384-dim) or SiliconFlow bge-m3 (1024-dim) | Cloud quality with local fallback |
-| Reverse proxy | **Nginx** | Single ingress, fast static serving |
-
----
-
-## Configuration
-
-Everything user-facing is configurable via the web UI:
-
-**Settings page** → AI 对话模型 / 嵌入模型 / 缓存
-
-| What | Where |
-|------|-------|
-| LLM provider + key + model | Settings → AI 对话模型 |
-| Embedding provider + key + model | Settings → 嵌入模型 |
-| Cache clearing / rebuilding | Settings → 系统缓存 |
-| Obsidian sync token | Personal Settings → Obsidian 备份 |
-| WeChat Bot binding | Personal Settings → WeChat |
-| Review schedule | Personal Settings → 周期回顾 |
-
-### Environment variables
-
-| Var | Required | What |
-|-----|----------|------|
-| `POSTGRES_PASSWORD` | ✅ | DB password |
-| `SECRET_KEY` | ✅ | JWT signing secret (≥ 32 random chars) |
-| `ACCESS_TOKEN_EXPIRE_DAYS` | ❌ | Login JWT lifetime in days (`7`, `30`, `0` ≈ unlimited; default **24h** if unset) |
-| `ACCESS_TOKEN_EXPIRE_HOURS` | ❌ | Login JWT lifetime in hours (used only when `ACCESS_TOKEN_EXPIRE_DAYS` is unset) |
-| `OPENAI_API_KEY` | ❌ | Optional fallback if no UI config |
-| `DEEPSEEK_API_KEY` | ❌ | Optional fallback |
-| `SILICONFLOW_API_KEY` | ❌ | Optional fallback |
-| `MINIMAX_API_KEY` | ❌ | Optional fallback |
-| `SERVICE_TOKENS` | ❌ | `tokenA:userA,tokenB:userB` — for bots |
-| `LINKMIND_PUBLIC_BASE` | ❌ | Public URL for bot deep links |
-
-See `.env.example` for the complete template with comments.
-
-### Login session
-
-- Login uses a **stateless JWT** stored in the browser (`localStorage` key `inFlow_token`).
-- **Restarting backend/frontend does not invalidate the token** — as long as `SECRET_KEY` in `.env` stays the same and the token has not expired.
-- On page load the frontend validates the token via `/api/auth/me`. If the backend is still starting up, it **retries up to 5 times** and keeps the token instead of logging you out.
-- After changing `ACCESS_TOKEN_EXPIRE_DAYS`, **restart the backend** and **log in again** — only newly issued tokens pick up the new lifetime.
-
-| `ACCESS_TOKEN_EXPIRE_DAYS` | Effect |
-|----------------------------|--------|
-| `7` | One week |
-| `30` | One month (recommended for self-hosted) |
-| `0` | Effectively unlimited (~10 years; self-hosted only) |
-| *(unset)* | 24 hours |
+| 层 | 技术 | 选这个的理由 |
+|----|------|------|
+| 前端 | **Next.js 14** + TypeScript + Tailwind | App router · 服务端组件 · 响应式优先 |
+| 后端 | **FastAPI** + SQLAlchemy async + pydantic | 原生 async · 类型安全 · 自动生成 OpenAPI 文档 |
+| 数据库 | **PostgreSQL 16** + **pgvector** | 一个 DB 既存关系数据又存向量 |
+| 缓存 | **Redis 7** | session / 队列 |
+| 爬虫 | **Playwright** + **curl_cffi** + httpx | 突破中文反爬(TLS 指纹 / XHR 拦截 / JS VM 绕过) |
+| LLM | 任意 **OpenAI 兼容** | DeepSeek · 讯飞星辰 · OpenAI · SiliconFlow · MiniMax · 智谱 · ... |
+| 嵌入 | **SiliconFlow bge-m3** (1024 维) 或本地 fastembed (384 维) | 云端质量,带本地兜底 |
+| 反代 | **Nginx** | 单一入口 · 静态资源加速 |
 
 ---
 
-## API endpoints (high-level)
+## 配置
 
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /api/auth/login` | User login → JWT |
-| `POST /api/articles` | Add article by URL |
-| `POST /api/articles/upload` | Upload file (PDF / Word / EPUB / etc) |
-| `POST /api/articles/notes` | Write a note |
-| `POST /api/articles/spark` | One-sentence → AI-generated article |
-| `POST /api/assistant/ask` | RAG Q&A on your library |
-| `GET /api/knowledge/graph` | Knowledge graph data |
-| `POST /api/learning/paths/generate` | Generate learning path |
-| `POST /api/sync/issue-token` | Mint long-lived Obsidian sync token |
-| `GET /api/sync/articles` | Paginated articles for sync |
-| `POST /api/sync/revoke-all-tokens` | Revoke all sync tokens |
+所有用户面对的配置都通过网页 UI 完成:
 
-Full OpenAPI spec at `http://localhost/api/docs` once running.
+**设置页** → AI 对话模型 / 嵌入模型 / 系统缓存
 
----
+| 什么 | 在哪里 |
+|------|--------|
+| LLM 厂商 + Key + 模型 | 系统管理 → AI 对话模型 |
+| 嵌入厂商 + Key + 模型 | 系统管理 → 嵌入模型 |
+| 缓存清理 / 重建 | 系统管理 → 系统缓存 |
+| Obsidian 同步 Token | 个人设置 → Obsidian 备份 |
+| 微信 Bot 绑定 | 个人设置 → 微信 |
+| 周期回顾配置 | 个人设置 → 周期回顾 |
 
-## Obsidian Sync — companion plugin
+### 环境变量
 
-Plugin repo: **[weaiw/inFlow-sync-obsidian](https://github.com/weaiw/inFlow-sync-obsidian)** (MIT)
+| 变量 | 必填 | 用途 |
+|------|------|------|
+| `POSTGRES_PASSWORD` | ✅ | 数据库密码 |
+| `SECRET_KEY` | ✅ | JWT 签名密钥(≥ 32 位随机字符) |
+| `ACCESS_TOKEN_EXPIRE_DAYS` | ❌ | 登录 JWT 有效期（天）：`7` 一周、`30` 一月、`0` 近似永久；未设置时默认 **24 小时** |
+| `ACCESS_TOKEN_EXPIRE_HOURS` | ❌ | 登录 JWT 有效期（小时）；仅当未设置 `ACCESS_TOKEN_EXPIRE_DAYS` 时生效 |
+| `OPENAI_API_KEY` | ❌ | 可选,UI 没配时的兜底 |
+| `DEEPSEEK_API_KEY` | ❌ | 可选兜底 |
+| `SILICONFLOW_API_KEY` | ❌ | 可选兜底 |
+| `MINIMAX_API_KEY` | ❌ | 可选兜底 |
+| `SERVICE_TOKENS` | ❌ | `tokenA:userA,tokenB:userB` — 给 bot 用 |
+| `LINKMIND_PUBLIC_BASE` | ❌ | bot 深链接所用的公网地址 |
 
-**One-shot snapshot to your local vault.** Never overwrites your edits. Your data survives any future shutdown.
+完整模板见 `.env.example`。
 
-Setup:
+### 登录与会话
 
-1. Web app → **Personal Settings → Obsidian Backup → Generate Sync Token**
-2. Download plugin from [Releases](https://github.com/weaiw/inFlow-sync-obsidian/releases/latest)
-3. Drop into `<your-vault>/.obsidian/plugins/inFlow-sync/`
-4. In Obsidian → Community plugins → enable **inFlow AI Sync**
-5. Paste token + server URL → click **Sync Now**
+- 登录采用**无状态 JWT**，保存在浏览器 `localStorage`（键名 `inFlow_token`）。
+- **重启后端/前端不会使 Token 失效** — 只要 `.env` 中 `SECRET_KEY` 不变且 Token 未过期即可。
+- 页面加载时会请求 `/api/auth/me` 校验 Token；若后端尚在启动中，前端会**最多重试 5 次**并保留 Token，避免重启期间刷新页面被误登出。
+- 修改 `ACCESS_TOKEN_EXPIRE_DAYS` 后需**重启后端**并**重新登录一次**，新签发的 Token 才会使用新有效期。
 
-The plugin auto-detects already-synced articles via dual-OR (sync_state.json ∪ frontmatter scan), so it's safe to lose either side of the index.
-
----
-
-## Documentation
-
-- [`deploy/cloud/README.md`](deploy/cloud/README.md) — cloud deployment; local worker deployment lives in the separate repo [ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — How to contribute
-- API docs at `/api/docs` (auto-generated from FastAPI)
-
-
----
-
-## Simon Fork 变更 (v1.1)
-
-本仓库 ([simonlin000/ inFlow-ai](https://github.com/simonlin000/ inFlow-ai)) 在原版 [weaiw/ inFlow-ai](https://github.com/weaiw/ inFlow-ai) 基础上增加了以下能力：
-
-### 🎬 视频 ASR 语音转录
-
-**B 站 & YouTube 视频 → 完整文字稿。** 三层处理：
-
-1. **字幕抓取** — 有外挂字幕直接扒下来
-2. **ASR 转录** — 没字幕？后台自动下载音频轨道，Whisper (faster-whisper tiny) 转文字
-3. **智能限制** — 默认 30 分钟上限（可在设置页调），防止内存溢出
-
-流程：贴链接 → 秒存文章 → 30 秒内后台扫到标记 → 几分钟后刷新，字幕已在文章底部。
-
-### 📺 YouTube 完整支持
-
-接入 yt-dlp：自动获取标题/频道/简介/封面，优先中文字幕，无字幕走 ASR。只需在设置页填代理地址（国内访问 YouTube 需要）。
-
-### 🧠 DeepSeek V4-Pro 驱动
-
-1.6 万亿参数 MoE 模型（490 亿激活），摘要质量显著提升。不是"本文介绍了XXX"的表面总结，而是提炼核心命题。
-
-### ⚙️ UI 配置化
-
-**设置 → 插件设置**，四个开关随时改：
-
-- YouTube 解析（开/关）
-- 代理地址
-- 语音转录 ASR（开/关）
-- 转录视频上限（默认 1800 秒）
-
-改了立刻生效，不用重启容器。
-
-### 🔄 Obsidian 双向同步
-
-除原版 inFlow → Obsidian 拉取外，新增 `POST /api/sync/articles` 端点：Obsidian vault 里的 Markdown 文件可推送回 inFlow。按 obsidian_path 去重，支持更新。
-
-### 🐛 关键修复
-
-- **Embedding 向量化修复** — `TextEmbedding` 导入缺失、HuggingFace 国内不可达、向量维度不匹配（1024→384）
-- **双 Worker 竞态条件** — `ASR_RUNNING` 锁防重复转录
-- **临时文件堆积导致磁盘满** — 限制 30 分钟 + 及时清理
-- **长视频 OOM** — 内存保护，超过上限不转录
-
-### 从本仓库部署
-
-```bash
-git clone https://github.com/simonlin000/ inFlow-ai.git
-cd  inFlow-ai
-cp .env.example .env
-# 编辑 .env，至少填 DEEPSEEK_API_KEY 和 SECRET_KEY
-docker compose up -d
-```
-
-打开 http://localhost:80 → 设置 → AI 对话模型 配 DeepSeek → 设置 → 插件设置 配代理 → 开始用。
+| `ACCESS_TOKEN_EXPIRE_DAYS` | 效果 |
+|----------------------------|------|
+| `7` | 一周 |
+| `30` | 一月（自建环境推荐） |
+| `0` | 近似永久（约 10 年，仅适合自建环境） |
+| 未设置 | 24 小时 |
 
 ---
 
-## Roadmap
+## API 端点速查
 
-### v1.1 — current
-- ✅ WeChat Channels (视频号) capture
-- ✅ Smart generic extraction (trafilatura → headless render → BeautifulSoup)
-- ✅ Article-scoped Q&A (📄 this-article / 📚 whole-library toggle)
+| 端点 | 用途 |
+|------|------|
+| `POST /api/auth/login` | 用户登录 → JWT |
+| `POST /api/articles` | 按 URL 添加文章 |
+| `POST /api/articles/upload` | 上传文件(PDF / Word / EPUB / 等) |
+| `POST /api/articles/notes` | 写一篇笔记 |
+| `POST /api/articles/spark` | 一句话 → AI 生成文章 |
+| `POST /api/assistant/ask` | 基于你库的 RAG 问答 |
+| `GET /api/knowledge/graph` | 知识图谱数据 |
+| `POST /api/learning/paths/generate` | 生成学习路径 |
+| `POST /api/sync/issue-token` | 签发长期 Obsidian 同步 Token |
+| `GET /api/sync/articles` | 分页获取同步文章 |
+| `POST /api/sync/revoke-all-tokens` | 撤销所有同步 Token |
 
-### v1.0
-- ✅ Multi-platform capture (8+ sources)
-- ✅ AI processing pipeline (summary / key-points / tags / embedding / mind-map)
-- ✅ RAG Q&A + semantic search
-- ✅ Auto knowledge graph + learning paths
-- ✅ WeChat Bot ingress
-- ✅ Obsidian sync plugin
-- ✅ Multi-tenant + revocable sync tokens
-- ✅ Self-host via Docker
-- ✅ Responsive UI for PC / pad / mobile
+完整 OpenAPI 文档:启动后 `http://localhost/api/docs`。
+
+---
+
+## Obsidian 同步插件
+
+插件仓库:**[weaiw/inFlow-sync-obsidian](https://github.com/weaiw/inFlow-sync-obsidian)**(MIT)
+
+**一次性快照到本地 vault。** 永不覆盖你的本地修改。哪天产品没了,你的数据还在。
+
+使用流程:
+
+1. 网页 → **个人设置 → Obsidian 备份 → 生成本地同步 Token**
+2. 从 [Releases](https://github.com/weaiw/inFlow-sync-obsidian/releases/latest) 下载插件
+3. 解压到 `<your-vault>/.obsidian/plugins/inFlow-sync/`
+4. Obsidian → 社区插件 → 启用 **inFlow AI Sync**
+5. 粘贴 Token + 服务器地址 → 点 **Sync Now**
+
+插件用「sync_state.json ∪ frontmatter 扫描」双重 OR 判定"已同步",两边丢任意一边都不会重复同步。
+
+---
+
+## 文档
+
+- 本 README [部署与运维](#部署与运维云端) 章节 — 云端部署;本地 worker 部署见独立仓库 [ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)
+- API 文档:`/api/docs`(FastAPI 自动生成)
+
+---
+
+## 路线图
+
+### v1.0 — 当前版本
+- ✅ 全平台采集(8+ 来源)
+- ✅ AI 处理流水线(摘要 / 关键点 / 标签 / 嵌入 / 思维导图)
+- ✅ RAG 问答 + 语义搜索
+- ✅ 自动知识图谱 + 学习路径
+- ✅ 微信 Bot 入口
+- ✅ Obsidian 同步插件
+- ✅ 多租户 + 可撤销同步 Token
+- ✅ Docker 自部署
+- ✅ PC / pad / 移动端响应式 UI
 
 ### v1.1
-- 🔜 Browser extension (one-click clip from any tab)
-- 🔜 Image local download (offline-safe backup)
-- 🔜 Pocket / Omnivore import
-- 🔜 Better article deduplication
-- 🔜 PWA support for "add to home screen" on mobile
+- 🔜 浏览器扩展(任意标签一键收藏)
+- 🔜 图片本地下载(完全离线备份)
+- 🔜 Pocket / Omnivore 导入
+- 🔜 文章去重增强
+- 🔜 PWA 支持(手机"添加到主屏幕")
 
 ### v1.2
-- More LLM providers (Claude, Gemini, Doubao native)
-- Per-user theme & language preferences
-- Bulk re-process articles with new AI prompts
-- Article version history
+- 更多 LLM 厂商(Claude · Gemini · 豆包原生)
+- 用户主题与语言偏好
+- 批量重新处理文章(用新 AI Prompt)
+- 文章版本历史
 
-### v2 — research
-- Obsidian community marketplace submission
-- Multi-vault Obsidian sync
-- Notion / Logseq / Reflect export
-- Audio podcast generation from saved articles
-- Daily / weekly digest emails
-
----
-
-## FAQ
-
-<details>
-<summary><strong>Will inFlow AI work without paying for an LLM API?</strong></summary>
-
-Yes — embedding has a local CPU-only fallback (`BAAI/bge-small-en-v1.5`, 384-dim).
-For LLM features (summary, tags, RAG), you need at least a free-tier API:
-- **DeepSeek** — cheapest at ~$0.27 / 1M tokens
-- **讯飞 / 智谱** — both offer free trial credits
-- **OpenAI / Claude / Gemini** — pay-per-use
-- **MiniMax / SiliconFlow** — generous free tiers
-</details>
-
-<details>
-<summary><strong>How much does it cost to run?</strong></summary>
-
-~ **$5-10/month** on a small VPS + LLM API usage.
-At < 1000 articles/month with DeepSeek, expect ~$2-5/month in LLM costs.
-For totally free, use local embedding + skip AI summary features.
-</details>
-
-<details>
-<summary><strong>Can I migrate from Pocket / Omnivore / Readwise?</strong></summary>
-
-Direct importer coming in v1.1. Workarounds:
-- Pocket export → individual URL list → bulk paste via `/api/articles/batch`
-- Omnivore → markdown export → use `/api/articles/upload`
-</details>
-
-<details>
-<summary><strong>Is anything sent to third parties without my consent?</strong></summary>
-
-Only to the LLM provider **you explicitly configure**. The API key and base URL are entirely under your control.
-For air-gapped operation, use local embedding only and skip LLM-powered features.
-No analytics, no telemetry, no third-party JS in the frontend.
-</details>
-
-<details>
-<summary><strong>Does it work well on mobile?</strong></summary>
-
-Yes — built mobile-first with responsive layouts. Reader, library, search, knowledge graph all touch-optimized.
-v1.1 adds PWA so you can "add to home screen" on iOS / Android.
-</details>
-
-<details>
-<summary><strong>Do I need to know coding to deploy?</strong></summary>
-
-Basic terminal familiarity is enough. [`deploy/cloud/README.md`](deploy/cloud/README.md) walks through every step.
-If you're stuck, open an issue and the community usually responds within a day.
-</details>
-
-<details>
-<summary><strong>How is data isolated between users?</strong></summary>
-
-Every row in `articles`, `tags`, `folders`, `knowledge_edges`, `learning_paths`, `wechat_accounts` is tagged with `user_id`.
-All queries filter on `current_user.id`. JWT auth + per-user revocable sync tokens.
-Cross-tenant leaks are mechanically prevented at the ORM layer.
-</details>
-
-<details>
-<summary><strong>What happens if I delete an article?</strong></summary>
-
-It goes to a per-user recycle bin (`deleted_at` column). Auto-purge after 30 days, restorable before that.
-The Obsidian plugin **never** propagates deletes — your local file stays unless you manually delete it.
-</details>
-
-<details>
-<summary><strong>Can I run this commercially?</strong></summary>
-
-Yes, under AGPL-3.0: you can charge users for hosting, **as long as you publish your modifications** to those users.
-For closed-source SaaS deployment, contact the maintainer for a commercial license.
-</details>
+### v2 — 研究中
+- Obsidian 社区市场提交
+- 多 vault Obsidian 同步
+- Notion · Logseq · Reflect 导出
+- 音频播客生成
+- 每日 / 每周摘要邮件
 
 ---
 
-## Contributing
+## 常见问题
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+<details>
+<summary><strong>不付钱买 LLM API 能用吗?</strong></summary>
 
-Especially welcome:
-- New platform parsers (parser_service.py)
-- Translations (English, 日本語, others)
-- UI polish and accessibility
-- Bug reports with reproduction
-- Comparison tests with other LLM providers
+可以——嵌入有本地纯 CPU 兜底(`BAAI/bge-small-en-v1.5`,384 维)。
+LLM 功能(摘要/标签/RAG)至少要一个免费层 API:
+- **DeepSeek** — 最便宜,约 ¥2 / 100 万 token
+- **讯飞 / 智谱** — 都有免费额度
+- **OpenAI / Claude / Gemini** — 按量付费
+- **MiniMax / SiliconFlow** — 比较慷慨的免费层
+</details>
+
+<details>
+<summary><strong>运行成本大概多少?</strong></summary>
+
+约 **¥30-70/月** 一台小 VPS + LLM API 用量。
+个人用量 < 1000 篇/月 + 用 DeepSeek,LLM 成本约 ¥15-35/月。
+想完全免费:用本地嵌入,跳过 AI 摘要功能。
+</details>
+
+<details>
+<summary><strong>能从 Pocket / Omnivore / Readwise 迁移吗?</strong></summary>
+
+直接导入器在 v1.1 加。当前 workaround:
+- Pocket 导出 → URL 列表 → 批量粘贴到 `/api/articles/batch`
+- Omnivore → markdown 导出 → 用 `/api/articles/upload`
+</details>
+
+<details>
+<summary><strong>会不会偷偷把我的数据发给第三方?</strong></summary>
+
+只发给**你自己显式配置**的 LLM 厂商。API key 和 base URL 完全由你掌控。
+要完全断网运行:只用本地嵌入,关掉 LLM 功能。
+没有第三方分析、没有遥测、前端没有任何第三方 JS。
+</details>
+
+<details>
+<summary><strong>手机端真的好用吗?</strong></summary>
+
+是的——移动端优先设计,响应式排版。阅读器、文章库、搜索、知识图谱全部触控优化。
+v1.1 加 PWA,可以"添加到 iOS / Android 主屏幕"用得像原生 App。
+</details>
+
+<details>
+<summary><strong>不会写代码能部署吗?</strong></summary>
+
+会用终端基本命令就行。上文 **[快速开始](#快速开始5-分钟)** 与 **[部署与运维](#部署与运维云端)** 一步步带你走。
+遇到问题开 issue,社区一般一天内会回。
+</details>
+
+<details>
+<summary><strong>多用户的数据怎么隔离?</strong></summary>
+
+`articles` / `tags` / `folders` / `knowledge_edges` / `learning_paths` / `wechat_accounts` 每行都有 `user_id`。
+所有查询都按 `current_user.id` 过滤。JWT 鉴权 + 每用户可撤销同步 Token。
+跨租户泄露在 ORM 层就被机械性阻断。
+</details>
+
+<details>
+<summary><strong>文章删了能恢复吗?</strong></summary>
+
+进每用户回收站(`deleted_at` 列)。30 天后自动彻底删除,期间可恢复。
+Obsidian 插件**绝不**传播删除——你硬盘上的文件不会因为线上删了而消失。
+</details>
+
+<details>
+<summary><strong>能商用吗?</strong></summary>
+
+可以,在 AGPL-3.0 下:你可以收费提供托管服务,**前提是把你的改动开源**给你的用户。
+想做闭源 SaaS 部署,联系维护者获取商业授权。
+</details>
 
 ---
 
-## Acknowledgements
+## 贡献
 
-- Built with **[Hermes](https://hermes.ai)** AI coding agent + **[DeepSeek](https://www.deepseek.com)** as the LLM brain — over **2.7 billion tokens** spent in vibe-coding, 0 lines of human-written code
-- Backend: [FastAPI](https://fastapi.tiangolo.com) · [SQLAlchemy](https://www.sqlalchemy.org) · [pgvector](https://github.com/pgvector/pgvector) · [Playwright](https://playwright.dev) · [curl_cffi](https://github.com/lexiforest/curl_cffi)
-- Frontend: [Next.js](https://nextjs.org) · [Tailwind](https://tailwindcss.com) · [lucide-react](https://lucide.dev) · [react-flow](https://reactflow.dev)
-- Embedding: [BAAI/bge-m3](https://huggingface.co/BAAI/bge-m3) · [fastembed](https://github.com/qdrant/fastembed)
-- Inspired by **Pocket**, **Omnivore**, **Readwise** — and frustrated by the first two shutting down
+欢迎开 issue / PR。特别欢迎:
+- 新平台解析器(parser_service.py)
+- 翻译(English · 日本語 · 其他)
+- UI 打磨与无障碍优化
+- 带复现步骤的 bug 报告
+- 不同 LLM 厂商的对比测试
+
+---
+
+## 致谢
+
+- 用 **[Hermes](https://hermes.ai)** AI 编程助手 + **[DeepSeek](https://www.deepseek.com)** 作为 LLM 大脑 vibe-code 出来——共消耗 **27 亿 token**,0 行人写代码
+- 后端:[FastAPI](https://fastapi.tiangolo.com) · [SQLAlchemy](https://www.sqlalchemy.org) · [pgvector](https://github.com/pgvector/pgvector) · [Playwright](https://playwright.dev) · [curl_cffi](https://github.com/lexiforest/curl_cffi)
+- 前端:[Next.js](https://nextjs.org) · [Tailwind](https://tailwindcss.com) · [lucide-react](https://lucide.dev) · [react-flow](https://reactflow.dev)
+- 嵌入:[BAAI/bge-m3](https://huggingface.co/BAAI/bge-m3) · [fastembed](https://github.com/qdrant/fastembed)
+- 灵感来自 **Pocket** · **Omnivore** · **Readwise**——也因为前两个的关停而暴起做这件事
 
 ---
 
 ## License
 
-Core: **[AGPL-3.0](LICENSE)**.
-Obsidian plugin: [MIT](https://github.com/weaiw/inFlow-sync-obsidian/blob/main/LICENSE).
+主仓:**AGPL-3.0**。
+Obsidian 插件:[MIT](https://github.com/weaiw/inFlow-sync-obsidian/blob/main/LICENSE)。
 
-For commercial closed-source SaaS deployment, contact the maintainer for a separate commercial license.
+闭源 SaaS 商业部署,联系维护者获取商业授权。
 
 ---
 
 <div align="center">
 
-If inFlow AI saves your knowledge from yet another startup shutdown,
-**please drop a ⭐ — it costs you nothing and helps the project be discovered.**
+如果 inFlow AI 帮你的知识库免于又一次创业公司关停, **请给个 ⭐ —— 不花钱,但能让项目被更多人看到。**
 
 </div>

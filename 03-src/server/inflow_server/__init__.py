@@ -1,6 +1,6 @@
 """inflow-server — inFlow 云端服务。
 
-两个进程共用本包（部署见 deploy/cloud/）：
+两个进程共用本包（部署见仓库根 start-server.sh）：
 
     main         FastAPI 应用（uvicorn inflow_server.main:app）
     routers      API 路由

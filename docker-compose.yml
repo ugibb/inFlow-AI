@@ -2,6 +2,11 @@ services:
   nginx:
     image: nginx:alpine
     container_name: inflow-nginx
+    ports:
+      # 宝塔面板 Nginx 已占 80/443：容器 Nginx 仅绑本机回环 8080，
+      # 对外 HTTPS 由宝塔「网站 → 反向代理」转发到 127.0.0.1:8080。
+      # 非宝塔环境可改为 "80:80" 直接对外。
+      - "127.0.0.1:8080:80"
     volumes:
       - ./03-src/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -39,7 +44,7 @@ services:
     restart: unless-stopped
 
   # ── backend / wechat-bot：Docker 形态已于 2026-08-20 移除 ──────────
-  # backend 与 wechat-bot 由 deploy/cloud/start-server.sh 宿主机直跑。
+  # backend 与 wechat-bot 由仓库根 start-server.sh 宿主机直跑。
   # 历史容器配置（build context / 挂载 / command）可从 git 历史找回。
 
   frontend:

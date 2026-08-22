@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# inFlow AI — 云端（腾讯云）代码直跑部署一键启动（deploy/cloud/）
+# inFlow AI — 云端（腾讯云）代码直跑部署一键启动（仓库根）
 #
 # 部署形态：保留 infra 容器（postgres / redis / nginx / frontend），
 #            backend 与 wechat-bot 直接跑在宿主机（uvicorn / python -m bot），
@@ -7,23 +7,23 @@
 #            好处：改代码 git pull 后只需重启两个直跑进程，日志 tail 文本文件即可定位问题。
 #
 # 用法（在仓库根执行）:
-#   ./deploy/cloud/start-server.sh              启动/重建基础设施容器 + 直跑 backend/bot，并跟踪日志
-#   ./deploy/cloud/start-server.sh --detach     仅后台启动，不跟踪日志
-#   ./deploy/cloud/start-server.sh --logs       只跟踪日志（服务已在跑，不重建）
-#   ./deploy/cloud/start-server.sh --restart    改 .env / 拉代码后重建（默认行为就是重建）
-#   ./deploy/cloud/start-server.sh --verify     启动后额外验证健康状态
-#   ./deploy/cloud/stop-server.sh               停止直跑 backend/bot（容器不停止）
+#   ./start-server.sh              启动/重建基础设施容器 + 直跑 backend/bot，并跟踪日志
+#   ./start-server.sh --detach     仅后台启动，不跟踪日志
+#   ./start-server.sh --logs       只跟踪日志（服务已在跑，不重建）
+#   ./start-server.sh --restart    改 .env / 拉代码后重建（默认行为就是重建）
+#   ./start-server.sh --verify     启动后额外验证健康状态
+#   ./stop-server.sh               停止直跑 backend/bot（容器不停止）
 #
 # 首次运行会自动：复制 .env.example、生成密码/密钥、配置微信 bot token。
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# 脚本位于仓库根（2026-08-22 由 deploy/cloud/ 上移），REPO_ROOT 即脚本所在目录
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$REPO_ROOT"
 
-# 第一个 -f 必须是仓库根的 docker-compose.yml：compose 相对路径以其所在目录（仓库根）解析
-COMPOSE=(docker compose -f docker-compose.yml -f deploy/cloud/docker-compose.baota.yml)
+# infra 容器定义全部在仓库根 docker-compose.yml（原 baota 覆盖层已并入：nginx 绑 127.0.0.1:8080）
+COMPOSE=(docker compose)
 SERVER_DIR="${REPO_ROOT}/03-src/server"
 PID_DIR="${REPO_ROOT}/.server"
 BACKEND_PID_FILE="${PID_DIR}/backend.pid"
@@ -46,7 +46,7 @@ for arg in "$@"; do
       exit 0
       ;;
     *)
-      echo "[ERROR] 未知参数: $arg（./deploy/cloud/start-server.sh --help）" >&2
+      echo "[ERROR] 未知参数: $arg（./start-server.sh --help）" >&2
       exit 1
       ;;
   esac
@@ -217,6 +217,11 @@ fi
 # ── 前置检查 ──────────────────────────────────────────────────────
 if ! command -v docker &>/dev/null || ! docker compose version &>/dev/null; then
   error "需要 Docker + Compose v2（宝塔：软件商店 → Docker 管理器）"
+  if [ "$(uname -s)" = "Darwin" ]; then
+    error "本脚本是云端（腾讯云）生产入口；Mac 本地调试无需 Docker，直接："
+    error "  backend: cd 03-src/server && .venv/bin/uvicorn inflow_server.main:app --host 127.0.0.1 --port 8000"
+    error "  前端:    cd 03-src/frontend && npm run dev   # next.config 将 /api 代理到 :8000"
+  fi
   exit 1
 fi
 if [ ! -d "${SERVER_DIR}/.venv" ]; then
@@ -304,9 +309,9 @@ echo "  本机: http://127.0.0.1:8080"
 echo "  公网: 宝塔反向代理 → 127.0.0.1:8080"
 echo "  后端日志: 04-log/backend/$(date +%F).log"
 echo "  Bot 日志: 04-log/wechat-bot/$(date +%F).log"
-echo "  改 .env / 拉代码后: ./deploy/cloud/start-server.sh --restart"
-echo "  只看日志:           ./deploy/cloud/start-server.sh --logs"
-echo "  停止直跑:           ./deploy/cloud/stop-server.sh"
+echo "  改 .env / 拉代码后: ./start-server.sh --restart"
+echo "  只看日志:           ./start-server.sh --logs"
+echo "  停止直跑:           ./stop-server.sh"
 echo ""
 
 if [ "$VERIFY_KEYS" = true ]; then
@@ -319,6 +324,6 @@ if [ "$VERIFY_KEYS" = true ]; then
 fi
 
 if [ "$FOLLOW_LOGS" = true ]; then
-  info "跟踪 backend 日志中（Ctrl+C 退出跟踪，服务继续后台运行；停止用 ./deploy/cloud/stop-server.sh）"
+  info "跟踪 backend 日志中（Ctrl+C 退出跟踪，服务继续后台运行；停止用 ./stop-server.sh）"
   tail -F "${REPO_ROOT}/04-log/backend/${TODAY}.log"
 fi
