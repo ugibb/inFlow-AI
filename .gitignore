@@ -21,11 +21,13 @@
 
 # Backend local config (UI runtime overrides; secrets go in .env)
 03-src/core/inflow_core/config_store.json
+03-src/backend/core/config_store.json
 
 # Local test/sample data (large media files)
 02-docs/data/
 02-docs/data-/
 03-src/server/data/
+03-src/data/
 
 # OS
 .DS_Store

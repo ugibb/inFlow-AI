@@ -33,13 +33,13 @@ stop_pidfile "${PID_DIR}/wechat-bot.pid" "wechat-bot"
 stop_pidfile "${PID_DIR}/frontend.pid" "frontend"
 
 # 兜底：按进程名
-if pgrep -f 'uvicorn inflow_server.main:app' >/dev/null; then
+if pgrep -f 'uvicorn backend.main:app' >/dev/null; then
   echo "[INFO] 按进程名停止 backend"
-  pkill -f 'uvicorn inflow_server.main:app' || true
+  pkill -f 'uvicorn backend.main:app' || true
 fi
-if pgrep -f 'inflow_server.extensions.wechat.bot' >/dev/null; then
+if pgrep -f 'backend.plugins.wechat.bot' >/dev/null; then
   echo "[INFO] 按进程名停止 wechat-bot"
-  pkill -f 'inflow_server.extensions.wechat.bot' || true
+  pkill -f 'backend.plugins.wechat.bot' || true
 fi
 # 本地调试前端（next dev）：杀 node 进程树（npm run dev 会再起 next 子进程）
 if pgrep -f 'next dev' >/dev/null; then

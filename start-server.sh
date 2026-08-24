@@ -12,7 +12,7 @@
 #   ./start-server.sh --logs       只跟踪日志（服务已在跑，不重建）
 #   ./start-server.sh --restart    改 .env / 拉代码后重建（默认行为就是重建）
 #   ./start-server.sh --verify     启动后额外验证健康状态
-#   ./start-server.sh --local      Mac 本地调试：跳过 Docker，直跑 uvicorn(:8000) + next dev(:3000)
+#   ./start-server.sh --local      Mac 本地调试：跳过 Docker，直跑 uvicorn(:8000) + next dev(:3000) + wechat-bot
 #   ./stop-server.sh               停止直跑 backend/bot/frontend（容器不停止）
 #
 # 首次运行会自动：复制 .env.example、生成密码/密钥、配置微信 bot token。
@@ -25,14 +25,14 @@ cd "$REPO_ROOT"
 
 # infra 容器定义全部在仓库根 docker-compose.yml（原 baota 覆盖层已并入：nginx 绑 127.0.0.1:8080）
 COMPOSE=(docker compose)
-SERVER_DIR="${REPO_ROOT}/03-src/server"
+SERVER_DIR="${REPO_ROOT}/03-src/backend"
 FRONTEND_DIR="${REPO_ROOT}/03-src/frontend"
 PID_DIR="${REPO_ROOT}/.server"
 BACKEND_PID_FILE="${PID_DIR}/backend.pid"
 BOT_PID_FILE="${PID_DIR}/wechat-bot.pid"
 FRONTEND_PID_FILE="${PID_DIR}/frontend.pid"
-CONFIG_STORE="${REPO_ROOT}/03-src/core/inflow_core/config_store.json"
-CONFIG_EXAMPLE="${REPO_ROOT}/03-src/core/inflow_core/config_store.example.json"
+CONFIG_STORE="${REPO_ROOT}/03-src/backend/core/config_store.json"
+CONFIG_EXAMPLE="${REPO_ROOT}/03-src/backend/core/config_store.example.json"
 
 FOLLOW_LOGS=true
 LOGS_ONLY=false
@@ -132,8 +132,7 @@ bootstrap_pipeline_dir() {
   if [[ "$REPO_ROOT" == /www/wwwroot/* ]] || [[ -d /www/server/panel ]]; then
     if [ -z "$pipeline_dir" ] \
       || [[ "$pipeline_dir" == ./03-src/* ]] \
-      || [[ "$pipeline_dir" == */03-src/backend/data ]] \
-      || [[ "$pipeline_dir" == */03-src/server/data ]]; then
+      || [[ "$pipeline_dir" == */03-src/backend/data ]]; then
       pipeline_dir="$prod_dir"
       env_set INFLOW_PIPELINE_DATA_DIR "$pipeline_dir"
       warn "生产环境已自动设置 INFLOW_PIPELINE_DATA_DIR=$pipeline_dir"
@@ -147,8 +146,8 @@ bootstrap_pipeline_dir() {
       fi
     fi
   elif [ -z "$pipeline_dir" ]; then
-    env_set INFLOW_PIPELINE_DATA_DIR "./03-src/server/data"
-    info "本地开发使用 INFLOW_PIPELINE_DATA_DIR=./03-src/server/data"
+    env_set INFLOW_PIPELINE_DATA_DIR "./03-src/backend/data"
+    info "本地开发使用 INFLOW_PIPELINE_DATA_DIR=./03-src/backend/data"
   fi
 }
 
@@ -234,9 +233,9 @@ if [ "$LOCAL_MODE" = false ] && { ! command -v docker &>/dev/null || ! docker co
   exit 1
 fi
 if [ ! -d "${SERVER_DIR}/.venv" ]; then
-  error "未找到 server venv（${SERVER_DIR}/.venv），请先创建（依赖瘦身版，两步）："
+  error "未找到 backend venv（${SERVER_DIR}/.venv），请先创建："
   error "  cd ${SERVER_DIR} && python3 -m venv .venv"
-  error "  .venv/bin/pip install -r requirements.txt && .venv/bin/pip install --no-deps -e ../core"
+  error "  .venv/bin/pip install -r requirements.txt"
   exit 1
 fi
 
@@ -291,8 +290,9 @@ stop_pidfile "${FRONTEND_PID_FILE}" "frontend"
 UVI_HOST="0.0.0.0"
 [ "$LOCAL_MODE" = true ] && UVI_HOST="127.0.0.1"
 info "启动 backend（直跑 uvicorn :8000）…"
-cd "${SERVER_DIR}"
-nohup .venv/bin/uvicorn inflow_server.main:app --host "${UVI_HOST}" --port 8000 --workers 1 \
+# backend 包在 03-src/backend，需从父目录 03-src 运行才能 import backend.*
+cd "${SERVER_DIR}/.."
+nohup "${SERVER_DIR}/.venv/bin/uvicorn" backend.main:app --host "${UVI_HOST}" --port 8000 --workers 1 \
   >> "${REPO_ROOT}/04-log/backend/${TODAY}.log" 2>&1 &
 echo $! > "${BACKEND_PID_FILE}"
 info "  backend PID $(cat "${BACKEND_PID_FILE}")（日志 04-log/backend/${TODAY}.log）"
@@ -308,26 +308,32 @@ if [ "$LOCAL_MODE" = true ]; then
   fi
   echo $! > "${FRONTEND_PID_FILE}"
   info "  前端 PID $(cat "${FRONTEND_PID_FILE}")（日志 04-log/frontend/${TODAY}.log）"
-  cd "${REPO_ROOT}"
-  warn "本地模式跳过 wechat-bot"
-else
-  # ── wechat-bot 直跑（有 token 才起）────────────────────────────
-  if [ -n "${SERVICE_TOKEN_WECHAT_BOT:-}" ]; then
-    export inFlow_BASE="${inFlow_BASE:-http://127.0.0.1:8000}"
-    export inFlow_TOKEN="${SERVICE_TOKEN_WECHAT_BOT}"
-    export inFlow_PUBLIC_BASE="${inFlow_PUBLIC_BASE:-http://127.0.0.1:8080}"
-    # bot 日志独立目录（bot.py 用 get_log_dir_path()，绝对路径直接生效）
-    export LOG_DIR="${REPO_ROOT}/04-log/wechat-bot"
-    info "启动 wechat-bot（直跑 python -m inflow_server.extensions.wechat.bot）…"
-    nohup "${SERVER_DIR}/.venv/bin/python" -m inflow_server.extensions.wechat.bot \
-      >> "${REPO_ROOT}/04-log/wechat-bot/${TODAY}.log" 2>&1 &
-    echo $! > "${BOT_PID_FILE}"
-    info "  wechat-bot PID $(cat "${BOT_PID_FILE}")（日志 04-log/wechat-bot/${TODAY}.log）"
-  else
-    warn "未配置 SERVICE_TOKEN_WECHAT_BOT，跳过 wechat-bot"
-  fi
-  cd "${REPO_ROOT}"
 fi
+
+# ── wechat-bot 直跑（本地/生产一致，有 token 才起）────────────────
+# bot 是前端微信绑定交互的基础服务（绑定状态心跳 last_seen_at 由它写入），
+# 本地调试同样需要，否则绑定 10 分钟后会被判定「会话过期」。
+if [ -n "${SERVICE_TOKEN_WECHAT_BOT:-}" ]; then
+  export inFlow_BASE="${inFlow_BASE:-http://127.0.0.1:8000}"
+  export inFlow_TOKEN="${SERVICE_TOKEN_WECHAT_BOT}"
+  # 公网回链：生产走 nginx:8080，本地走 next dev:3000
+  if [ "$LOCAL_MODE" = true ]; then
+    export inFlow_PUBLIC_BASE="${inFlow_PUBLIC_BASE:-http://127.0.0.1:3000}"
+  else
+    export inFlow_PUBLIC_BASE="${inFlow_PUBLIC_BASE:-http://127.0.0.1:8080}"
+  fi
+  # bot 日志独立目录（bot.py 用 get_log_dir_path()，绝对路径直接生效）
+  export LOG_DIR="${REPO_ROOT}/04-log/wechat-bot"
+  cd "${SERVER_DIR}/.."
+  info "启动 wechat-bot（直跑 python -m backend.plugins.wechat.bot）…"
+  nohup "${SERVER_DIR}/.venv/bin/python" -m backend.plugins.wechat.bot \
+    >> "${REPO_ROOT}/04-log/wechat-bot/${TODAY}.log" 2>&1 &
+  echo $! > "${BOT_PID_FILE}"
+  info "  wechat-bot PID $(cat "${BOT_PID_FILE}")（日志 04-log/wechat-bot/${TODAY}.log）"
+else
+  warn "未配置 SERVICE_TOKEN_WECHAT_BOT，跳过 wechat-bot（微信绑定将无法收发消息）"
+fi
+cd "${REPO_ROOT}"
 
 # ── 健康检查（生产经 nginx:8080；本地直连 backend:8000）──────────
 HEALTH_URL="http://127.0.0.1:8080/api/health"
@@ -346,6 +352,7 @@ if [ "$LOCAL_MODE" = true ]; then
   echo "  前端:    http://127.0.0.1:3000（/api 代理 → :8000）"
   echo "  backend: http://127.0.0.1:8000"
   echo "  后端日志: 04-log/backend/${TODAY}.log；前端日志: 04-log/frontend/${TODAY}.log"
+  echo "  Bot 日志: 04-log/wechat-bot/${TODAY}.log"
   echo "  停止:    ./stop-server.sh"
 else
   info "inFlow AI 已运行（直接代码部署）"

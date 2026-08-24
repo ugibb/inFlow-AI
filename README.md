@@ -187,8 +187,8 @@ inFlow AI 是**唯一**同时拥有这些能力的产品:深度中文平台支�
 
 inFlow 的部署形态为两个物理独立的单元:
 
-- **云端单元**(本仓库根,启停脚本 `./start-server.sh` / `./stop-server.sh`):服务器代码直跑 backend + wechat-bot,仅基础设施(postgres / redis / nginx / frontend)走容器;共享引擎 `03-src/core` 也由本仓库分发
-- **本地 worker**(**独立仓库** [ugibb/inflow-worker](https://github.com/ugibb/inflow-worker),可选):Mac 直连云端 PostgreSQL 轮询认领任务,承接播客等重计算 pipeline;引擎经 pip git 子目录依赖取自本仓库 `03-src/core`
+- **云端单元**(本仓库根,启停脚本 `./start-server.sh` / `./stop-server.sh`):服务器代码直跑 backend + wechat-bot,仅基础设施(postgres / redis / nginx / frontend)走容器;后端单包 `03-src/backend`(core 引擎已并入,import 前缀 `backend.*`)
+- **本地 worker**(**独立仓库** [ugibb/inflow-worker](https://github.com/ugibb/inflow-worker),可选):Mac 直连云端 PostgreSQL 轮询认领任务,承接播客等重计算 pipeline;与本仓库无代码依赖,见独立仓库 README
 
 **云端单元**
 
@@ -206,10 +206,9 @@ inFlow 的部署形态为两个物理独立的单元:
 # 1. 克隆
 git clone <repo-url> && cd inFlow-ai
 
-# 2. 后端依赖(一次性,两步:精简清单 + 共享引擎)
-cd 03-src/server && python3 -m venv .venv \
-  && .venv/bin/pip install -r requirements.txt \
-  && .venv/bin/pip install --no-deps -e ../core && cd ../..
+# 2. 后端依赖(一次性)
+cd 03-src/backend && python3 -m venv .venv \
+  && .venv/bin/pip install -r requirements.txt && cd ../..
 
 # 3. 启动:自动生成 .env 密钥、起 infra 容器、直跑 backend / wechat-bot
 ./start-server.sh
@@ -229,7 +228,7 @@ grep -i admin "04-log/backend/$(date +%F).log"
 
 ### 本地 worker(可选)
 
-worker 已拆为独立工程 **[ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)**(引擎以 pip git 子目录依赖取自本仓库 `03-src/core`):
+worker 已拆为完全独立工程 **[ugibb/inflow-worker](https://github.com/ugibb/inflow-worker)**(与本仓库无代码依赖):
 
 ```bash
 git clone git@github.com:ugibb/inflow-worker.git && cd inflow-worker
@@ -240,7 +239,7 @@ cp .env.local-worker.example .env.local-worker   # 填云端 PG 连接 / SFTP / 
 ./start-worker.sh   # 启动并跟踪日志
 ```
 
-引擎升级(本仓库 `03-src/core` 更新后):`./start-worker.sh --upgrade`。
+worker 升级:在 `inflow-worker` 仓库内执行 `./start-worker.sh --upgrade`。
 
 ---
 
@@ -286,7 +285,7 @@ docker exec inflow-db pg_dump -U inflow inflow > /www/backup/inflow_$(date +%F).
 ### 部署注意
 
 - 容器 Nginx 绑定本机回环 `127.0.0.1:8080`(宝塔 Nginx 占 80/443,由宝塔反代转发);非宝塔环境可改 `docker-compose.yml` 中该端口映射
-- 仓库根 `docker-compose.yml` 与 `.env.example` 同时是后端定位仓库根的 marker(`03-src/core/inflow_core/core/paths.py`),不可移动
+- 仓库根 `docker-compose.yml` 与 `.env.example` 同时是后端定位仓库根的 marker(`03-src/backend/core/paths.py`),不可移动
 
 ---
 
