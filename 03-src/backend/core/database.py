@@ -9,7 +9,7 @@ settings = get_settings()
 logger = get_logger("database")
 
 engine = create_async_engine(
-    settings.database_url,
+    settings.resolved_database_url,
     echo=settings.log_sql,
     pool_size=20,
     max_overflow=10,

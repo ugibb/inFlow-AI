@@ -250,19 +250,14 @@ fi
 # ── 构造直跑环境 ──────────────────────────────────────────────────
 if [ "$LOCAL_MODE" = false ]; then
   # 生产：backend/bot 直连宿主回环的 postgres/redis 容器。
-  # DSN 以 .env 的 DATABASE_URL 为唯一配置点（load_env_file 已注入）；
-  # 仅当 .env 未设置时用 POSTGRES_PASSWORD 兜底（兼容旧部署）。
-  if [ -z "${DATABASE_URL:-}" ]; then
-    export DATABASE_URL="postgresql+asyncpg://inflow:${POSTGRES_PASSWORD}@127.0.0.1:5432/inflow"
-    export DATABASE_URL_SYNC="postgresql://inflow:${POSTGRES_PASSWORD}@127.0.0.1:5432/inflow"
-  fi
+  # DSN 由 backend config 按 POSTGRES_* 组件自动拼（脚本不再手动拼 URL）；
+  # 旧部署的显式 DATABASE_URL 仍会被 config 优先采用（非 change_me 占位符时）。
   export REDIS_URL="redis://127.0.0.1:6379/0"
   export inFlow_ENV="${inFlow_ENV:-production}"
 else
-  # 本地调试：DSN 优先取 .env 的 DATABASE_URL（load_env_file 已注入），
-  # 未设置时用 config 默认（Homebrew PG inflow:inFlow@localhost:5432）；
-  # 本地无 redis 时缓存功能按需降级，不影响启动
-  info "本地模式：DSN 取 .env 的 DATABASE_URL（缺省时 config 默认，Homebrew PG）"
+  # 本地调试：DSN 由 config 按 POSTGRES_* 自动拼（缺省默认 Homebrew PG
+  # inflow:inFlow@localhost:5432）；本地无 redis 时缓存功能按需降级，不影响启动
+  info "本地模式：DSN 由 config 自动拼（缺省默认 Homebrew PG）"
 fi
 export LOG_TO_STDOUT="1"
 # 不设 LOG_DIR：默认 log_dir="04-log/backend" 由 get_log_dir_path 相对仓库根解析，

@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import quote_plus
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 from typing import List
@@ -8,7 +9,7 @@ from backend.core.paths import get_env_file, get_project_root
 _PROJECT_ROOT = get_project_root()
 _ENV_FILE = get_env_file()
 
-  
+
 class Settings(BaseSettings):
     """应用配置。
 
@@ -24,9 +25,16 @@ class Settings(BaseSettings):
     app_name: str = "inFlow AI"
     debug: bool = True
 
-    # Database — override via DATABASE_URL env in docker-compose (set from .env)
-    database_url: str = "postgresql+asyncpg://inflow:inFlow@localhost:5432/inflow"
-    database_url_sync: str = "postgresql://inflow:inFlow@localhost:5432/inflow"
+    # Database — 组件参数（推荐）。POSTGRES_* 由代码自动拼 URL，
+    # 无需再手动配 DATABASE_URL（host/user/port/db 有默认值，生产即本机 127.0.0.1:5432）。
+    # 旧部署仍可显式设 DATABASE_URL / DATABASE_URL_SYNC（非 change_me 占位符时优先）。
+    postgres_user: str = "inflow"
+    postgres_password: str = "inFlow"  # 仅本地开发兜底；生产必须从 .env 的 POSTGRES_PASSWORD 读
+    postgres_host: str = "localhost"
+    postgres_port: int = 5432
+    postgres_db: str = "inflow"
+    database_url: str = ""  # 兼容旧部署：显式 asyncpg 连接串
+    database_url_sync: str = ""  # 兼容旧部署：显式同步连接串
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
@@ -81,6 +89,33 @@ class Settings(BaseSettings):
 
     # NOTE: LLM / Embedding 的 API Key 放 .env（SILICONFLOW_API_KEY 等）。
     # 网页「设置」写入 config_store.json 的覆盖项优先级最高。
+
+    def _build_url(self, driver: str) -> str:
+        """按 POSTGRES_* 组件拼连接串（密码特殊字符自动 URL 编码）。"""
+        user = quote_plus(self.postgres_user)
+        password = quote_plus(self.postgres_password)
+        return (
+            f"{driver}://{user}:{password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
+
+    @property
+    def resolved_database_url(self) -> str:
+        """asyncpg 连接串：显式 DATABASE_URL（非 change_me 占位符）优先，否则 POSTGRES_* 自动拼。
+
+        change_me 检测用于兼容旧部署：若 .env 里 DATABASE_URL 是 .env.example 的占位符
+        密码（而 POSTGRES_PASSWORD 已被 start-server.sh 自动生成真实值），此处会
+        忽略占位符 DSN 改走组件拼，避免「建库密码与连接密码不匹配」。
+        """
+        if self.database_url and "change_me" not in self.database_url:
+            return self.database_url
+        return self._build_url("postgresql+asyncpg")
+
+    @property
+    def resolved_database_url_sync(self) -> str:
+        """同步驱动连接串（psycopg2/SQLAlchemy sync），规则同 resolved_database_url。"""
+        if self.database_url_sync and "change_me" not in self.database_url_sync:
+            return self.database_url_sync
+        return self._build_url("postgresql")
 
     def get_allowed_origins(self) -> List[str]:
         """Parse ALLOWED_ORIGINS into a list, stripping whitespace."""
