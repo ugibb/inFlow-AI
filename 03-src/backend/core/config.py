@@ -74,27 +74,6 @@ class Settings(BaseSettings):
     log_access: bool = False
     log_access_skip: str = "/api/ingest/jobs,/api/health"
 
-    # ── 精华卡截图（Playwright）──────────────────────────────
-    card_viewport_width: int = 750
-    card_screenshot_scale: int = 2
-
-    # ── Transcription ────────────────────────────────────────
-    # ASR_PROVIDER: groq（默认，Groq Whisper）| tingwu（通义听悟）
-    asr_provider: str = "groq"
-    groq_api_key: str = ""
-    whisper_model: str = "large-v3"
-    whisper_model_path: str = ""
-    transcribe_timeout_sec: int = 300
-    # 通义听悟（ASR_PROVIDER=tingwu 时必填）
-    tingwu_app_key: str = ""
-    alibaba_cloud_access_key_id: str = ""
-    alibaba_cloud_access_key_secret: str = ""
-    tingwu_oss_bucket: str = ""
-    tingwu_oss_endpoint: str = "oss-cn-beijing.aliyuncs.com"
-    tingwu_source_language: str = "cn"
-    tingwu_poll_interval_sec: int = 30
-    tingwu_max_wait_sec: int = 10800
-
     # ── Embedding（语义搜索向量化，非敏感）──────────────────
     embedding_provider: str = "siliconflow"
     embedding_api_base: str = "https://api.siliconflow.cn/v1"
