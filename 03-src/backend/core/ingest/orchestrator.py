@@ -18,8 +18,8 @@ import logging
 import os
 from uuid import UUID
 
-from fastapi import BackgroundTasks
-from sqlalchemy import select
+from fastapi import BackgroundTasks, HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.models.ingest_job import IngestJob
@@ -96,6 +96,39 @@ def _mark_external(job: IngestJob) -> None:
     job.external_processing = True
 
 
+async def _count_ready_today(db: AsyncSession, user_id: UUID) -> int:
+    """当日已到 ready 的 job 数（worker 契约 quota_check.sql 判定口径）。
+
+    按 updated_at 归日（当天完成即占当天额度），status='ready' 才算成功产出。
+    """
+    result = await db.execute(
+        select(func.count())
+        .select_from(IngestJob)
+        .where(
+            IngestJob.user_id == user_id,
+            IngestJob.status == "ready",
+            IngestJob.updated_at >= func.date_trunc("day", func.now()),
+        )
+    )
+    return int(result.scalar_one())
+
+
+async def ensure_within_quota(db: AsyncSession, user_id: UUID) -> None:
+    """免费额度配额前置检查：登记新 job 前调用，超限拒绝（HTTP 429）。
+
+    FREE_QUOTA_PER_DAY=0 表示不限制（自托管全放开）。
+    """
+    quota = get_settings().free_quota_per_day
+    if quota <= 0:
+        return
+    used = await _count_ready_today(db, user_id)
+    if used >= quota:
+        raise HTTPException(
+            status_code=429,
+            detail=f"今日免费额度（{quota} 条）已用完，明天再来",
+        )
+
+
 async def ingest_url(
     db: AsyncSession,
     background_tasks: BackgroundTasks,
@@ -111,6 +144,8 @@ async def ingest_url(
 
     `background_tasks` is retained for signature compatibility with callers.
     """
+    await ensure_within_quota(db, user_id)
+
     from backend.core.ingest.fetchers import extract_url_from_text
     clean_url = extract_url_from_text(url) or url
 
@@ -185,6 +220,8 @@ async def ingest_upload(
     The raw bytes are written atomically to data/00_staging/ so the worker
     can pull them over SFTP and run markitdown/parse locally.
     """
+    await ensure_within_quota(db, user_id)
+
     article_stub = Article(
         user_id=user_id,
         url=None,
@@ -231,6 +268,8 @@ async def ingest_text(
     user_id: UUID,
 ) -> UUID:
     """Register an IngestJob for pasted text, staged for the worker."""
+    await ensure_within_quota(db, user_id)
+
     real_title = title or "Pasted note"
 
     article_stub = Article(

@@ -51,6 +51,18 @@ class Settings(BaseSettings):
     # 默认 True：worker 未运行时新 job 停在 pending（前端可见），不会静默丢数据。
     external_processing: bool = True
 
+    # ── 云端观测告警（轻量巡检，见 core/observer.py）────────────────
+    # 兜住「worker 长时间失联无人知」：进度停滞>10min / 租约超时>10min /
+    # 日失败率>30% / worker 失联，命中写 WARNING/ERROR 日志。
+    # 仅 4 条 SELECT 每 5min 一次，非重任务；无需可设 OBSERVER_ENABLED=false。
+    observer_enabled: bool = True
+    observer_interval_sec: int = 300
+
+    # ── 免费额度配额（worker 契约 quota_check.sql，免费 10 条/人/天）──
+    # 「条」= 当日到 ready 的 ingest_jobs 数（成功产出卡片）；登记新 job 时
+    # 检查，超限拒绝返回 429。0=不限制（自托管全部放开）。
+    free_quota_per_day: int = 10
+
     # ── 微信 Bot 服务令牌（插件体系使用）───────────────────────
     # .env 中 SERVICE_TOKEN_WECHAT_BOT；wechat 插件启动 bot 进程时注入 inFlow_TOKEN。
     service_token_wechat_bot: str = ""

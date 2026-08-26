@@ -1,4 +1,5 @@
 """inFlow AI — read-later + AI knowledge base for the Chinese internet"""
+import asyncio
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -15,6 +16,7 @@ from backend.core.utils.logger import (
     setup_logging,
 )
 from backend.core.database import get_db, init_db
+from backend.core.observer import observer_loop
 from .routers import articles, knowledge, system, assistant, auth, users
 from backend.core.ingest.router import router as ingest_router
 from .routers.research import router as research_router
@@ -57,6 +59,17 @@ async def lifespan(app: FastAPI):
 
     get_logger("main").info("inFlow AI started successfully")
 
+    # 云端观测告警：轻量巡检（4 条 SELECT 每 OBSERVER_INTERVAL_SEC 一次），
+    # 命中写 WARNING/ERROR 日志，兜住 worker 失联/租约超时等无人知。
+    # OBSERVER_ENABLED=false 可关（config.py core/observer.py）。
+    observer_task = None
+    if settings.observer_enabled:
+        observer_task = asyncio.create_task(observer_loop())
+        get_logger("main").info(
+            "云端观测告警已启用（OBSERVER_INTERVAL_SEC=%s）",
+            settings.observer_interval_sec,
+        )
+
     # 插件体系：进程型 auto_start 插件自动拉起（wechat bot）；
     # API 型开关由 plugin_states 表决定，此处仅初始化。
     await plugin_manager.startup()
@@ -64,6 +77,8 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     get_logger("main").info("inFlow AI shutting down")
+    if observer_task is not None:
+        observer_task.cancel()
     # 优雅停止全部运行中进程型插件（bot 长轮询子进程）
     await plugin_manager.shutdown()
 

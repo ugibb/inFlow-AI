@@ -56,6 +56,8 @@ class IngestJob(Base):
     source_platform = Column(String(50), nullable=True)
     # wechat | bilibili | xiaoyuzhou | xhs | douyin | youtube |
     # toutiao | juejin | csdn | upload | generic
+    # skill（worker 路由推导 source_platform → skill，capture 时写入；可空则不归因）
+    skill_id = Column(Text, nullable=True)
 
     # File paths set by pipeline steps (used for retry file-reuse)
     raw_file_path = Column(Text, nullable=True)     # set at: captured
