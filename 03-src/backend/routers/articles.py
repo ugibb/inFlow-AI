@@ -611,44 +611,22 @@ async def get_article_chapters(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    """Return rich chapter data from the {job_id}_chapters.json file."""
-    import json as _json
-    from pathlib import Path
-    from backend.core.shared.storage.conventions import parse_chapters_path
-
+    """Return rich chapter data from the articles.chapters JSONB column."""
     article = await db.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     if not current_user.is_super_admin and article.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Article not found")
 
-    r = await db.execute(select(IngestJob).where(IngestJob.article_id == article_id).limit(1))
-    job = r.scalar_one_or_none()
-    if not job or not job.raw_file_path:
-        raise HTTPException(status_code=404, detail="Chapters not available")
-
-    chapters_file = Path(parse_chapters_path(job.raw_file_path, job.id))
-    if not chapters_file.is_file():
+    data = article.chapters
+    if not data or not data.get("chapters"):
         raise HTTPException(status_code=404, detail="Chapters not yet generated")
 
-    try:
-        data = _json.loads(chapters_file.read_text(encoding="utf-8"))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to read chapters: {exc}") from exc
-
-    # If total_duration is missing, fill from ASR verbose JSON (display only — chapter times come from LLM)
-    if not data.get("total_duration"):
-        try:
-            from backend.core.shared.storage.conventions import parse_transcript_base
-            base = parse_transcript_base(job.raw_file_path, job.id)
-            verbose = Path(base).parent / (Path(base).stem + "_verbose.json")
-            if verbose.is_file():
-                vdata = _json.loads(verbose.read_text(encoding="utf-8"))
-                real_dur = float(vdata.get("duration") or 0)
-                if real_dur > 0:
-                    data["total_duration"] = real_dur
-        except Exception:
-            pass
+    # If total_duration is missing, fill from transcript column (display only — chapter times come from LLM)
+    if not data.get("total_duration") and article.transcript:
+        real_dur = float((article.transcript or {}).get("duration") or 0)
+        if real_dur > 0:
+            data = {**data, "total_duration": real_dur}
 
     return data
 
@@ -659,38 +637,22 @@ async def get_article_transcript(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    """Return ASR transcript segments for a completed audio article."""
-    import json as _json
-    from pathlib import Path
-    from backend.core.shared.storage.conventions import parse_transcript_base
-
+    """Return ASR transcript segments from the articles.transcript JSONB column."""
     article = await db.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     if not current_user.is_super_admin and article.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Article not found")
 
-    r = await db.execute(
-        select(IngestJob).where(IngestJob.article_id == article_id).limit(1)
-    )
-    job = r.scalar_one_or_none()
-    if not job or not job.raw_file_path:
-        raise HTTPException(status_code=404, detail="Transcript not available")
-
-    base = parse_transcript_base(job.raw_file_path, job.id)
-    verbose_path = Path(base).parent / (Path(base).stem + "_verbose.json")
-    if not verbose_path.is_file():
+    data = article.transcript
+    if not data:
         raise HTTPException(status_code=404, detail="Transcript not yet available")
 
-    try:
-        data = _json.loads(verbose_path.read_text(encoding="utf-8"))
-        segments = [
-            {"start": s["start"], "end": s["end"], "text": s["text"]}
-            for s in (data.get("segments") or [])
-        ]
-        return {"language": data.get("language"), "duration": data.get("duration"), "segments": segments}
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to read transcript: {exc}") from exc
+    return {
+        "language": data.get("language"),
+        "duration": data.get("duration"),
+        "segments": data.get("segments") or [],
+    }
 
 
 @router.get("/{article_id}/deep-read", response_class=HTMLResponse)
@@ -699,31 +661,17 @@ async def get_article_deep_read(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> HTMLResponse:
-    """Return the AI deep-read card HTML from data/03_display/…/{job_id}.html."""
-    from pathlib import Path
-    from backend.core.shared.storage.conventions import display_card_html_path
-
+    """Return the AI deep-read card HTML from the articles.deep_read_html column."""
     article = await db.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     if not current_user.is_super_admin and article.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Article not found")
 
-    r = await db.execute(select(IngestJob).where(IngestJob.article_id == article_id).limit(1))
-    job = r.scalar_one_or_none()
-    if not job or not job.raw_file_path:
-        raise HTTPException(status_code=404, detail="Deep read not available")
-
-    html_path = Path(display_card_html_path(job.raw_file_path, job.id))
-    if not html_path.is_file():
+    if not article.deep_read_html:
         raise HTTPException(status_code=404, detail="Deep read not yet generated")
 
-    try:
-        html_content = html_path.read_text(encoding="utf-8")
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to read deep read HTML: {exc}") from exc
-
-    return HTMLResponse(content=html_content)
+    return HTMLResponse(content=article.deep_read_html)
 
 
 @router.post("/{article_id}/deep-read/screenshot")
@@ -831,7 +779,8 @@ async def get_article(
 
     media_url, ingest_raw_text, ingest_cover, ingest_content_type = await _get_ingest_extras(db, article_id)
     detail = ArticleDetailResponse.model_validate(article)
-    detail.media_url = media_url
+    # DB 字段优先（worker capture 直写）；老管线文章走文件兜底
+    detail.media_url = article.media_url or media_url
     if not detail.raw_content and ingest_raw_text:
         detail.raw_content = ingest_raw_text
     if not detail.cover_image and ingest_cover:

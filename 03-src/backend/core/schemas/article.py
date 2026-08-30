@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Union
 from datetime import datetime
 from uuid import UUID
 
@@ -103,7 +103,9 @@ class ArticleDetailResponse(ArticleResponse):
     clean_content: Optional[str] = None
     raw_content: Optional[str] = None
     media_url: Optional[str] = None
-    chapters: Optional[list] = None
+    # worker 直写的富格式 dict {version,total_duration,chapters:[...]}；
+    # 老数据/其他调用方可能还是 list，两种都放行（前端实际走 /chapters 接口，不消费此字段）
+    chapters: Optional[Union[list, dict]] = None
 
 
 class DeepReadScreenshotRequest(BaseModel):

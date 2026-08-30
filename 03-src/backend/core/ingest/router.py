@@ -384,11 +384,14 @@ async def get_job_status(
                     except Exception:
                         kp = None
                 chapters_raw = article.chapters or []
+                # worker 直写富格式 {"chapters":[{index,start_time,...}]}；老数据可能是裸 list
+                if isinstance(chapters_raw, dict):
+                    chapters_raw = chapters_raw.get("chapters") or []
                 chapters = [
                     ChapterPreview(
-                        start_min=int(c.get("start_min", 0)),
+                        start_min=int(c.get("start_min") or (c.get("start_time") or 0) // 60),
                         title=str(c.get("title", "")),
-                        description=str(c.get("description", "")),
+                        description=str(c.get("description") or c.get("summary") or ""),
                     )
                     for c in chapters_raw
                     if isinstance(c, dict) and c.get("title")

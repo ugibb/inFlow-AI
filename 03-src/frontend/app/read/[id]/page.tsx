@@ -144,6 +144,24 @@ function getPlatformLabel(platform?: string): string {
   return map[platform.toLowerCase()] || platform;
 }
 
+/** 音频 CDN 链接缺失/过期时的兜底入口：跳转原平台收听（小宇宙 episode 链接永久有效） */
+function ExternalListenLink({ url, platform }: { url?: string; platform?: string }) {
+  if (!url) return <p className="text-sm text-[#aeaeb2]">音频链接暂不可用</p>;
+  const label = platform?.toLowerCase() === 'xiaoyuzhou' ? '在小宇宙收听' : '在原平台收听';
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#1d1d1f] text-white text-xs font-medium hover:bg-[#3a3a3c] transition-colors"
+    >
+      <Play size={12} fill="currentColor" strokeWidth={0} />
+      {label}
+      <ExternalLink size={11} />
+    </a>
+  );
+}
+
 // ─── Raw Content Renderer ────────────────────────────────────────────────────
 // Detects HTML content and renders it safely; falls back to ReactMarkdown.
 
@@ -288,6 +306,8 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
   const [audioDuration, setAudioDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [audioMuted, setAudioMuted] = useState(false);
+  // CDN 签名链接加载失败（403 过期等）→ 降级为原平台跳转
+  const [audioFailed, setAudioFailed] = useState(false);
   const segmentRefs = useRef<(HTMLDivElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const autoFollowRef = useRef(true);
@@ -393,6 +413,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     setDeepReadHtml(null);
     setDeepReadLoading(false);
+    setAudioFailed(false);
   }, [params.id]);
 
   useEffect(() => {
@@ -1375,12 +1396,17 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                   <p className="text-xs font-medium text-[#6e6e73] mb-3 uppercase tracking-wider truncate">
                     {article.author || '音频'}
                   </p>
-                  {article.media_url ? (
+                  {article.media_url && !audioFailed ? (
                     <div className="space-y-2">
-                      {/* Hidden audio element — controlled via ref */}
-                      <audio ref={audioRef} preload="metadata" className="hidden">
-                        <source src={article.media_url} />
-                      </audio>
+                      {/* Hidden audio element — controlled via ref.
+                          src 直连（非 <source> 子元素）保证 403/404 触发 onError 降级。 */}
+                      <audio
+                        ref={audioRef}
+                        preload="metadata"
+                        className="hidden"
+                        src={article.media_url}
+                        onError={() => setAudioFailed(true)}
+                      />
 
                       {/* Native-style controls: ▶ time [━━━━━━━] */}
                       <div className="flex items-center gap-2.5">
@@ -1454,7 +1480,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-[#aeaeb2]">音频链接暂不可用</p>
+                    <ExternalListenLink url={article.url} platform={article.source_platform} />
                   )}
                 </div>
               </div>
@@ -1858,8 +1884,8 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
             ) : (
               <div className="text-center py-16">
                 <BookOpen size={40} className="mx-auto text-[#c7c7cc] mb-4" />
-                <p className="text-[var(--text-primary)] text-base mb-2">章节文件暂不可用</p>
-                <p className="text-[var(--text-tertiary)] text-sm">章节速览尚未完成，或章节文件不存在</p>
+                <p className="text-[var(--text-primary)] text-base mb-2">章节速览暂不可用</p>
+                <p className="text-[var(--text-tertiary)] text-sm">章节速览尚未生成，可稍后刷新或重新生成</p>
               </div>
             )}
           </div>
@@ -1886,7 +1912,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
               <div className="text-center py-16">
                 <BookOpen size={40} className="mx-auto text-[#c7c7cc] mb-4" />
                 <p className="text-[var(--text-primary)] text-base mb-2">AI 精读暂不可用</p>
-                <p className="text-[var(--text-tertiary)] text-sm">精读卡片尚未生成，或 HTML 文件不存在</p>
+                <p className="text-[var(--text-tertiary)] text-sm">精读卡片尚未生成，可稍后刷新或重新解析</p>
               </div>
             )}
           </div>
@@ -1960,8 +1986,8 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
             ) : (
               <div className="text-center py-16">
                 <BookOpen size={40} className="mx-auto text-[var(--text-tertiary)] mb-4" />
-                <p className="text-[var(--text-primary)] text-base mb-2">转录文件暂不可用</p>
-                <p className="text-[var(--text-tertiary)] text-sm">音频转录尚未完成，或转录文件不存在</p>
+                <p className="text-[var(--text-primary)] text-base mb-2">转录内容暂不可用</p>
+                <p className="text-[var(--text-tertiary)] text-sm">音频转录尚未完成，请稍后再试</p>
               </div>
             )}
           </div>

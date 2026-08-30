@@ -44,7 +44,10 @@ class Article(Base):
     
     summary = Column(Text)  # AI-generated summary
     key_points = Column(JSONB)  # ["point1", "point2", ...]
-    chapters = Column(JSONB)  # [{"start_min": 0, "title": "...", "description": "..."}] (audio only)
+    chapters = Column(JSONB)  # {"version","total_duration","chapters":[{index,start_time,end_time,title,summary}]} (audio/article, worker parse 直写)
+    transcript = Column(JSONB)  # {"language","duration","segments":[{start,end,text}]} (audio, worker ready 前直写)
+    deep_read_html = Column(Text)  # AI 精读卡片 HTML (worker ready 前直写)
+    media_url = Column(String(2048))  # 音频 CDN 链接（平台签名，会过期；前端以 url 原生链接兜底）
     
     reading_time = Column(Integer, default=0)  # estimated minutes
     word_count = Column(Integer, default=0)
