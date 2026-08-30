@@ -741,7 +741,7 @@ class AccountWorker:
             try:
                 from pathlib import Path
                 from backend.core.models.article import Article
-                from backend.core.shared.storage.conventions import display_card_png_path
+                from backend.core.shared.storage.conventions import card_png_candidates
 
                 # Resolve ingest job + article content type
                 async with async_session() as db:
@@ -761,12 +761,26 @@ class AccountWorker:
                     raise ValueError(f"No raw_file_path for job {job_id}")
 
                 push_label = resolve_phase_label("wechat_push", content_type)
-                png_path = display_card_png_path(job.raw_file_path, job_id)
-                if not Path(png_path).is_file() or Path(png_path).stat().st_size == 0:
+                # raw_file_path 登记形态随管线代际不同：旧云端管线为云端绝对
+                # 路径（换段即命中）；本地 worker 为相对形态（04-output/...），
+                # 需剥前缀拼 INFLOW_PIPELINE_DATA_DIR 才是 SFTP 回传落盘位置。
+                png_candidates = card_png_candidates(
+                    job.raw_file_path, job_id,
+                    pipeline_data_dir=get_settings().inflow_pipeline_data_dir,
+                )
+                png_path = next(
+                    (
+                        p for p in png_candidates
+                        if Path(p).is_file() and Path(p).stat().st_size > 0
+                    ),
+                    None,
+                )
+                if not png_path:
                     # PNG 由本地 worker 经 SFTP 回传云端；缺失即回传未完成，
                     # 云端无 raw/parsed/asr 文件可补渲染，失败等 worker 重跑重传。
                     raise ValueError(
-                        f"Card PNG not uploaded for job {job_id}: {png_path}（等待本地 worker SFTP 回传）"
+                        f"Card PNG not found for job {job_id}: tried {png_candidates}"
+                        "（等待本地 worker SFTP 回传）"
                     )
 
                 size_kb = Path(png_path).stat().st_size // 1024

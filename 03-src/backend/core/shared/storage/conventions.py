@@ -221,6 +221,28 @@ def ext_display_card_png_rel(raw_file_path: str, job_id: UUID) -> str:
     return display_card_png_path(raw_file_path, job_id).removeprefix("data/")
 
 
+def card_png_candidates(
+    raw_file_path: str, job_id: UUID, pipeline_data_dir: str = ""
+) -> list[str]:
+    """卡片 PNG 在云端的候选路径（兼容新旧管线的 raw_file_path 登记形态）。
+
+    - 云端绝对形态（旧云端管线，登记 ``/www/.../01_ingest/...``）：
+      换段路径即真实位置，首个候选直接命中
+    - worker 相对形态（本地 worker 登记 ``04-output/01_ingest/...``，
+      或云端 ``data/01_ingest/...``）：剥掉本地 data_root 前缀后拼
+      ``{pipeline_data_dir}`` —— worker 的 SFTP 回传落盘根（SFTP_PIPELINE_DIR
+      须与云端 INFLOW_PIPELINE_DATA_DIR 指向同一目录）
+
+    调用方按序 stat，取第一个存在且非空的候选。
+    """
+    direct = display_card_png_path(raw_file_path, job_id)
+    candidates = [direct]
+    rel = direct.removeprefix("data/").removeprefix("04-output/")
+    if pipeline_data_dir and rel != direct:
+        candidates.append(f"{pipeline_data_dir.rstrip('/')}/{rel}")
+    return candidates
+
+
 def parse_transcript_base(raw_file_path: str, job_id: UUID) -> str:
     """Base path for ASR transcript files (WhisperTranscriber appends suffixes).
 

@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379/0"
 
+    # Pipeline 数据目录 —— worker 经 SFTP 回传的卡片 PNG/HTML 落盘根
+    # （须与 worker 侧 SFTP_PIPELINE_DIR 一致；bot 推送与 deep-read 截图按此回读）
+    inflow_pipeline_data_dir: str = "./03-src/backend/data"
+
     # CORS — comma-separated list of allowed origins.
     allowed_origins: str = "http://localhost:3000,http://localhost:80"
 

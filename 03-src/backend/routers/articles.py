@@ -693,19 +693,31 @@ async def capture_article_deep_read_screenshot(
         raise HTTPException(status_code=404, detail="Article not found")
 
     from pathlib import Path
-    from backend.core.shared.storage.conventions import display_card_png_path
+    from backend.core.config import get_settings
+    from backend.core.shared.storage.conventions import card_png_candidates
 
     r = await db.execute(select(IngestJob).where(IngestJob.article_id == article_id).limit(1))
     job = r.scalar_one_or_none()
     if not job or not job.raw_file_path:
         raise HTTPException(status_code=404, detail="Deep read not available")
 
-    png_path = Path(display_card_png_path(job.raw_file_path, job.id))
-    if not png_path.is_file():
+    # 兼容新旧管线登记形态：旧云端管线为绝对路径；本地 worker 为 04-output/...
+    # 相对形态，需剥前缀拼 INFLOW_PIPELINE_DATA_DIR（SFTP 回传落盘根）
+    png_path = next(
+        (
+            p for p in card_png_candidates(
+                job.raw_file_path, job.id,
+                pipeline_data_dir=get_settings().inflow_pipeline_data_dir,
+            )
+            if Path(p).is_file() and Path(p).stat().st_size > 0
+        ),
+        None,
+    )
+    if not png_path:
         raise HTTPException(status_code=404, detail="Card PNG not yet returned by worker")
 
     try:
-        png_bytes = png_path.read_bytes()
+        png_bytes = Path(png_path).read_bytes()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to read card PNG: {exc}") from exc
 
