@@ -90,6 +90,9 @@ function ProcessingJobCard({ job }: { job: IngestJob }) {
   );
 }
 
+// 每页拉取条数（后端 page_size 上限 100）
+const PAGE_SIZE = 24;
+
 const SOURCE_OPTIONS = [
   { value: '', label: '全部来源' },
   { value: 'wechat', label: '微信公众号' },
@@ -146,6 +149,7 @@ export default function LibraryPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [username, setUsername] = useState('');
 
@@ -208,29 +212,47 @@ export default function LibraryPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const fetchArticles = useCallback(async () => {
-    setLoading(true); setError('');
+  // 是否处于无筛选的默认视图（空列表自动重试仅在该视图下生效）
+  const hasActiveFilters = !!(statusFilter || tagFilter || folderFilter || sourceFilter || search || username);
+
+  // 列表请求参数（fetchArticles 与 loadMore 共用）
+  const buildListParams = useCallback((pageNum: number): any => {
+    const params: any = { page: pageNum, page_size: PAGE_SIZE, sort: 'updated_at' };
+    if (statusFilter) params.status = statusFilter;
+    if (tagFilter) params.tag = tagFilter;
+    if (folderFilter) params.folder_id = folderFilter;
+    if (sourceFilter) params.source_platform = sourceFilter;
+    if (search) { params.search = search; params.search_mode = searchMode; }
+    if (username) params.username = username;
+    return params;
+  }, [statusFilter, tagFilter, folderFilter, sourceFilter, search, searchMode, username]);
+
+  // fetchArticles 始终拉第 1 页，两种语义：
+  //   非 silent → replace：骨架屏 + 整表替换 + 重置回第 1 页（初始加载、筛选/搜索变化、手动重试）
+  //   silent    → merge：只把第 1 页合并进列表头部（sort=updated_at，新文章/刚处理完的必在第 1 页），
+  //                深处已加载的卡片原样保留，按 article.id 复用 DOM，滚动位置不丢；失败静默待下轮重试。
+  const fetchArticles = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (!silent) { setLoading(true); setError(''); }
     try {
-      const params: any = { page, page_size: 24, sort: 'updated_at' };
-      if (statusFilter) params.status = statusFilter;
-      if (tagFilter) params.tag = tagFilter;
-      if (folderFilter) params.folder_id = folderFilter;
-      if (sourceFilter) params.source_platform = sourceFilter;
-      if (search) { params.search = search; params.search_mode = searchMode; }
-      if (username) params.username = username;
-      const data = await api.getArticles(params) as ArticleListResponse;
-      setArticles(data.items); setTotal(data.total);
-      const noFilters = !statusFilter && !tagFilter && !folderFilter && !sourceFilter && !search && !username;
-      if (noFilters && data.total === 0 && data.items.length === 0 && listEmptyRetryRef.current < 2) {
+      const data = await api.getArticles(buildListParams(1)) as ArticleListResponse;
+      if (silent) {
+        const firstPageIds = new Set(data.items.map(a => a.id));
+        setArticles(prev => [...data.items, ...prev.filter(a => !firstPageIds.has(a.id))]);
+      } else {
+        setArticles(data.items); setPage(1);
+      }
+      setTotal(data.total);
+      if (!hasActiveFilters && data.total === 0 && data.items.length === 0 && listEmptyRetryRef.current < 2) {
         listEmptyRetryRef.current += 1;
-        window.setTimeout(() => fetchArticlesRef.current(), 800);
+        window.setTimeout(() => fetchArticlesRef.current({ silent: true }), 800);
         return;
       }
       if (data.total > 0) listEmptyRetryRef.current = 0;
     } catch (e: any) {
-      setError(e.message || '加载失败');
-    } finally { setLoading(false); }
-  }, [page, statusFilter, tagFilter, folderFilter, sourceFilter, search, searchMode, username]);
+      if (!silent) setError(e.message || '加载失败');
+    } finally { if (!silent) setLoading(false); }
+  }, [buildListParams, hasActiveFilters]);
 
   const fetchTags = async () => { try { setTags(await api.getTags()); } catch {} };
   const fetchFolders = async () => { try { setFolders(await api.getFolders()); } catch {} };
@@ -244,6 +266,38 @@ export default function LibraryPage() {
 
   const fetchArticlesRef = useRef(fetchArticles);
   fetchArticlesRef.current = fetchArticles;
+
+  // ─── 无限滚动：滚到底部附近自动追加下一页 ────────────────────────────────────
+  const hasMore = page * PAGE_SIZE < total;
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || authLoading || !token) return;
+    setLoadingMore(true);
+    try {
+      const data = await api.getArticles(buildListParams(page + 1)) as ArticleListResponse;
+      setArticles(prev => [...prev, ...data.items]);
+      setTotal(data.total);
+      setPage(p => p + 1);
+    } catch {} finally { setLoadingMore(false); }
+  }, [loadingMore, hasMore, authLoading, token, page, buildListParams]);
+
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // 哨兵进入视口（提前 600px 预加载）→ 加载下一页。root 必须挂右栏滚动容器，
+  // 页面滚动发生在该容器内而非 window，默认 root 会永远不触发。
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const io = new IntersectionObserver(
+      entries => { if (entries[0]?.isIntersecting) loadMoreRef.current(); },
+      { root: scrollContainerRef.current, rootMargin: '600px 0px' },
+    );
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, [loading, error]);
 
   useEffect(() => {
     if (authLoading || !token) return;
@@ -261,7 +315,7 @@ export default function LibraryPage() {
     if (activeJobs.length === 0) return;
     const currentIds = activeJobs.map(j => j.job_id).sort().join(',');
     if (prevJobIdsRef.current && prevJobIdsRef.current !== currentIds) {
-      fetchArticlesRef.current();
+      fetchArticlesRef.current({ silent: true });
     }
     prevJobIdsRef.current = currentIds;
     const t = setInterval(fetchActiveJobs, 3000);
@@ -299,7 +353,7 @@ export default function LibraryPage() {
     if (pollAttemptsRef.current >= cap) return;
     const t = setTimeout(() => {
       pollAttemptsRef.current += 1;
-      fetchArticlesRef.current();
+      fetchArticlesRef.current({ silent: true });
     }, interval);
     return () => clearTimeout(t);
   }, [articles]);
@@ -307,12 +361,12 @@ export default function LibraryPage() {
   // Debounced search via ref to avoid stale closure
   useEffect(() => {
     if (authLoading || !token) return;
-    const t = setTimeout(() => { setPage(1); fetchArticlesRef.current(); }, 300);
+    const t = setTimeout(() => { fetchArticlesRef.current(); }, 300);
     return () => clearTimeout(t);
   }, [search, authLoading, token]);
   useEffect(() => {
     if (authLoading || !token) return;
-    if (search) { setPage(1); fetchArticlesRef.current(); }
+    if (search) { fetchArticlesRef.current(); }
   }, [searchMode, search, authLoading, token]);
 
   const toggleSelect = (id: string) => {
@@ -321,23 +375,33 @@ export default function LibraryPage() {
     setSelectedIds(next);
   };
 
+  // 批量操作后原地更新列表（不整表重拉），避免已滚到的深处内容被重置
+  const removeFromList = (ids: Set<string>) => {
+    setArticles(prev => prev.filter(a => !ids.has(a.id)));
+    setTotal(t => Math.max(0, t - ids.size));
+  };
+
   const batchDelete = async () => {
     if (!confirm(`确定删除选中的 ${selectedIds.size} 篇文章？`)) return;
     for (const id of Array.from(selectedIds)) { try { await api.deleteArticle(id); } catch {} }
-    setSelectedIds(new Set()); showToast('批量删除完成', 'success'); fetchArticles();
+    removeFromList(selectedIds);
+    setSelectedIds(new Set()); showToast('批量删除完成', 'success');
   };
 
   const batchArchive = async () => {
     for (const id of Array.from(selectedIds)) { try { await api.updateArticle(id, { status: 'archived' }); } catch {} }
-    setSelectedIds(new Set()); showToast('已归档', 'success'); fetchArticles();
+    removeFromList(selectedIds);
+    setSelectedIds(new Set()); showToast('已归档', 'success');
   };
 
   const batchMoveToFolder = async (folderId: string) => {
     const folderName = folders.find(f => f.id === folderId)?.name || '所选文件夹';
     try {
       await api.batchMoveArticles(Array.from(selectedIds), folderId);
+      // 正在浏览目标文件夹之外的视图时，被移走的卡片就地消失；其余情况卡片仍在
+      if (folderFilter && folderFilter !== folderId) removeFromList(selectedIds);
       setSelectedIds(new Set()); setMoveToFolderId('');
-      showToast(`已移动到「${folderName}」`, 'success'); fetchArticles();
+      showToast(`已移动到「${folderName}」`, 'success');
     } catch (e: any) { showToast(e.message || '移动失败', 'error'); }
   };
 
@@ -742,7 +806,7 @@ export default function LibraryPage() {
       </div>
 
       {/* Right: Main content */}
-      <div className="flex-1 min-w-0 p-4 md:p-6 overflow-y-auto">
+      <div ref={scrollContainerRef} className="flex-1 min-w-0 p-4 md:p-6 overflow-y-auto">
         {/* Mobile folder selector */}
         <div className="md:hidden mb-4">
           <select value={folderFilter} onChange={e => setFolderFilter(e.target.value)}
@@ -893,7 +957,7 @@ export default function LibraryPage() {
         ) : error ? (
           <div className="text-center py-16">
             <p className="text-[#ff3b30] mb-4">{error}</p>
-            <button onClick={fetchArticles} className="px-6 py-2 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)]">重试</button>
+            <button onClick={() => fetchArticles()} className="px-6 py-2 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)]">重试</button>
           </div>
         ) : articles.length === 0 && visibleJobs.length === 0 ? (
           <div className="text-center py-16">
@@ -925,25 +989,21 @@ export default function LibraryPage() {
                 </div>
               ))}
             </div>
-            {total > 24 && (
-              <div className="flex justify-center items-center gap-2 mt-8">
-                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                  className="px-4 py-2 text-sm rounded-lg disabled:opacity-30 hover:bg-[var(--bg-secondary)]">上一页</button>
-                {Array.from({ length: Math.min(5, Math.ceil(total / 24)) }, (_, i) => {
-                  const current = Math.max(1, page - 2) + i;
-                  if (current > Math.ceil(total / 24)) return null;
-                  return (<button key={current} onClick={() => setPage(current)}
-                    className={`w-9 h-9 text-sm rounded-lg ${page === current ? 'bg-[var(--accent)] text-white' : 'hover:bg-[var(--bg-secondary)]'}`}>{current}</button>);
-                })}
-                <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / 24)}
-                  className="px-4 py-2 text-sm rounded-lg disabled:opacity-30 hover:bg-[var(--bg-secondary)]">下一页</button>
+            {/* 无限滚动：哨兵进入视口自动加载下一页 */}
+            <div ref={sentinelRef} className="h-px" />
+            {loadingMore && (
+              <div className="flex justify-center py-6">
+                <Loader2 size={20} className="animate-spin text-[var(--text-tertiary)]" />
               </div>
+            )}
+            {!hasMore && total > PAGE_SIZE && (
+              <div className="text-center py-6 text-xs text-[var(--text-tertiary)]">已经到底啦</div>
             )}
           </>
         )}
       </div>
     </div>
-    <AddContentModal onSuccess={fetchArticles} />
+    <AddContentModal onSuccess={() => fetchArticles()} />
     </>
   );
 }
