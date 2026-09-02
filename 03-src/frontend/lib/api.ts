@@ -538,6 +538,27 @@ class ApiClient {
     return this.request(`/api/articles/${articleId}/regenerate-ai`, { method: 'POST' });
   }
 
+  /** 单块重新生成：ai(文本) 云端同步返回 completed；worker 产出的块返回 started（异步） */
+  async regenerateArticleBlock(
+    articleId: string,
+    block: import('./types').ContentBlockKey
+  ): Promise<{
+    ok: boolean;
+    status: string; // completed | started
+    mode: 'sync' | 'async';
+    block: string;
+    article_id: string;
+    job_id?: string;
+    from_step?: string;
+    summary?: string;
+    word_count?: number;
+  }> {
+    return this.request(`/api/articles/${articleId}/regenerate-block`, {
+      method: 'POST',
+      body: JSON.stringify({ block }),
+    });
+  }
+
   async getArticleRegenStatus(articleId: string): Promise<{ active: boolean; message: string }> {
     return this.request(`/api/articles/${articleId}/regen-status`);
   }

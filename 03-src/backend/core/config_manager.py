@@ -227,6 +227,33 @@ CONFIG_SCHEMA: Dict[str, dict] = {
         ],
         "test_provider": None,
     },
+    "quota": {
+        "label": "入库免费额度",
+        "description": "控制内容入库（URL 抓取 / 文件上传 / 粘贴文本）的每日免费条数",
+        "icon": "gauge",
+        "fields": [
+            {
+                "key": "enabled",
+                "label": "启用额度限制",
+                "type": "select",
+                "options": [
+                    {"value": "true", "label": "启用"},
+                    {"value": "false", "label": "停用"},
+                ],
+                "default": "true",
+                "required": False,
+            },
+            {
+                "key": "limit_per_day",
+                "label": "每日免费条数",
+                "type": "number",
+                "default": "10",
+                "placeholder": "10；填 0 表示不限额",
+                "required": False,
+            },
+        ],
+        "test_provider": None,
+    },
 }
 
 
@@ -378,6 +405,25 @@ def get_embedding_config() -> Dict[str, str]:
 def get_plugins_config() -> Dict[str, str]:
     """Get effective plugins config."""
     return get_effective_config("plugins")
+
+
+def get_quota_limit() -> int:
+    """每日免费入库条数（返回 <=0 表示不限额）。
+
+    优先级：系统管理 UI（config_store.json 的 quota 组）> 环境变量/默认
+    （config.py 的 free_quota_per_day，即 FREE_QUOTA_PER_DAY）。本文件每次现读
+    JSON，因此 UI 保存后下一条入库请求立即按新值生效，无需重启。
+    """
+    if "quota" in _load_overrides():
+        cfg = get_effective_config("quota")
+        enabled = str(cfg.get("enabled", "true")).strip().lower()
+        if enabled == "false":
+            return 0
+        try:
+            return int(float(cfg.get("limit_per_day") or 0))
+        except (TypeError, ValueError):
+            return 0
+    return get_settings().free_quota_per_day
 
 
 def get_all_schemas() -> Dict[str, dict]:

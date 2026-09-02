@@ -145,7 +145,7 @@ async def test_config(group_name: str, body: dict):
             result = await test_llm_connection(body)
         elif group_name == "embedding":
             result = await test_embedding_connection(body)
-        elif group_name == "plugins":
+        elif group_name in ("plugins", "quota"):
             result = {"ok": True, "message": "配置无需联网测试"}
         else:
             return {"success": False, "message": f"未知配置组: {group_name}"}
@@ -172,7 +172,7 @@ async def update_config(group_name: str, body: dict):
             test_result = await test_llm_connection(body)
         elif group_name == "embedding":
             test_result = await test_embedding_connection(body)
-        elif group_name == "plugins":
+        elif group_name in ("plugins", "quota"):
             test_result = {"ok": True, "message": "配置无需联网测试"}
         else:
             return {"success": False, "message": f"未知配置组: {group_name}"}

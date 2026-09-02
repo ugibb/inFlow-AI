@@ -57,11 +57,25 @@ export interface CardThemesResponse {
   themes: Record<string, CardTheme>;
 }
 
+// ─── 内容块存在性（read 页生成进度）─────────────────────────────────────────
+
+/** read 页各标签页（内容块）id：raw/transcript/chapters/deepRead/ai */
+export type ContentBlockKey = 'raw' | 'transcript' | 'chapters' | 'deepRead' | 'ai';
+
+export interface ContentBlockState {
+  applicable: boolean; // 该内容类型是否展示此标签页
+  present: boolean;    // 对应内容是否已生成
+}
+
+export type ContentBlocks = Partial<Record<ContentBlockKey, ContentBlockState>>;
+
 export interface ArticleDetail extends Article {
   clean_content?: string;
   raw_content?: string;
   media_url?: string;
   chapters?: IngestJobChapter[] | null;
+  /** GET /articles/{id} 附带的内容块存在性快照（detail 路由计算） */
+  content_blocks?: ContentBlocks;
 }
 
 export interface ArticleListResponse {

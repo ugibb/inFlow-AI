@@ -18,7 +18,7 @@ from backend.core.models.user import User
 from backend.core.schemas.article import (
     ArticleCreate, ArticleBatchCreate, ArticleManualCreate, ArticleUpdate, NoteCreate,
     ArticleResponse, ArticleDetailResponse, ArticleListResponse,
-    DeepReadScreenshotRequest,
+    DeepReadScreenshotRequest, RegenerateBlockRequest,
     AIProcessResponse, SearchRequest,
     SparkCreateRequest, SparkResponse, SparkSectionResponse,
     FileUploadResponse, ArticleTagsUpdate,
@@ -626,6 +626,89 @@ async def _get_ingest_extras(
         return None, None, None, None
 
 
+# 内容类型门控：与 read 页 tab 展示规则一致。哪些 tab（内容块）对该类型可见，
+# 以及该块产出位于 worker 流水线哪一阶段入口（用于单块重新生成的续跑点）。
+_BLOCK_APPLICABLE = {
+    "raw":        {"article", "video"},
+    "transcript": {"audio"},
+    "chapters":   {"audio", "article"},
+    "deepRead":   {"article", "audio", "video"},
+    "ai":         {"article", "audio", "video", "note"},
+}
+# worker 阶段产出块 → resume_for_retry 入口（from_step）。ai 块文本类走云端同步，
+# 不入此表；audio 的 ai 与章节同源于 parsing 续跑。
+_BLOCK_WORKER_STEP = {
+    "raw":        ("capturing",    {"article", "video"}),
+    "transcript": ("transcribing", {"audio"}),
+    "chapters":   ("parsing",      {"audio", "article"}),
+    "deepRead":   ("composing",    {"article", "audio", "video"}),
+    "ai":         ("parsing",      {"audio"}),  # 仅音频：AI 依赖转写链，需 worker 续跑
+}
+
+
+def _chapters_present(article: Article) -> bool:
+    data = article.chapters
+    if not data:
+        return False
+    return bool(data.get("chapters")) if isinstance(data, dict) else bool(data)
+
+
+def _transcript_present(article: Article) -> bool:
+    data = article.transcript
+    if not data:
+        return False
+    return bool(data.get("segments")) if isinstance(data, dict) else bool(data)
+
+
+def _content_block_summary(
+    article: Article,
+    raw_fallback: Optional[str] = None,
+    content_type: Optional[str] = None,
+) -> dict:
+    """read 页各内容块的存在性快照（含是否对该内容类型适用）。
+
+    Keys 与 read 页 tab 一致：raw / transcript / chapters / deepRead / ai。
+    每项形如 {"applicable": bool, "present": bool}，供前端展示生成进度、
+    并按缺失块提供单块重新生成入口。
+    """
+    ct = (content_type or article.content_type or "article").lower()
+    ai_present = bool(
+        (article.summary or "").strip() or (article.key_points or [])
+    )
+    return {
+        "raw": {
+            "applicable": ct in _BLOCK_APPLICABLE["raw"],
+            "present": bool(article.raw_content or raw_fallback),
+        },
+        "transcript": {
+            "applicable": ct in _BLOCK_APPLICABLE["transcript"],
+            "present": _transcript_present(article),
+        },
+        "chapters": {
+            "applicable": ct in _BLOCK_APPLICABLE["chapters"],
+            "present": _chapters_present(article),
+        },
+        "deepRead": {
+            "applicable": ct in _BLOCK_APPLICABLE["deepRead"],
+            "present": bool(article.deep_read_html),
+        },
+        "ai": {
+            "applicable": True,
+            "present": ai_present,
+        },
+    }
+
+
+async def _find_article_job(
+    db: AsyncSession, article_id: UUID
+) -> Optional[IngestJob]:
+    """文章最近的 IngestJob（同一 article 下通常单 job）。"""
+    r = await db.execute(
+        select(IngestJob).where(IngestJob.article_id == article_id).limit(1)
+    )
+    return r.scalar_one_or_none()
+
+
 @router.get("/{article_id}/chapters")
 async def get_article_chapters(
     article_id: UUID,
@@ -795,6 +878,172 @@ async def get_article_regen_status(
     return {"active": msg is not None, "message": msg or ""}
 
 
+# ------------------------------------------------------------------ #
+# 单块重新生成                                                          #
+# ------------------------------------------------------------------ #
+
+
+async def _regenerate_ai_block(db: AsyncSession, article: Article) -> Article:
+    """文本内容 AI 块同步重生成：复用干净文本/原文重跑 LLM 解析。
+
+    只回写 AI 相关字段（title/summary/key_points/reading_time/word_count/
+    AI 标签），不重抓取、不改写正文、不动图谱与流水线任务。
+    """
+    # Notes 以 clean_content 为正文源；为空时用 raw 兜底
+    if article.content_type == "note" and not article.raw_content:
+        article.raw_content = article.clean_content or ""
+
+    content = article.clean_content or article.raw_content
+    if not content:
+        raise HTTPException(
+            status_code=400,
+            detail="暂无可解析的正文，请先完成内容抓取后再试",
+        )
+
+    # 仅在还没有干净文本时才做平台化清理 —— 块级重生成不改写既有正文
+    if not article.clean_content:
+        platform = article.source_platform or (
+            parser_service.detect_platform(article.url) if article.url else "other"
+        )
+        if platform in ("spark", "note") or article.content_type == "note":
+            clean_md = content  # Already markdown, don't re-process
+        else:
+            clean_md = parser_service.clean_to_markdown(content, platform)
+        article.clean_content = clean_md
+        article.plain_text = clean_md
+
+    ai_result = await llm_service.parse_article(
+        article.clean_content, article.url, article.raw_content or ""
+    )
+    if ai_result.get("title"):
+        article.title = ai_result.get("title")[:500]
+    article.summary = ai_result.get("summary", "") or ""
+    article.key_points = ai_result.get("key_points") or []
+    article.reading_time = ai_result.get("estimated_reading_minutes", 5) or 0
+    article.word_count = parser_service.count_words(article.clean_content)
+
+    # 标签：仅替换由 AI 生成的标签，保留用户手动添加的标签
+    for tag in [t for t in list(article.tags) if t.is_ai_generated]:
+        article.tags.remove(t)
+    for name in (ai_result.get("tags") or []):
+        name = (name or "").strip()
+        if not name:
+            continue
+        res = await db.execute(
+            select(Tag).where(func.lower(Tag.name) == name.lower())
+        )
+        tag = res.scalar_one_or_none()
+        if not tag:
+            tag = Tag(name=name, is_ai_generated=True, user_id=article.user_id)
+            db.add(tag)
+            await db.flush()
+        if tag not in article.tags:
+            article.tags.append(tag)
+
+    await db.commit()
+    await db.refresh(article)
+    return article
+
+
+async def _resume_worker_block(
+    db: AsyncSession,
+    job: IngestJob,
+    *,
+    block: str,
+    from_step: str,
+    article_id: UUID,
+) -> dict:
+    """把已结束的 job 从该块对应流水线入口续跑，交给本地 worker 补齐对应产出。
+
+    云端不调度任何管道：仅重置状态 + 标记 external，等 worker 认领。
+    """
+    if not job.external_processing:
+        # 历史 non-external job：云端已无自跑管道，统一标记转交本地 worker。
+        job.external_processing = True
+        await db.commit()
+
+    from backend.core.pipeline.state_machine import resume_for_retry
+
+    ok = await resume_for_retry(db, job_id=job.id, from_step=from_step)
+    if not ok:
+        raise HTTPException(
+            status_code=400,
+            detail=f"该任务当前状态（{job.status}）不可从此处重新生成，请稍后重试",
+        )
+    return {
+        "ok": True,
+        "status": "started",
+        "mode": "async",
+        "block": block,
+        "article_id": str(article_id),
+        "job_id": str(job.id),
+        "from_step": from_step,
+    }
+
+
+@router.post("/{article_id}/regenerate-block")
+async def regenerate_article_block(
+    article_id: UUID,
+    body: RegenerateBlockRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """按块重新生成文章内容 —— 尽量只补齐对应内容块，不整条链路重跑。
+
+    - ``ai``：文本类（article/video/note）在云端**同步**重跑 LLM 解析
+      （复用干净文本/原文，不重抓取、不动图谱）；音频因 AI 依赖转写链，
+      走本地 worker 的 parsing 续跑。
+    - ``raw/transcript/chapters/deepRead``：均由 worker 某阶段产出，云端只把
+      已结束的 job 重置到该块对应的流水线入口，交本地 worker 续跑补齐。
+
+    内容类型门控与 read 页 tab 展示一致；找不到任务 / 状态不可续跑时 400/404。
+    """
+    article = await db.get(Article, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    if not current_user.is_super_admin and article.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    ct = (article.content_type or "article").lower()
+
+    # ── ai：文本类 → 云端同步 LLM 解析（只回写 AI 块） ──────────────
+    if body.block == "ai" and ct != "audio":
+        updated = await _regenerate_ai_block(db, article)
+        return {
+            "ok": True,
+            "status": "completed",
+            "mode": "sync",
+            "block": "ai",
+            "article_id": str(article_id),
+            "summary": updated.summary or "",
+            "word_count": updated.word_count or 0,
+        }
+
+    # ── 其余（含 audio 的 ai）：需要本地 worker 按阶段续跑 ────────────
+    from_step, allowed = _BLOCK_WORKER_STEP[body.block]
+    if ct not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"该内容类型不支持单独重新生成“{body.block}”内容块",
+        )
+
+    job = await _find_article_job(db, article_id)
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail="未找到该内容对应的生成任务，无法单独重新生成此块",
+        )
+    if ct == "audio" and not job.raw_file_path:
+        raise HTTPException(
+            status_code=404,
+            detail="音频源文件缺失，无法重新生成（请重新添加该音频）",
+        )
+
+    return await _resume_worker_block(
+        db, job, block=body.block, from_step=from_step, article_id=article_id
+    )
+
+
 @router.get("/{article_id}", response_model=ArticleDetailResponse)
 async def get_article(
     article_id: UUID,
@@ -821,6 +1070,10 @@ async def get_article(
     # Backfill content_type if DB still has default 'article' but ingest says otherwise
     if ingest_content_type and ingest_content_type != 'article' and detail.content_type == 'article':
         detail.content_type = ingest_content_type
+    # read 页内容块存在性快照（raw_fallback 也纳入 raw 判断）
+    detail.content_blocks = _content_block_summary(
+        article, raw_fallback=ingest_raw_text, content_type=detail.content_type
+    )
     return detail
 
 

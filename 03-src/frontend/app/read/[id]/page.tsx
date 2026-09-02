@@ -41,7 +41,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { ArticleDetail, Folder as FolderType, Tag as TagType, RelatedArticlesResponse, JobTranscript, ArticleChaptersResponse, IngestJob } from '@/lib/types';
+import type { ArticleDetail, Folder as FolderType, Tag as TagType, RelatedArticlesResponse, JobTranscript, ArticleChaptersResponse, IngestJob, ContentBlockKey, ContentBlockState } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { PipelineBar } from '@/components/PipelineBar';
 import { DeepReadPanel } from '@/components/deep-read-panel';
@@ -71,6 +71,17 @@ const PLATFORM_STYLES: Record<string, string> = {
   feishu: 'bg-[#e8eeff] text-[#3370ff]',
   default: 'bg-[#f2f2f7] text-[#6e6e73]',
 };
+
+/** read 页内容块 id → 展示名（与后端 content_blocks / regenerate-block 对齐） */
+const BLOCK_LABELS: Record<ContentBlockKey, string> = {
+  raw: '原文',
+  transcript: '全文转录',
+  chapters: '章节速览',
+  deepRead: 'AI 精读',
+  ai: 'AI 摘要',
+};
+
+const BLOCK_ORDER: ContentBlockKey[] = ['raw', 'transcript', 'chapters', 'deepRead', 'ai'];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -328,6 +339,10 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
   // Incrementing this restarts the polling interval (e.g. after a manual retry).
   const [pollTrigger, setPollTrigger] = useState(0);
   const fetchAttemptRef = useRef(0);
+
+  // 单块重新生成（页面底部/标签页底部按钮）：pendingBlock 非空 = 有块正在重新生成。
+  // worker 异步块由 job 轮询到终态后收尾（见 handleRegenerateBlock 下方 effect）。
+  const [pendingBlock, setPendingBlock] = useState<ContentBlockKey | null>(null);
 
   // ── Custom audio player handlers ────────────────────────────────────────
   const togglePlay = useCallback(() => {
@@ -885,6 +900,88 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
     }
   }, [params.id, fetchArticle, showToast]);
 
+  // ── 单块重新生成（read 页每个标签页底部可只重跑该块，无需整条流水线）────────
+  const reloadTabBlock = useCallback((articleId: string, block: ContentBlockKey) => {
+    if (block === 'chapters') {
+      setRichChapters(null);
+      setChaptersLoading(true);
+      api.getArticleChapters(articleId)
+        .then((data) => setRichChapters(data))
+        .catch(() => setRichChapters(null))
+        .finally(() => setChaptersLoading(false));
+    } else if (block === 'deepRead') {
+      setDeepReadHtml(null);
+      setDeepReadLoading(true);
+      api.getArticleDeepReadHtml(articleId)
+        .then((html) => setDeepReadHtml(html))
+        .catch(() => setDeepReadHtml(null))
+        .finally(() => setDeepReadLoading(false));
+    } else if (block === 'transcript') {
+      setTranscript(null);
+      setTranscriptLoading(true);
+      api.getArticleTranscript(articleId)
+        .then((data) => setTranscript(data))
+        .catch(() => setTranscript(null))
+        .finally(() => setTranscriptLoading(false));
+    }
+  }, []);
+
+  const handleRegenerateBlock = useCallback(async (articleId: string, block: ContentBlockKey) => {
+    if (!article || pendingBlock) return;
+    setPendingBlock(block);
+    try {
+      const res = await api.regenerateArticleBlock(articleId, block);
+      if (res && res.mode === 'sync') {
+        // 云端同步重解析 AI（文本类）：直接刷新即可
+        setPendingBlock(null);
+        await fetchArticle(true);
+        reloadTabBlock(articleId, block);
+        showToast(`「${BLOCK_LABELS[block]}」已重新生成`, 'success');
+        return;
+      }
+      // worker 异步续跑：关联 job 让 PipelineBar 显示进度，完成后由下方 effect 收尾
+      try {
+        const job = await api.getJobByArticleId(articleId);
+        if (job) { setProcessingJob(job); setResolvedJobId(job.job_id); }
+      } catch { /* PipelineBar 是补充展示，关联失败可忽略 */ }
+      showToast(`已开始重新生成「${BLOCK_LABELS[block]}」，完成后自动刷新`, 'success');
+    } catch (err: any) {
+      setPendingBlock(null);
+      showToast(err?.message || '重新生成失败，请稍后重试', 'error');
+    }
+  }, [article, pendingBlock, fetchArticle, reloadTabBlock, showToast]);
+
+  // worker 异步块收尾：pendingBlock 挂起期间 job 到达终态 → 刷新文章并复位进度
+  useEffect(() => {
+    if (!pendingBlock || !processingJob || !article) return;
+    const st = processingJob.status;
+    if (st !== 'ready' && st !== 'failed' && st !== 'cancelled') return;
+    const articleId = article.id;
+    const block = pendingBlock;
+    setPendingBlock(null);
+    setResolvedJobId(null);
+    setProcessingJob(null);
+    if (st === 'ready') {
+      fetchArticle(true);
+      reloadTabBlock(articleId, block);
+      showToast(`「${BLOCK_LABELS[block]}」已重新生成`, 'success');
+    } else {
+      showToast(st === 'failed'
+        ? `「${BLOCK_LABELS[block]}」重新生成失败，可在对应标签页底部重试`
+        : `「${BLOCK_LABELS[block]}」重新生成已取消`, 'error');
+    }
+  }, [processingJob, pendingBlock, article, fetchArticle, reloadTabBlock, showToast]);
+
+  // 顶部统一「重新生成」按钮：audio 走 worker 重解析（含后续链），图文/笔记走完整云端重新解析
+  const handleFullRegenerate = useCallback(async () => {
+    if (!article) return;
+    if (article.content_type === 'audio') {
+      await handleRegenerate();
+      return;
+    }
+    await handleReprocess();
+  }, [article, handleRegenerate, handleReprocess]);
+
   // ── Tag Management ───────────────────────────────────────────────────
   const handleRemoveTag = useCallback((tagId: string) => {
     setEditTags(prev => prev.filter(t => t.id !== tagId));
@@ -1033,6 +1130,62 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
   const currentFolder = folders.find((f) => f.id === article.folder_id);
   const displayFolderName = article.folder?.name || currentFolder?.name;
 
+  // ── 内容块生成进度（后端 detail 路由已按类型算好 applicable / present）──────
+  const blockMap = article.content_blocks;
+  const blockStates = BLOCK_ORDER
+    .map((key) => ({ key, state: blockMap?.[key] }))
+    .filter((b): b is { key: ContentBlockKey; state: ContentBlockState } => !!b.state?.applicable);
+  const missingBlocks = blockStates.filter((b) => !b.state.present);
+  // 硬性“正在跑”信号才隐藏进度栏/单块按钮：
+  // 缺 summary 却无活跃 job（卡住/部分生成）不算 busy —— 正是要让用户看到缺失并可单独补生成。
+  const pipelineBusy =
+    article.fetch_status === 'ingesting' ||
+    article.fetch_status === 'pending_agent' ||
+    (!!processingJob && !['ready', 'failed', 'cancelled'].includes(processingJob.status)) ||
+    regenerating ||
+    pendingBlock !== null;
+  // 手动笔记不是流水线产物，其“正文/摘要”由作者自行撰写，不参与生成进度
+  const showBlockBar =
+    article.content_type !== 'note' &&
+    !!blockMap &&
+    missingBlocks.length > 0 &&
+    !pipelineBusy;
+
+  /** 打开对应标签页（懒加载其内容缓存） */
+  const openBlockTab = (block: ContentBlockKey) => {
+    if (block === 'transcript') { setActiveTab('transcript'); loadTranscript(); }
+    else if (block === 'chapters') { setActiveTab('chapters'); loadChapters(); }
+    else if (block === 'deepRead') { setActiveTab('deepRead'); loadDeepRead(); }
+    else setActiveTab(block);
+  };
+
+  /** 单块「重新生成」footer：仅重新生成该块，idle 时才显示 */
+  const renderBlockRegenFooter = (block: ContentBlockKey) => {
+    if (!blockMap?.[block]?.applicable) return null;
+    if (article.content_type === 'note' || pipelineBusy) return null;
+    // 文本类尚无正文（抓取失败/未抓到）时，除 raw（重抓原文）外其它块无源可产
+    const textWithNoBody =
+      article.content_type !== 'audio' &&
+      block !== 'raw' &&
+      !(article.clean_content || article.raw_content);
+    if (textWithNoBody) return null;
+    const busy = pendingBlock === block;
+    const label = BLOCK_LABELS[block];
+    return (
+      <div className="mt-6 flex justify-center">
+        <button
+          onClick={() => handleRegenerateBlock(article.id, block)}
+          disabled={pendingBlock !== null || regenerating || actionLoading === 'reprocess'}
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--bg-secondary)] transition-colors disabled:opacity-40"
+          title={`仅重新生成${label}，不会重跑整条流水线`}
+        >
+          {busy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+          {busy ? `正在重新生成${label}…` : `仅重新生成${label}`}
+        </button>
+      </div>
+    );
+  };
+
   // ── Render: Article ────────────────────────────────────────────────────
   return (
     <>
@@ -1118,19 +1271,21 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
               </span>
             </button>
 
-            {/* Reprocess */}
+            {/* 顶部统一「重新生成」：audio 走 worker 重解析；图文/笔记走完整云端重新解析 */}
             <button
-              onClick={handleReprocess}
-              disabled={actionLoading === 'reprocess'}
+              onClick={handleFullRegenerate}
+              disabled={actionLoading === 'reprocess' || regenerating || pendingBlock !== null}
               className="h-8 px-2.5 flex items-center gap-1 rounded-lg hover:bg-white/70 transition-colors disabled:opacity-40 text-xs text-[#6e6e73]"
-              title="AI 重新解析"
+              title="重新生成 AI 内容（音频重新解析；图文重新解析摘要与标签）"
             >
-              {actionLoading === 'reprocess' ? (
+              {actionLoading === 'reprocess' || regenerating ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : (
                 <RefreshCw size={14} />
               )}
-              <span className="hidden sm:inline">重新解析</span>
+              <span className="hidden sm:inline">
+                {actionLoading === 'reprocess' || regenerating ? '生成中…' : '重新生成'}
+              </span>
             </button>
 
             {/* Share */}
@@ -1673,26 +1828,49 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
               <Loader2 size={11} className="animate-spin opacity-60" />
             )}
           </button>
-          {article.content_type === 'audio' && (
-            <div className="ml-auto flex flex-col items-end gap-0.5 self-center">
-              <button
-                onClick={handleRegenerate}
-                disabled={regenerating}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40 transition-colors"
-              >
-                {regenerating
-                  ? <><Loader2 size={12} className="animate-spin" />生成中…</>
-                  : <><RefreshCw size={12} />重新生成</>
-                }
-              </button>
-              {regenerating && regenMessage && (
-                <span className="text-[10px] text-[#007aff] max-w-[140px] text-right leading-tight truncate">
-                  {regenMessage}
-                </span>
-              )}
-            </div>
-          )}
         </div>
+
+        {/* ── 内容生成进度栏：任一适用内容块缺失即展示，可单独补齐 ─────────── */}
+        {showBlockBar && (
+          <div className="mb-6 rounded-xl border border-[#e5e5ea] bg-[#fafafa] px-4 py-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span className="text-xs font-medium text-[#1d1d1f] shrink-0">内容生成进度</span>
+              <span className="text-[11px] text-[#6e6e73] shrink-0">
+                已生成 {blockStates.length - missingBlocks.length}/{blockStates.length}
+              </span>
+              <div className="flex flex-wrap items-center gap-1.5 ml-1">
+                {blockStates.map(({ key, state }) => {
+                  const present = state.present;
+                  return (
+                    <button
+                      key={key}
+                      onClick={present ? undefined : () => openBlockTab(key)}
+                      disabled={present}
+                      title={present
+                        ? `「${BLOCK_LABELS[key]}」已生成`
+                        : `「${BLOCK_LABELS[key]}」尚未生成，点击前往该标签页单独生成`}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] transition-colors ${
+                        present
+                          ? 'bg-[#e8f8ed] text-[#1f8f49] cursor-default'
+                          : 'bg-[#fff3e0] text-[#b25000] cursor-pointer hover:bg-[#ffe4c2]'
+                      }`}
+                    >
+                      <span
+                        className={`shrink-0 w-1.5 h-1.5 rounded-full ${present ? 'bg-[#34c759]' : 'bg-[#ff9500]'}`}
+                      />
+                      {BLOCK_LABELS[key]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {missingBlocks.length > 0 && (
+              <p className="text-[11px] text-[#aeaeb2] mt-1.5">
+                部分内容尚未生成，可在对应标签页底部点「仅重新生成…」，无需整篇重跑。
+              </p>
+            )}
+          </div>
+        )}
 
         {/* ── Tab 1: 原始内容 ────────────────────────────────────────────── */}
         {activeTab === 'raw' && (
@@ -1801,6 +1979,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                 </div>
               )}
             </article>
+            {renderBlockRegenFooter('raw')}
           </>
         )}
 
@@ -1892,6 +2071,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                 <p className="text-[var(--text-tertiary)] text-sm">章节速览尚未生成，可稍后刷新或重新生成</p>
               </div>
             )}
+            {renderBlockRegenFooter('chapters')}
           </div>
         )}
 
@@ -1919,6 +2099,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                 <p className="text-[var(--text-tertiary)] text-sm">精读卡片尚未生成，可稍后刷新或重新解析</p>
               </div>
             )}
+            {renderBlockRegenFooter('deepRead')}
           </div>
         )}
 
@@ -1994,6 +2175,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                 <p className="text-[var(--text-tertiary)] text-sm">音频转录尚未完成，请稍后再试</p>
               </div>
             )}
+            {renderBlockRegenFooter('transcript')}
           </div>
         )}
 
@@ -2109,6 +2291,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                 </article>
               </>
             )}
+            {renderBlockRegenFooter('ai')}
           </>
         )}
 
@@ -2230,12 +2413,12 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
               <Share2 size={16} className="text-[#6e6e73]" />
             </button>
             <button
-              onClick={handleReprocess}
-              disabled={actionLoading === 'reprocess'}
+              onClick={handleFullRegenerate}
+              disabled={actionLoading === 'reprocess' || regenerating || pendingBlock !== null}
               className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-white/70 transition-colors disabled:opacity-40"
-              title="AI 重新解析"
+              title="重新生成 AI 内容"
             >
-              {actionLoading === 'reprocess' ? (
+              {actionLoading === 'reprocess' || regenerating ? (
                 <Loader2 size={16} className="animate-spin" />
               ) : (
                 <RefreshCw size={16} className="text-[#6e6e73]" />

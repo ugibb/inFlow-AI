@@ -116,9 +116,13 @@ async def _count_ready_today(db: AsyncSession, user_id: UUID) -> int:
 async def ensure_within_quota(db: AsyncSession, user_id: UUID) -> None:
     """免费额度配额前置检查：登记新 job 前调用，超限拒绝（HTTP 429）。
 
-    FREE_QUOTA_PER_DAY=0 表示不限制（自托管全放开）。
+    额度来源：系统管理 UI（config_store.json quota 组）> FREE_QUOTA_PER_DAY /
+    默认 10；返回 <=0 表示不限制（自托管全放开）。config_manager 每次现读，
+    因此 UI 改动后立即生效。
     """
-    quota = get_settings().free_quota_per_day
+    from backend.core.config_manager import get_quota_limit
+
+    quota = get_quota_limit()
     if quota <= 0:
         return
     used = await _count_ready_today(db, user_id)

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Literal
 from datetime import datetime
 from uuid import UUID
 
@@ -106,6 +106,22 @@ class ArticleDetailResponse(ArticleResponse):
     # worker 直写的富格式 dict {version,total_duration,chapters:[...]}；
     # 老数据/其他调用方可能还是 list，两种都放行（前端实际走 /chapters 接口，不消费此字段）
     chapters: Optional[Union[list, dict]] = None
+    # read 页各标签页内容块存在性快照（含内容类型是否展示该 tab）。
+    # 形如 {"raw":{"applicable":bool,"present":bool},"transcript":...,"chapters":...,
+    #       "deepRead":...,"ai":...}；由 detail 路由在回填后填充。
+    content_blocks: Optional[dict] = None
+
+
+class RegenerateBlockRequest(BaseModel):
+    """单块重新生成请求：block 取值对应 read 页 tab id。
+
+    - raw        原始抓取（article / video）
+    - transcript 全文转录（audio）
+    - chapters   章节速览（audio / article）
+    - deepRead   AI 精读卡片（article / audio / video）
+    - ai         AI 解析摘要（所有类型；audio 走 worker，其余云端同步）
+    """
+    block: Literal["raw", "transcript", "chapters", "deepRead", "ai"]
 
 
 class DeepReadScreenshotRequest(BaseModel):

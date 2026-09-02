@@ -19,6 +19,7 @@ from fastapi import HTTPException
 
 from backend.core.models.article import Article
 from backend.routers.articles import (
+    _content_block_summary,
     get_article,
     get_article_chapters,
     get_article_deep_read,
@@ -165,3 +166,65 @@ def test_get_article_falls_back_to_file_media_url():
 def asyncio_run(coro):
     import asyncio
     return asyncio.run(coro)
+
+
+# ── content_blocks 存在性快照（read 页生成进度 / 单块重生成入口的依据）────────
+
+
+def _rich_chapters() -> dict:
+    return {"version": "1.0", "total_duration": 3600.0,
+            "chapters": [{"index": 1, "title": "开场", "start_time": 0.0,
+                          "end_time": 120.0, "summary": "自我介绍"}]}
+
+
+def test_content_blocks_audio_full_pipeline_all_present():
+    article = _article(
+        content_type="audio",
+        raw_content="节目信息：主理人访谈",
+        chapters=_rich_chapters(),
+        transcript={"language": "zh", "duration": 3600.0, "segments": [{"start": 0.0, "end": 1.0, "text": "你好"}]},
+        deep_read_html="<div>卡片</div>",
+        summary="本期聊了……",
+        key_points=["要点一"],
+    )
+    cb = _content_block_summary(article)
+    # 音频 raw（节目信息）不可独立重生成 → 不参与进度
+    assert cb["raw"] == {"applicable": False, "present": True}
+    assert cb["transcript"] == {"applicable": True, "present": True}
+    assert cb["chapters"] == {"applicable": True, "present": True}
+    assert cb["deepRead"] == {"applicable": True, "present": True}
+    assert cb["ai"] == {"applicable": True, "present": True}
+
+
+def test_content_blocks_article_partial_flags_missing():
+    article = _article(
+        content_type="article",
+        raw_content="正文抓取成功",
+        chapters=None,          # 缺章节
+        transcript=None,        # article 不适用
+        deep_read_html=None,    # 缺精读
+        summary="",             # 缺 AI
+        key_points=[],
+    )
+    cb = _content_block_summary(article)
+    assert cb["raw"] == {"applicable": True, "present": True}
+    assert cb["transcript"] == {"applicable": False, "present": False}
+    assert cb["chapters"] == {"applicable": True, "present": False}
+    assert cb["deepRead"] == {"applicable": True, "present": False}
+    assert cb["ai"] == {"applicable": True, "present": False}
+
+
+def test_content_blocks_notes_only_ai_applicable():
+    article = _article(content_type="note", raw_content=None, summary=None)
+    cb = _content_block_summary(article)
+    assert cb["raw"]["applicable"] is False
+    assert cb["deepRead"]["applicable"] is False
+    assert cb["ai"] == {"applicable": True, "present": False}
+
+
+def test_content_blocks_video_and_fallback_raw():
+    article = _article(content_type="video", raw_content=None, summary=None)
+    # raw 未写回 DB，但 ingest 文件里仍有原文兜底 → present 应来自 raw_fallback
+    cb = _content_block_summary(article, raw_fallback="文件兜底原文")
+    assert cb["raw"] == {"applicable": True, "present": True}
+    assert cb["ai"]["present"] is False

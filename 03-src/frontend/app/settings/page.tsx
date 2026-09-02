@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Trash2, RefreshCw, CheckCircle2, AlertCircle,
   Loader2, Zap, Cpu, Download, Upload, Settings2,
-  Eye, EyeOff, Activity, Server, HardDrive, Cog
+  Eye, EyeOff, Activity, Server, HardDrive, Cog, Gauge
 } from 'lucide-react';
 
 const API_BASE = '/api/system';
@@ -177,18 +177,21 @@ export default function SettingsPage() {
     llm: <Zap className="w-5 h-5 text-amber-500" />,
     embedding: <Cpu className="w-5 h-5 text-blue-500" />,
     plugins: <Download className="w-5 h-5 text-green-500" />,
+    quota: <Gauge className="w-5 h-5 text-purple-500" />,
   };
 
   const groupLabels: Record<string, string> = {
     llm: 'AI 对话模型',
     embedding: '嵌入模型',
     plugins: '插件设置',
+    quota: '入库免费额度',
   };
 
   const groupDescs: Record<string, string> = {
     llm: '用于文章摘要、灵感创作、标签生成等 AI 功能',
     embedding: '用于语义搜索和知识图谱的向量化',
     plugins: '视频解析和语音转录',
+    quota: '控制内容入库（URL 抓取 / 文件上传 / 粘贴文本）的每日免费条数，保存后立即生效',
   };
 
   return (
