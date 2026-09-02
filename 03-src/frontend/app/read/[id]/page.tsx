@@ -20,6 +20,7 @@ import {
   Pencil,
   RefreshCw,
   Clock,
+  Calendar,
   BookOpen,
   Tag,
   Folder,
@@ -120,7 +121,7 @@ function formatDate(dateStr?: string): string {
   if (!dateStr) return '';
   try {
     const d = parseISO(dateStr);
-    return format(d, 'yyyy年M月d日', { locale: zhCN });
+    return format(d, 'yyyy-MM-dd', { locale: zhCN });
   } catch {
     return dateStr;
   }
@@ -1250,6 +1251,14 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
 
           {/* Meta row */}
           <div className="flex flex-wrap items-center gap-3 text-sm text-[#6e6e73] mb-5">
+            {/* Platform publish date */}
+            {article.published_at && (
+              <span className="flex items-center gap-1.5 text-[#aeaeb2]">
+                <Calendar size={14} />
+                {formatDate(article.published_at)}
+              </span>
+            )}
+
             {/* Author */}
             {article.author && (
               <span className="flex items-center gap-1.5">
@@ -1289,11 +1298,6 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
               <span className="text-[#aeaeb2]">
                 {article.word_count.toLocaleString()} 字
               </span>
-            )}
-
-            {/* Published date */}
-            {article.published_at && (
-              <span className="text-[#aeaeb2]">{formatDate(article.published_at)}</span>
             )}
           </div>
 
