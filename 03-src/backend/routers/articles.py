@@ -468,6 +468,27 @@ async def upload_article_file(
     return {"job_id": str(job_id), "status": "capturing"}
 
 
+@router.get("/platforms")
+async def list_platform_counts(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """侧边栏「平台」tab 数据：按 source_platform 分组计数，仅本用户文章。
+
+    注册于 /{article_id} 之前，避免被路径参数吞掉；count 降序方便前端直接渲染。
+    """
+    result = await db.execute(
+        select(
+            func.coalesce(func.nullif(Article.source_platform, ""), "other").label("platform"),
+            func.count(Article.id).label("count"),
+        )
+        .where(Article.user_id == current_user.id)
+        .group_by("platform")
+        .order_by(desc("count"))
+    )
+    return [{"platform": row.platform, "count": row.count} for row in result]
+
+
 @router.get("", response_model=ArticleListResponse)
 async def list_articles(
     page: int = Query(1, ge=1),

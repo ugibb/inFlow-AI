@@ -1,5 +1,5 @@
 // inFlow AI API Client — direct backend (bypass Next.js proxy)
-import type { Article, ArticleDetail, ArticleListResponse, Tag, TagWithCount, Folder, GraphData, LearningPath, LearningPathDetail, Stats, SparkResponse, RelatedArticlesResponse, AskResponse, MindMapData, MindMapResponse, User } from './types';
+import type { Article, ArticleDetail, ArticleListResponse, Tag, TagWithCount, Folder, GraphData, LearningPath, LearningPathDetail, Stats, SparkResponse, RelatedArticlesResponse, AskResponse, MindMapData, MindMapResponse, User, PlatformCount } from './types';
 
 export interface StepLogEntry {
   step: string;
@@ -211,6 +211,11 @@ class ApiClient {
 
   async getArticle(id: string): Promise<ArticleDetail> {
     return this.request<ArticleDetail>(`/api/articles/${id}`);
+  }
+
+  /** 侧边栏「平台」tab：按 source_platform 分组计数（count 降序，仅当前用户） */
+  async getPlatformCounts(): Promise<PlatformCount[]> {
+    return this.request<PlatformCount[]>('/api/articles/platforms');
   }
 
   async updateArticle(id: string, data: Partial<any>): Promise<Article> {

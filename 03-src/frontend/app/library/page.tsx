@@ -5,11 +5,11 @@ import Link from 'next/link';
 import {
   Search, X, LayoutGrid, Filter, Check, FolderOpen, ChevronRight,
   PanelLeftClose, PanelLeft, Plus, Loader2, Trash2, Tag, Edit2,
-  FolderKanban, MoreHorizontal, GitMerge, Palette, Headphones, FileText,
+  FolderKanban, MoreHorizontal, GitMerge, Palette, Headphones, FileText, Globe,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import type { Article, Tag as TagType, TagWithCount, Folder, ArticleListResponse, IngestJob } from '@/lib/types';
+import type { Article, Tag as TagType, TagWithCount, Folder, ArticleListResponse, IngestJob, PlatformCount } from '@/lib/types';
 import ArticleCard from '@/components/ArticleCard';
 import AddContentModal from '@/components/AddContentModal';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,7 +20,10 @@ const PLATFORM_LABELS: Record<string, string> = {
   wechat: '微信公众号', bilibili: 'B 站', xiaoyuzhou: '小宇宙',
   xhs: '小红书', douyin: '抖音', youtube: 'YouTube',
   toutiao: '今日头条', juejin: '掘金', csdn: 'CSDN',
+  '36kr': '36 氪', sspai: '少数派', jianshu: '简书',
+  weibo: '微博', douban: '豆瓣', medium: 'Medium',
   upload: '上传文件', generic: '网页', note: '笔记',
+  spark: 'AI 生成', other: '其他',
 };
 
 const PLATFORM_GRADIENTS: Record<string, string> = {
@@ -93,27 +96,8 @@ function ProcessingJobCard({ job }: { job: IngestJob }) {
 // 每页拉取条数（后端 page_size 上限 100）
 const PAGE_SIZE = 24;
 
-const SOURCE_OPTIONS = [
-  { value: '', label: '全部来源' },
-  { value: 'wechat', label: '微信公众号' },
-  { value: 'xhs', label: '小红书' },
-  { value: 'douyin', label: '抖音' },
-  { value: 'bilibili', label: 'B 站' },
-  { value: 'juejin', label: '掘金' },
-  { value: 'toutiao', label: '今日头条' },
-  { value: '36kr', label: '36 氪' },
-  { value: 'sspai', label: '少数派' },
-  { value: 'jianshu', label: '简书' },
-  { value: 'csdn', label: 'CSDN' },
-  { value: 'weibo', label: '微博' },
-  { value: 'douban', label: '豆瓣' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'spark', label: 'AI 生成' },
-  { value: 'upload', label: '文件上传' },
-  { value: 'note', label: '笔记' },
-  { value: 'other', label: '其他' },
-];
-
+// 平台来源下拉选项不再硬编码：由 GET /articles/platforms 返回的真实平台动态生成，
+// 新平台自动出现，避免静态列表漏平台（如小宇宙/youtube）。见搜索栏 sourceFilter select。
 const TAG_COLORS = [
   '#007aff', '#5856d6', '#ff9500', '#34c759', '#ff3b30',
   '#af52de', '#ff2d55', '#00c7be', '#007aff', '#ffcc00',
@@ -159,13 +143,14 @@ export default function LibraryPage() {
   const [tagFilter, setTagFilter] = useState('');
   const [folderFilter, setFolderFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
+  const [platformCounts, setPlatformCounts] = useState<PlatformCount[]>([]);
 
   const [tags, setTags] = useState<TagWithCount[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
 
   // Left panel state
   const [showFolderPanel, setShowFolderPanel] = useState(true);
-  const [activeLeftTab, setActiveLeftTab] = useState<'folders' | 'tags'>('folders');
+  const [activeLeftTab, setActiveLeftTab] = useState<'folders' | 'tags' | 'platforms'>('folders');
 
   // Folder state
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -243,6 +228,8 @@ export default function LibraryPage() {
         setArticles(data.items); setPage(1);
       }
       setTotal(data.total);
+      // 平台计数随列表一起静默刷新，入库/收藏后侧栏 tab 数字保持同步（失败忽略）
+      api.getPlatformCounts().then(setPlatformCounts).catch(() => {});
       if (!hasActiveFilters && data.total === 0 && data.items.length === 0 && listEmptyRetryRef.current < 2) {
         listEmptyRetryRef.current += 1;
         window.setTimeout(() => fetchArticlesRef.current({ silent: true }), 800);
@@ -308,6 +295,7 @@ export default function LibraryPage() {
     fetchTags();
     fetchFolders();
     fetchActiveJobs();
+    api.getPlatformCounts().then(setPlatformCounts).catch(() => {});
   }, [authLoading, token, fetchActiveJobs]);
 
   // Poll active jobs every 3s; when count drops, a job finished → refresh articles
@@ -589,6 +577,16 @@ export default function LibraryPage() {
             >
               <Tag size={13} /> 标签
             </button>
+            <button
+              onClick={() => setActiveLeftTab('platforms')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
+                activeLeftTab === 'platforms'
+                  ? 'bg-[var(--bg-primary)] text-[var(--accent)] shadow-sm'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <Globe size={13} /> 平台
+            </button>
           </div>
 
           {/* Folders Tab */}
@@ -802,6 +800,48 @@ export default function LibraryPage() {
               </div>
             </>
           )}
+
+          {/* Platforms Tab */}
+          {activeLeftTab === 'platforms' && (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">文章平台</span>
+              </div>
+
+              <button onClick={() => setSourceFilter('')}
+                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors mb-0.5 ${
+                  !sourceFilter ? 'bg-[var(--accent-light)] text-[var(--accent)] font-medium' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
+                }`}>
+                <LayoutGrid size={14} /> <span className="truncate flex-1 text-left">全部文章</span>
+              </button>
+
+              <div className="flex-1 overflow-y-auto mt-1 space-y-0.5">
+                {platformCounts.map(pc => {
+                  const active = sourceFilter === pc.platform;
+                  const label = PLATFORM_LABELS[pc.platform] || pc.platform;
+                  const gradient = PLATFORM_GRADIENTS[pc.platform] || PLATFORM_GRADIENTS.generic;
+                  return (
+                    <button key={pc.platform}
+                      onClick={() => setSourceFilter(active ? '' : pc.platform)}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
+                        active
+                          ? 'bg-[var(--accent-light)] text-[var(--accent)] font-medium'
+                          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
+                      }`}
+                      title={label}>
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: gradient }} />
+                      <span className="truncate flex-1 text-left">{label}</span>
+                      <span className="text-[10px] text-[var(--text-tertiary)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded-full">{pc.count}</span>
+                      {active && <ChevronRight size={12} className="shrink-0" />}
+                    </button>
+                  );
+                })}
+                {platformCounts.length === 0 && (
+                  <div className="text-center py-8 text-[var(--text-tertiary)] text-xs">暂无平台数据</div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -835,6 +875,11 @@ export default function LibraryPage() {
                 {tagFilter && (
                   <span className="flex items-center gap-1 px-2 py-0.5 bg-[var(--accent-light)] text-[var(--accent)] text-xs font-medium rounded-full">
                     <Tag size={12} /> {tagFilter}
+                  </span>
+                )}
+                {sourceFilter && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 bg-[var(--accent-light)] text-[var(--accent)] text-xs font-medium rounded-full">
+                    <Globe size={12} /> {PLATFORM_LABELS[sourceFilter] || sourceFilter}
                   </span>
                 )}
               </div>
@@ -887,7 +932,10 @@ export default function LibraryPage() {
               </select>
               <select value={sourceFilter} onChange={e => { setSourceFilter(e.target.value); setPage(1); }}
                 className="px-3 py-2 bg-[var(--bg-secondary)] rounded-lg text-sm outline-none text-[var(--text-primary)]">
-                {SOURCE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                <option value="">全部来源</option>
+                {platformCounts.map(pc => (
+                  <option key={pc.platform} value={pc.platform}>{PLATFORM_LABELS[pc.platform] || pc.platform}</option>
+                ))}
               </select>
               {(tagFilter || sourceFilter) && (
                 <button onClick={() => { setTagFilter(''); setSourceFilter(''); setPage(1); }}

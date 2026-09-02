@@ -260,6 +260,12 @@ export interface IngestJob {
   pipeline_steps?: PipelineStep[] | null;
 }
 
+/** 平台计数统计：GET /api/articles/platforms 返回项 */
+export interface PlatformCount {
+  platform: string;
+  count: number;
+}
+
 // ─── Auth ──────────────────────────────────────────────────────────────────
 
 export interface User {
