@@ -835,14 +835,23 @@ async def regenerate_article_ai(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    """Re-run AI analysis (chapters + summary) for an audio article, skipping ASR."""
+    """Re-run the full AI chain for an article, handing off to the local worker.
+
+    - audio：复用已转写文本（asr_file_path），重跑 parse→compose→index，不重转录。
+    - article（图文/公众号等）：复用已抓 raw_file_path，worker 从 captured 起重跑
+      normalize→parse→compose→index，不重新抓取网络。
+    - note / video：无此流水线形态，拒绝（note 走云端 reprocess）。
+    """
     article = await db.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     if not current_user.is_super_admin and article.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Article not found")
-    if article.content_type != "audio":
-        raise HTTPException(status_code=400, detail="Regeneration only supported for audio articles")
+    if article.content_type not in ("audio", "article"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"该内容类型（{article.content_type}）不支持从 worker 重新生成",
+        )
 
     r = await db.execute(select(IngestJob).where(IngestJob.article_id == article_id).limit(1))
     job = r.scalar_one_or_none()

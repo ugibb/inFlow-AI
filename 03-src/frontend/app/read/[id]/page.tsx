@@ -973,10 +973,11 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
     }
   }, [processingJob, pendingBlock, article, fetchArticle, reloadTabBlock, showToast]);
 
-  // 顶部统一「重新生成」按钮：audio 走 worker 重解析（含后续链），图文/笔记走完整云端重新解析
+  // 顶部统一「重新生成」按钮：audio/article 走 worker 重跑（云端只登记转交，
+  // 不跑任何 LLM/管道）；note 无流水线任务，走云端辅助重算。
   const handleFullRegenerate = useCallback(async () => {
     if (!article) return;
-    if (article.content_type === 'audio') {
+    if (article.content_type === 'audio' || article.content_type === 'article') {
       await handleRegenerate();
       return;
     }
@@ -1284,7 +1285,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
               className="h-8 px-2.5 flex items-center gap-1 rounded-lg hover:bg-white/70 transition-colors disabled:opacity-40 text-xs text-[#6e6e73]"
               title={jobBusy
                 ? '内容正在处理中，请等待处理完成后再重新生成'
-                : '重新生成 AI 内容（音频重新解析；图文重新解析摘要与标签）'}
+                : '重新生成 AI 内容（音频复用转写/图文复用正文，由处理端重跑；笔记仅重算摘要）'}
             >
               {jobBusy || actionLoading === 'reprocess' || regenerating ? (
                 <Loader2 size={14} className="animate-spin" />
