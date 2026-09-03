@@ -928,6 +928,12 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
 
   const handleRegenerateBlock = useCallback(async (articleId: string, block: ContentBlockKey) => {
     if (!article || pendingBlock) return;
+    // 二次确认：单块重生成会覆盖该块当前内容；raw 语义特殊（重抓原文）单独说明
+    const label = BLOCK_LABELS[block];
+    const tip = block === 'raw'
+      ? `将重新抓取原文并仅更新「${label}」，AI 解析结果保持不变。确定继续？`
+      : `仅重新生成「${label}」，其它内容保持不变。确定继续？`;
+    if (!window.confirm(tip)) return;
     setPendingBlock(block);
     try {
       const res = await api.regenerateArticleBlock(articleId, block);

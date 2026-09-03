@@ -979,6 +979,12 @@ async def _resume_worker_block(
             status_code=400,
             detail=f"该任务当前状态（{job.status}）不可从此处重新生成，请稍后重试",
         )
+    # 登记单块标记（resume 已统一清空）：worker 落库层据此只写目标块，
+    # 其它字段（摘要/正文/精读/转录等）保持不变。
+    await db.execute(
+        update(IngestJob).where(IngestJob.id == job.id).values(regen_block=block)
+    )
+    await db.commit()
     return {
         "ok": True,
         "status": "started",

@@ -214,6 +214,10 @@ async def resume_for_retry(
             retry_count=new_retry_count,
             error_stage=None,
             error_message=None,
+            # 统一清空单块重生成标记：resume 默认整段续跑（全量落库）。
+            # regenerate-block 单块入口在 resume 成功后再写入自己的块标记，
+            # 其它入口（顶部重新生成 / PipelineBar 重试）天然不带旧过滤。
+            regen_block=None,
         )
     )
     await db.commit()

@@ -77,6 +77,10 @@ class IngestJob(Base):
 
     retry_count = Column(SmallInteger, nullable=False, default=0)
 
+    # 单块重新生成标记（articles.py regenerate-block 登记；worker 落库层据此
+    # 只写目标块、其它字段不动。resume_for_retry 统一清空，job 到 ready 亦清空）
+    regen_block = Column(String(20), nullable=True)
+
     # ── 本地 worker 分流（外部处理）────────────────────────────
     # external_processing=True  → 由本地 worker 承接，云端不跑 capture/pipeline
     # processing_host           → 最近认领主机（hostname-pid），审计 + 重启自回收
