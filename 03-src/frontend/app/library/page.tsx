@@ -150,7 +150,7 @@ export default function LibraryPage() {
 
   // Left panel state
   const [showFolderPanel, setShowFolderPanel] = useState(true);
-  const [activeLeftTab, setActiveLeftTab] = useState<'folders' | 'tags' | 'platforms'>('folders');
+  const [activeLeftTab, setActiveLeftTab] = useState<'folders' | 'platforms' | 'tags'>('platforms');
 
   // Folder state
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -550,7 +550,7 @@ export default function LibraryPage() {
         }`}>{toast.message}</div>
       )}
 
-      {/* Left Panel: Folders + Tags (desktop) */}
+      {/* Left Panel: Folders + Platforms + Tags (desktop) */}
       <div className={`hidden md:block border-r border-[var(--border-color)] bg-[var(--bg-primary)] transition-all duration-200 ${
         showFolderPanel ? 'w-60' : 'w-0 overflow-hidden border-r-0'
       }`}>
@@ -568,16 +568,6 @@ export default function LibraryPage() {
               <FolderKanban size={13} /> 文件夹
             </button>
             <button
-              onClick={() => setActiveLeftTab('tags')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
-                activeLeftTab === 'tags'
-                  ? 'bg-[var(--bg-primary)] text-[var(--accent)] shadow-sm'
-                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <Tag size={13} /> 标签
-            </button>
-            <button
               onClick={() => setActiveLeftTab('platforms')}
               className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
                 activeLeftTab === 'platforms'
@@ -586,6 +576,16 @@ export default function LibraryPage() {
               }`}
             >
               <Globe size={13} /> 平台
+            </button>
+            <button
+              onClick={() => setActiveLeftTab('tags')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
+                activeLeftTab === 'tags'
+                  ? 'bg-[var(--bg-primary)] text-[var(--accent)] shadow-sm'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <Tag size={13} /> 标签
             </button>
           </div>
 
