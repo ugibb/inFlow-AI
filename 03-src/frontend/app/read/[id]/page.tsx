@@ -41,7 +41,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import type { ArticleDetail, Folder as FolderType, Tag as TagType, RelatedArticlesResponse, JobTranscript, ArticleChaptersResponse, IngestJob, ContentBlockKey, ContentBlockState } from '@/lib/types';
+import type { ArticleDetail, Folder as FolderType, Tag as TagType, RelatedArticlesResponse, JobTranscript, ArticleChaptersResponse, IngestJob, ContentBlockKey } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { PipelineBar } from '@/components/PipelineBar';
 import { DeepReadPanel } from '@/components/deep-read-panel';
@@ -81,7 +81,6 @@ const BLOCK_LABELS: Record<ContentBlockKey, string> = {
   ai: 'AI 摘要',
 };
 
-const BLOCK_ORDER: ContentBlockKey[] = ['raw', 'transcript', 'chapters', 'deepRead', 'ai'];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -1134,11 +1133,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
 
   // ── 内容块生成进度（后端 detail 路由已按类型算好 applicable / present）──────
   const blockMap = article.content_blocks;
-  const blockStates = BLOCK_ORDER
-    .map((key) => ({ key, state: blockMap?.[key] }))
-    .filter((b): b is { key: ContentBlockKey; state: ContentBlockState } => !!b.state?.applicable);
-  const missingBlocks = blockStates.filter((b) => !b.state.present);
-  // 硬性“正在跑”信号才隐藏进度栏/单块按钮：
+  // 硬性“正在跑”信号才隐藏单块按钮：
   // 缺 summary 却无活跃 job（卡住/部分生成）不算 busy —— 正是要让用户看到缺失并可单独补生成。
   // 判据只认「存在活跃(非终态) job / 当前有重新生成操作」，不用 fetch_status：worker 历史
   // 不写 completed，大量已就绪文章会永久停在 'ingesting'，按 fetch_status 判 busy 会让它们
@@ -1152,20 +1147,6 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
   // 已就绪(job=ready)的音频文章被永久误判为处理中而无法重新生成。
   const jobBusy =
     !!processingJob && !['ready', 'failed', 'cancelled'].includes(processingJob.status);
-  // 手动笔记不是流水线产物，其“正文/摘要”由作者自行撰写，不参与生成进度
-  const showBlockBar =
-    article.content_type !== 'note' &&
-    !!blockMap &&
-    missingBlocks.length > 0 &&
-    !pipelineBusy;
-
-  /** 打开对应标签页（懒加载其内容缓存） */
-  const openBlockTab = (block: ContentBlockKey) => {
-    if (block === 'transcript') { setActiveTab('transcript'); loadTranscript(); }
-    else if (block === 'chapters') { setActiveTab('chapters'); loadChapters(); }
-    else if (block === 'deepRead') { setActiveTab('deepRead'); loadDeepRead(); }
-    else setActiveTab(block);
-  };
 
   /** 单块「重新生成」footer：仅重新生成该块，idle 时才显示 */
   const renderBlockRegenFooter = (block: ContentBlockKey) => {
@@ -1835,48 +1816,6 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
             )}
           </button>
         </div>
-
-        {/* ── 内容生成进度栏：任一适用内容块缺失即展示，可单独补齐 ─────────── */}
-        {showBlockBar && (
-          <div className="mb-6 rounded-xl border border-[#e5e5ea] bg-[#fafafa] px-4 py-3">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <span className="text-xs font-medium text-[#1d1d1f] shrink-0">内容生成进度</span>
-              <span className="text-[11px] text-[#6e6e73] shrink-0">
-                已生成 {blockStates.length - missingBlocks.length}/{blockStates.length}
-              </span>
-              <div className="flex flex-wrap items-center gap-1.5 ml-1">
-                {blockStates.map(({ key, state }) => {
-                  const present = state.present;
-                  return (
-                    <button
-                      key={key}
-                      onClick={present ? undefined : () => openBlockTab(key)}
-                     disabled={present}
-                      title={present
-                        ? `「${BLOCK_LABELS[key]}」已生成`
-                        : `「${BLOCK_LABELS[key]}」尚未生成，点击前往该标签页单独生成`}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] transition-colors ${
-                        present
-                          ? 'bg-[#e8f8ed] text-[#1f8f49] cursor-default'
-                          : 'bg-[#fff3e0] text-[#b25000] cursor-pointer hover:bg-[#ffe4c2]'
-                      }`}
-                    >
-                      <span
-                        className={`shrink-0 w-1.5 h-1.5 rounded-full ${present ? 'bg-[#34c759]' : 'bg-[#ff9500]'}`}
-                      />
-                      {BLOCK_LABELS[key]}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            {missingBlocks.length > 0 && (
-              <p className="text-[11px] text-[#aeaeb2] mt-1.5">
-                部分内容尚未生成，可在对应标签页底部点「仅重新生成…」，无需整篇重跑。
-              </p>
-            )}
-          </div>
-        )}
 
         {/* ── Tab 1: 原始内容 ────────────────────────────────────────────── */}
         {activeTab === 'raw' && (
