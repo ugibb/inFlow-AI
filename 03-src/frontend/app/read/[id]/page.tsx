@@ -378,9 +378,10 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
     const startMs = Date.now();
     try {
       await api.regenerateArticleAI(article.id);
-    } catch {
+    } catch (err: any) {
       setRegenerating(false);
-      setToast({ message: '触发失败，请稍后重试', type: 'error' });
+      // 透传后端真实原因（如任务状态不可重新生成），不再笼统提示「触发失败」
+      setToast({ message: err?.message || '触发失败，请稍后重试', type: 'error' });
       return;
     }
     const articleId = article.id;
@@ -1144,6 +1145,11 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
     (!!processingJob && !['ready', 'failed', 'cancelled'].includes(processingJob.status)) ||
     regenerating ||
     pendingBlock !== null;
+  // 顶部「重新生成」禁用条件：有活跃(非终态) job 才算真在处理。
+  // fetch_status='ingesting' 不作依据——worker 历史不写 completed，会让
+  // 已就绪(job=ready)的音频文章被永久误判为处理中而无法重新生成。
+  const jobBusy =
+    !!processingJob && !['ready', 'failed', 'cancelled'].includes(processingJob.status);
   // 手动笔记不是流水线产物，其“正文/摘要”由作者自行撰写，不参与生成进度
   const showBlockBar =
     article.content_type !== 'note' &&
@@ -1274,26 +1280,24 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
             {/* 顶部统一「重新生成」：audio 走 worker 重解析；图文/笔记走完整云端重新解析 */}
             <button
               onClick={handleFullRegenerate}
-              disabled={actionLoading === 'reprocess' || regenerating || pendingBlock !== null}
+              disabled={jobBusy || actionLoading === 'reprocess' || regenerating || pendingBlock !== null}
               className="h-8 px-2.5 flex items-center gap-1 rounded-lg hover:bg-white/70 transition-colors disabled:opacity-40 text-xs text-[#6e6e73]"
-              title="重新生成 AI 内容（音频重新解析；图文重新解析摘要与标签）"
+              title={jobBusy
+                ? '内容正在处理中，请等待处理完成后再重新生成'
+                : '重新生成 AI 内容（音频重新解析；图文重新解析摘要与标签）'}
             >
-              {actionLoading === 'reprocess' || regenerating ? (
+              {jobBusy || actionLoading === 'reprocess' || regenerating ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : (
                 <RefreshCw size={14} />
               )}
               <span className="hidden sm:inline">
-                {actionLoading === 'reprocess' || regenerating ? '生成中…' : '重新生成'}
+                {jobBusy ? '处理中…' : (actionLoading === 'reprocess' || regenerating ? '生成中…' : '重新生成')}
               </span>
             </button>
 
             {/* Share */}
-            <button
-              onClick={handleShare}
-              className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-white/70 transition-colors"
-              title="复制链接"
-            >
+            <button onClick={handleShare} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-white/70 transition-colors" title="复制链接" >
               <Share2 size={16} className="text-[#6e6e73]" />
             </button>
 
@@ -1845,7 +1849,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                     <button
                       key={key}
                       onClick={present ? undefined : () => openBlockTab(key)}
-                      disabled={present}
+                     disabled={present}
                       title={present
                         ? `「${BLOCK_LABELS[key]}」已生成`
                         : `「${BLOCK_LABELS[key]}」尚未生成，点击前往该标签页单独生成`}
@@ -2405,11 +2409,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                 className={status === 'completed' ? 'text-[#34c759]' : 'text-[#6e6e73]'}
               />
             </button>
-            <button
-              onClick={handleShare}
-              className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-white/70 transition-colors"
-              title="复制链接"
-            >
+            <button onClick={handleShare} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-white/70 transition-colors" title="复制链接" >
               <Share2 size={16} className="text-[#6e6e73]" />
             </button>
             <button

@@ -75,7 +75,9 @@ RETRY_ENTRY_POINTS: dict[str, str] = {
     "transcribing":  "captured",      # reuse raw_file_path
     "normalizing":   "captured",      # reuse raw_file_path
     "preprocessing": "captured",      # reuse video file (reserved)
-    "parsing":       "captured",      # orchestrator picks normalized/transcribed checkpoint
+    # parsing 的断点由 resume_for_retry 按 asr_file_path 分派：
+    # 音频已转写 → transcribed（复用 asr 只重跑 AI 链）；图文/未转写 → captured。
+    "parsing":       "captured",      # audio with asr overridden to "transcribed"
     "composing":     "parsed",        # reuse parsed_file_path
     "indexing":      "composed",      # reuse composed artifacts + parsed_file_path
 }
@@ -192,6 +194,13 @@ async def resume_for_retry(
         return False
 
     target_status = RETRY_ENTRY_POINTS[from_step]
+    if (
+        from_step == "parsing"
+        and job.asr_file_path  # 非空 ⟺ 音频且已完成转写（executor 同款判据）
+    ):
+        # 音频「重新生成 AI」：复用已转写文本，只重跑 parse→compose→index，
+        # 不再整段重转录。worker 认领 transcribed 走 _resume_after_transcribed。
+        target_status = "transcribed"
     is_reprocess = job.status == "ready"
     # Manual retries are always user-initiated, so never block them.
     # Reset counter when the previous limit was reached so the job doesn't stay permanently stuck.
