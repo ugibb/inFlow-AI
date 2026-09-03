@@ -1140,9 +1140,10 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
   const missingBlocks = blockStates.filter((b) => !b.state.present);
   // 硬性“正在跑”信号才隐藏进度栏/单块按钮：
   // 缺 summary 却无活跃 job（卡住/部分生成）不算 busy —— 正是要让用户看到缺失并可单独补生成。
+  // 判据只认「存在活跃(非终态) job / 当前有重新生成操作」，不用 fetch_status：worker 历史
+  // 不写 completed，大量已就绪文章会永久停在 'ingesting'，按 fetch_status 判 busy 会让它们
+  // 无法单块补生成（与顶部「重新生成」的 jobBusy 判据一致，见上方 jobBusy 说明）。
   const pipelineBusy =
-    article.fetch_status === 'ingesting' ||
-    article.fetch_status === 'pending_agent' ||
     (!!processingJob && !['ready', 'failed', 'cancelled'].includes(processingJob.status)) ||
     regenerating ||
     pendingBlock !== null;
