@@ -31,6 +31,16 @@ const PLATFORM_GRADIENTS: Record<string, string> = {
   generic:    'linear-gradient(135deg, #007aff 0%, #0055cc 100%)',
 };
 
+function formatPublishedDate(dateStr?: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export default function ArticleCard({ article }: ArticleCardProps) {
   const router = useRouter();
 
@@ -93,6 +103,11 @@ export default function ArticleCard({ article }: ArticleCardProps) {
             ? <Headphones size={12} className="text-[var(--text-tertiary)]" />
             : <FileText size={12} className="text-[var(--text-tertiary)]" />
           }
+          {article.published_at && (
+            <span className="text-xs text-[var(--text-tertiary)] ml-auto shrink-0">
+              {formatPublishedDate(article.published_at)}
+            </span>
+          )}
         </div>
 
         {/* Title */}
