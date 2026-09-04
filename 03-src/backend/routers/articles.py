@@ -498,6 +498,32 @@ async def list_platform_counts(
     return [{"platform": row.platform, "count": row.count} for row in result]
 
 
+@router.get("/authors")
+async def list_author_counts(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """侧边栏「主理人」tab 数据：按 author 分组计数，仅本用户文章。
+
+    空 / 'unknown' 的主理人不展示；count 降序。注册于 /{article_id} 之前。
+    """
+    result = await db.execute(
+        select(
+            Article.author.label("author"),
+            func.count(Article.id).label("count"),
+        )
+        .where(
+            Article.user_id == current_user.id,
+            Article.author.isnot(None),
+            Article.author != "",
+            func.lower(Article.author) != "unknown",
+        )
+        .group_by("author")
+        .order_by(desc("count"), "author")
+    )
+    return [{"author": row.author, "count": row.count} for row in result]
+
+
 @router.get("", response_model=ArticleListResponse)
 async def list_articles(
     page: int = Query(1, ge=1),
@@ -507,6 +533,7 @@ async def list_articles(
     tag: Optional[str] = None,
     search: Optional[str] = None,
     source_platform: Optional[str] = None,
+    author: Optional[str] = None,
     search_mode: str = Query("semantic", regex="^(semantic|keyword)$"),
     sort: str = Query("published_at", regex="^(published_at|created_at|updated_at|title)$"),
     db: AsyncSession = Depends(get_db),
@@ -582,6 +609,12 @@ async def list_articles(
         platform_filter = func.lower(Article.source_platform) == source_platform.lower()
         query = query.where(platform_filter)
         count_query = count_query.where(platform_filter)
+
+    # Author (主理人) filter (case-insensitive)
+    if author:
+        author_filter = func.lower(Article.author) == author.lower()
+        query = query.where(author_filter)
+        count_query = count_query.where(author_filter)
     
     # Count
     total_result = await db.execute(count_query)

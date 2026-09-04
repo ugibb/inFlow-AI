@@ -5,11 +5,11 @@ import Link from 'next/link';
 import {
   Search, X, LayoutGrid, Filter, Check, FolderOpen, ChevronRight,
   PanelLeftClose, PanelLeft, Plus, Loader2, Trash2, Tag, Edit2,
-  FolderKanban, MoreHorizontal, GitMerge, Palette, Headphones, FileText, Globe,
+  FolderKanban, MoreHorizontal, GitMerge, Palette, Headphones, FileText, Globe, User,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import type { Article, Tag as TagType, TagWithCount, Folder, ArticleListResponse, IngestJob, PlatformCount } from '@/lib/types';
+import type { Article, Tag as TagType, TagWithCount, Folder, ArticleListResponse, IngestJob, PlatformCount, AuthorCount } from '@/lib/types';
 import ArticleCard from '@/components/ArticleCard';
 import AddContentModal from '@/components/AddContentModal';
 import { useAuth } from '@/contexts/AuthContext';
@@ -126,6 +126,40 @@ function articleQualityScore(a: Article): number {
   return score;
 }
 
+// 瀑布流分发用：估算卡片高度（无需精确，只用于把卡片塞进当前最短列、让各列大致均衡）。
+// 主要区分封面有无/摘要有无/标签有无这几类高度差异。
+function estimateCardHeight(a: Article): number {
+  let h = 32; // info 区 p-4 上下 padding
+  h += a.cover_image ? 180 : 144; // 自然比例封面(估) vs 固定 h-36 占位(144px)
+  h += 40; // 标题 line-clamp-2（约两行）
+  if (a.summary) h += 32; // 摘要 line-clamp-2
+  else if (a.fetch_status === 'pending_agent' || a.fetch_status === 'failed') h += 28; // 状态条
+  else if (a.content_type !== 'note') h += 28; // 「AI 处理中」条
+  if (a.tags && a.tags.length > 0) h += 26; // 标签（通常一行）
+  h += 20; // 底部 author / 阅读时长
+  return h;
+}
+
+type MasonryItem = { key: string; height: number; node: React.ReactNode };
+
+// 响应式列数：沿用旧 columns-* 的视口断点 sm(640)/lg(1024)，保证和之前列数一致。
+function useColumnCount() {
+  const [count, setCount] = useState(3);
+  useEffect(() => {
+    const mqLg = window.matchMedia('(min-width: 1024px)');
+    const mqSm = window.matchMedia('(min-width: 640px)');
+    const compute = () => setCount(mqLg.matches ? 3 : mqSm.matches ? 2 : 1);
+    compute();
+    mqLg.addEventListener('change', compute);
+    mqSm.addEventListener('change', compute);
+    return () => {
+      mqLg.removeEventListener('change', compute);
+      mqSm.removeEventListener('change', compute);
+    };
+  }, []);
+  return count;
+}
+
 export default function LibraryPage() {
   const searchParams = useSearchParams();
   const { loading: authLoading, token } = useAuth();
@@ -143,14 +177,16 @@ export default function LibraryPage() {
   const [tagFilter, setTagFilter] = useState('');
   const [folderFilter, setFolderFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
+  const [authorFilter, setAuthorFilter] = useState('');
   const [platformCounts, setPlatformCounts] = useState<PlatformCount[]>([]);
+  const [authorCounts, setAuthorCounts] = useState<AuthorCount[]>([]);
 
   const [tags, setTags] = useState<TagWithCount[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
 
   // Left panel state
   const [showFolderPanel, setShowFolderPanel] = useState(true);
-  const [activeLeftTab, setActiveLeftTab] = useState<'folders' | 'platforms' | 'tags'>('platforms');
+  const [activeLeftTab, setActiveLeftTab] = useState<'folders' | 'platforms' | 'authors' | 'tags'>('platforms');
 
   // Folder state
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -181,14 +217,17 @@ export default function LibraryPage() {
   const [moveToFolderId, setMoveToFolderId] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const columnCount = useColumnCount();
 
   // Apply URL search params
   useEffect(() => {
     const urlTag = searchParams.get('tag');
     const urlSource = searchParams.get('source_platform');
+    const urlAuthor = searchParams.get('author');
     const urlUsername = searchParams.get('username');
     if (urlTag) { setTagFilter(urlTag); setShowFilters(true); } else { setTagFilter(''); }
     if (urlSource) { setSourceFilter(urlSource); setShowFilters(true); } else { setSourceFilter(''); }
+    if (urlAuthor) { setAuthorFilter(urlAuthor); setShowFilters(true); } else { setAuthorFilter(''); }
     if (urlUsername) { setUsername(urlUsername); } else { setUsername(''); }
   }, [searchParams]);
 
@@ -198,7 +237,7 @@ export default function LibraryPage() {
   };
 
   // 是否处于无筛选的默认视图（空列表自动重试仅在该视图下生效）
-  const hasActiveFilters = !!(statusFilter || tagFilter || folderFilter || sourceFilter || search || username);
+  const hasActiveFilters = !!(statusFilter || tagFilter || folderFilter || sourceFilter || authorFilter || search || username);
 
   // 列表请求参数（fetchArticles 与 loadMore 共用）
   const buildListParams = useCallback((pageNum: number): any => {
@@ -207,10 +246,11 @@ export default function LibraryPage() {
     if (tagFilter) params.tag = tagFilter;
     if (folderFilter) params.folder_id = folderFilter;
     if (sourceFilter) params.source_platform = sourceFilter;
+    if (authorFilter) params.author = authorFilter;
     if (search) { params.search = search; params.search_mode = searchMode; }
     if (username) params.username = username;
     return params;
-  }, [statusFilter, tagFilter, folderFilter, sourceFilter, search, searchMode, username]);
+  }, [statusFilter, tagFilter, folderFilter, sourceFilter, authorFilter, search, searchMode, username]);
 
   // fetchArticles 始终拉第 1 页，两种语义：
   //   非 silent → replace：骨架屏 + 整表替换 + 重置回第 1 页（初始加载、筛选/搜索变化、手动重试）
@@ -230,6 +270,7 @@ export default function LibraryPage() {
       setTotal(data.total);
       // 平台计数随列表一起静默刷新，入库/收藏后侧栏 tab 数字保持同步（失败忽略）
       api.getPlatformCounts().then(setPlatformCounts).catch(() => {});
+      api.getAuthorCounts().then(setAuthorCounts).catch(() => {});
       if (!hasActiveFilters && data.total === 0 && data.items.length === 0 && listEmptyRetryRef.current < 2) {
         listEmptyRetryRef.current += 1;
         window.setTimeout(() => fetchArticlesRef.current({ silent: true }), 800);
@@ -243,6 +284,7 @@ export default function LibraryPage() {
 
   const fetchTags = async () => { try { setTags(await api.getTags()); } catch {} };
   const fetchFolders = async () => { try { setFolders(await api.getFolders()); } catch {} };
+  const fetchAuthorCounts = async () => { try { setAuthorCounts(await api.getAuthorCounts()); } catch {} };
 
   const fetchActiveJobs = useCallback(async () => {
     try {
@@ -294,6 +336,7 @@ export default function LibraryPage() {
     if (authLoading || !token) return;
     fetchTags();
     fetchFolders();
+    fetchAuthorCounts();
     fetchActiveJobs();
     api.getPlatformCounts().then(setPlatformCounts).catch(() => {});
   }, [authLoading, token, fetchActiveJobs]);
@@ -540,6 +583,55 @@ export default function LibraryPage() {
     [activeJobs, articleIds, articleUrlKeys],
   );
 
+  // 统一的瀑布流条目：处理中的 job 卡（放最前）+ 已入库文章卡，
+  // 之后按「当前最短列」从左到右分发，保证最新卡片落在左上角、阅读顺序从左到右。
+  const gridItems = useMemo((): MasonryItem[] => {
+    const items: MasonryItem[] = [];
+    for (const job of visibleJobs) {
+      items.push({
+        key: `job:${job.job_id}`,
+        height: 280,
+        node: (
+          <div key={job.job_id} className="relative group">
+            <ProcessingJobCard job={job} />
+          </div>
+        ),
+      });
+    }
+    for (const article of dedupedArticles) {
+      items.push({
+        key: `article:${article.id}`,
+        height: estimateCardHeight(article),
+        node: (
+          <div key={article.id} className="relative group">
+            <div className="absolute top-3 left-3 z-10">
+              <button onClick={(e) => { e.preventDefault(); toggleSelect(article.id); }}
+                className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                  selectedIds.has(article.id) ? 'bg-[var(--accent)] border-[#007aff]' : 'border-[#aeaeb2] opacity-0 group-hover:opacity-100'
+                }`}>
+                {selectedIds.has(article.id) && <Check size={12} className="text-white" />}
+              </button>
+            </div>
+            <ArticleCard article={article} />
+          </div>
+        ),
+      });
+    }
+    return items;
+  }, [visibleJobs, dedupedArticles, selectedIds, toggleSelect]);
+
+  const columns = useMemo(() => {
+    const cols: MasonryItem[][] = Array.from({ length: columnCount }, () => []);
+    const heights = new Array(columnCount).fill(0);
+    for (const item of gridItems) {
+      let minIdx = 0;
+      for (let i = 1; i < columnCount; i++) if (heights[i] < heights[minIdx]) minIdx = i;
+      cols[minIdx].push(item);
+      heights[minIdx] += item.height;
+    }
+    return cols;
+  }, [gridItems, columnCount]);
+
   return (
     <>
     <div className="flex h-[calc(100vh-0px)] max-w-7xl mx-auto">
@@ -576,6 +668,16 @@ export default function LibraryPage() {
               }`}
             >
               <Globe size={13} /> 平台
+            </button>
+            <button
+              onClick={() => setActiveLeftTab('authors')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
+                activeLeftTab === 'authors'
+                  ? 'bg-[var(--bg-primary)] text-[var(--accent)] shadow-sm'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <User size={13} /> 主理人
             </button>
             <button
               onClick={() => setActiveLeftTab('tags')}
@@ -668,6 +770,39 @@ export default function LibraryPage() {
                     </div>
                   );
                 })}
+              </div>
+            </>
+          )}
+
+          {/* Authors Tab */}
+          {activeLeftTab === 'authors' && (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">主理人</span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto mt-1 space-y-0.5">
+                {authorCounts.map(a => {
+                  const active = authorFilter === a.author;
+                  return (
+                    <button key={a.author}
+                      onClick={() => setAuthorFilter(active ? '' : a.author)}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
+                        active
+                          ? 'bg-[var(--accent-light)] text-[var(--accent)] font-medium'
+                          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
+                      }`}
+                      title={a.author}>
+                      <User size={14} className="shrink-0 text-[var(--text-tertiary)]" />
+                      <span className="truncate flex-1 text-left">{a.author}</span>
+                      <span className="text-[10px] text-[var(--text-tertiary)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded-full">{a.count}</span>
+                      {active && <ChevronRight size={12} className="shrink-0" />}
+                    </button>
+                  );
+                })}
+                {authorCounts.length === 0 && (
+                  <div className="text-center py-8 text-[var(--text-tertiary)] text-xs">暂无主理人</div>
+                )}
               </div>
             </>
           )}
@@ -872,6 +1007,11 @@ export default function LibraryPage() {
                     <FolderOpen size={12} /> {selectedFolderName}
                   </span>
                 )}
+                {authorFilter && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 bg-[var(--accent-light)] text-[var(--accent)] text-xs font-medium rounded-full">
+                    <User size={12} /> {authorFilter}
+                  </span>
+                )}
                 {tagFilter && (
                   <span className="flex items-center gap-1 px-2 py-0.5 bg-[var(--accent-light)] text-[var(--accent)] text-xs font-medium rounded-full">
                     <Tag size={12} /> {tagFilter}
@@ -925,6 +1065,11 @@ export default function LibraryPage() {
 
           {showFilters && (
             <div className="flex flex-wrap gap-3 pt-2 border-t border-[var(--border-color)]">
+              <select value={authorFilter} onChange={e => { setAuthorFilter(e.target.value); setPage(1); }}
+                className="px-3 py-2 bg-[var(--bg-secondary)] rounded-lg text-sm outline-none text-[var(--text-primary)]">
+                <option value="">所有主理人</option>
+                {authorCounts.map(a => <option key={a.author} value={a.author}>{a.author}</option>)}
+              </select>
               <select value={tagFilter} onChange={e => { setTagFilter(e.target.value); setPage(1); }}
                 className="px-3 py-2 bg-[var(--bg-secondary)] rounded-lg text-sm outline-none text-[var(--text-primary)]">
                 <option value="">所有标签</option>
@@ -937,8 +1082,8 @@ export default function LibraryPage() {
                   <option key={pc.platform} value={pc.platform}>{PLATFORM_LABELS[pc.platform] || pc.platform}</option>
                 ))}
               </select>
-              {(tagFilter || sourceFilter) && (
-                <button onClick={() => { setTagFilter(''); setSourceFilter(''); setPage(1); }}
+              {(tagFilter || sourceFilter || authorFilter) && (
+                <button onClick={() => { setTagFilter(''); setSourceFilter(''); setAuthorFilter(''); setPage(1); }}
                   className="px-3 py-2 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] rounded-lg transition-colors flex items-center gap-1">
                   <X size={14} /> 清除筛选
                 </button>
@@ -1017,23 +1162,10 @@ export default function LibraryPage() {
           </div>
         ) : (
           <>
-            <div className="columns-1 sm:columns-2 lg:columns-3 gap-4">
-              {visibleJobs.map(job => (
-                <div key={job.job_id} className="break-inside-avoid mb-4">
-                  <ProcessingJobCard job={job} />
-                </div>
-              ))}
-              {dedupedArticles.map(article => (
-                <div key={article.id} className="break-inside-avoid mb-4 relative group">
-                  <div className="absolute top-3 left-3 z-10">
-                    <button onClick={(e) => { e.preventDefault(); toggleSelect(article.id); }}
-                      className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                        selectedIds.has(article.id) ? 'bg-[var(--accent)] border-[#007aff]' : 'border-[#aeaeb2] opacity-0 group-hover:opacity-100'
-                      }`}>
-                      {selectedIds.has(article.id) && <Check size={12} className="text-white" />}
-                    </button>
-                  </div>
-                  <ArticleCard article={article} />
+            <div className="flex items-start gap-4">
+              {columns.map((col, i) => (
+                <div key={i} className="flex-1 min-w-0 flex flex-col gap-4">
+                  {col.map(item => item.node)}
                 </div>
               ))}
             </div>

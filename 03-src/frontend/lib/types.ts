@@ -280,6 +280,12 @@ export interface PlatformCount {
   count: number;
 }
 
+/** 主理人计数统计：GET /api/articles/authors 返回项 */
+export interface AuthorCount {
+  author: string;
+  count: number;
+}
+
 // ─── Auth ──────────────────────────────────────────────────────────────────
 
 export interface User {
