@@ -71,10 +71,23 @@ def _today() -> str:
 
 
 def _swap_step(path: str, from_step: str, to_step: str) -> str:
-    """Replace the step directory segment in *path* (handles both / and os.sep)."""
-    return path.replace(f"/{from_step}/", f"/{to_step}/").replace(
-        f"{os.sep}{from_step}{os.sep}", f"{os.sep}{to_step}{os.sep}"
-    )
+    """Replace the step directory segment in *path* (handles both / and os.sep).
+
+    两种匹配形态（优先级从高到低）：
+    1. 步骤段为路径**末段**——新布局标准形态：``{platform}/{date}-{folder}/01_ingest``
+       （调用方传入 dirname(raw)，步骤段无尾随分隔符）；
+    2. 步骤段居中（``/{step}/``）——旧布局防御 + 标题段含步骤字面量时
+       rfind 只替换最后一次出现，不误伤前缀。
+    """
+    for sep in ("/", os.sep):
+        suffix = f"{sep}{from_step}"
+        if path.endswith(suffix):
+            return path[: -len(from_step)] + to_step
+        needle = f"{sep}{from_step}{sep}"
+        idx = path.rfind(needle)
+        if idx != -1:
+            return path[:idx] + f"{sep}{to_step}{sep}" + path[idx + len(needle):]
+    return path
 
 
 # ── 00_staging ────────────────────────────────────────────────────────────

@@ -51,3 +51,16 @@ def test_empty_pipeline_dir_returns_direct_only():
     got = card_png_candidates(raw, JOB_ID, pipeline_data_dir="")
 
     assert got == [f"04-output/03_display/wechat/20260830/002-标题/{JOB_ID}.png"]
+
+
+def test_new_worker_layout_step_is_final_component():
+    """worker 重构后目录约定：{platform}/{date}-{index}-{title}/{step}/{file}，
+    step 是路径末段（无尾斜杠），换段仍须命中 03_display。"""
+    raw = f"04-output/xiaoyuzhou/20260904-001-152_领读/01_ingest/{JOB_ID}.json"
+
+    got = card_png_candidates(raw, JOB_ID, pipeline_data_dir=PIPELINE_DIR)
+
+    assert got == [
+        f"04-output/xiaoyuzhou/20260904-001-152_领读/03_display/{JOB_ID}.png",
+        f"{PIPELINE_DIR}/xiaoyuzhou/20260904-001-152_领读/03_display/{JOB_ID}.png",
+    ]
