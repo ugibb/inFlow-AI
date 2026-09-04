@@ -35,6 +35,15 @@ router = APIRouter(prefix="/api/articles", tags=["articles"])
 PROACTIVE_DISTANCE_THRESHOLD = 0.45  # bge-small-zh cosine distance (<=>); lower = closer match
 PROACTIVE_PUBLIC_BASE = os.getenv("inFlow_PUBLIC_BASE", "http://localhost")
 
+# 列表排序统一按文章「发布时间」倒序；无发布时间的文章（笔记/上传/粘贴）回退到入库时间，
+# 避免 NULL 在 PostgreSQL 的 DESC 下被排到最前。
+ARTICLE_SORT_COLUMNS = {
+    "published_at": func.coalesce(Article.published_at, Article.created_at),
+    "created_at": Article.created_at,
+    "updated_at": Article.updated_at,
+    "title": Article.title,
+}
+
 
 def _canonical_url(url: str) -> str:
     """Normalize URL for dedup: strip query/fragment and trailing slash."""
@@ -499,7 +508,7 @@ async def list_articles(
     search: Optional[str] = None,
     source_platform: Optional[str] = None,
     search_mode: str = Query("semantic", regex="^(semantic|keyword)$"),
-    sort: str = Query("created_at", regex="^(created_at|updated_at|title)$"),
+    sort: str = Query("published_at", regex="^(published_at|created_at|updated_at|title)$"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     username_query: str | None = Query(None, alias="username", description="Superadmin: filter by username"),
@@ -554,7 +563,7 @@ async def list_articles(
                     Article.plain_text.ilike(f"%{search}%"),
                     Article.summary.ilike(f"%{search}%"),
                 )
-                query = query.where(search_filter).order_by(desc(Article.created_at))
+                query = query.where(search_filter).order_by(desc(ARTICLE_SORT_COLUMNS["published_at"]))
                 count_query = count_query.where(search_filter)
         else:
             search_filter = or_(
@@ -562,10 +571,10 @@ async def list_articles(
                 Article.plain_text.ilike(f"%{search}%"),
                 Article.summary.ilike(f"%{search}%"),
             )
-            query = query.where(search_filter).order_by(desc(Article.created_at))
+            query = query.where(search_filter).order_by(desc(ARTICLE_SORT_COLUMNS["published_at"]))
             count_query = count_query.where(search_filter)
     else:
-        sort_col = getattr(Article, sort)
+        sort_col = ARTICLE_SORT_COLUMNS.get(sort, Article.created_at)
         query = query.order_by(desc(sort_col))
 
     # Source platform filter (case-insensitive)
@@ -580,7 +589,7 @@ async def list_articles(
     
     # Sort (only when no search — search modes handle their own ordering)
     if not search:
-        sort_col = getattr(Article, sort)
+        sort_col = ARTICLE_SORT_COLUMNS.get(sort, Article.created_at)
         query = query.order_by(desc(sort_col))
     
     # Paginate

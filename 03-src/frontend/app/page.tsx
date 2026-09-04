@@ -144,7 +144,7 @@ export default function HomePage() {
     setArticlesLoading(true);
     setArticlesError(null);
     try {
-      const params: any = { page: 1, page_size: 8, sort: 'created_at' };
+      const params: any = { page: 1, page_size: 8, sort: 'published_at' };
       if (viewUsername) params.username = viewUsername;
       const data = await api.getArticles(params);
       // API returns ArticleListResponse with .items

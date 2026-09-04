@@ -202,7 +202,7 @@ export default function LibraryPage() {
 
   // 列表请求参数（fetchArticles 与 loadMore 共用）
   const buildListParams = useCallback((pageNum: number): any => {
-    const params: any = { page: pageNum, page_size: PAGE_SIZE, sort: 'updated_at' };
+    const params: any = { page: pageNum, page_size: PAGE_SIZE, sort: 'published_at' };
     if (statusFilter) params.status = statusFilter;
     if (tagFilter) params.tag = tagFilter;
     if (folderFilter) params.folder_id = folderFilter;
@@ -214,7 +214,7 @@ export default function LibraryPage() {
 
   // fetchArticles 始终拉第 1 页，两种语义：
   //   非 silent → replace：骨架屏 + 整表替换 + 重置回第 1 页（初始加载、筛选/搜索变化、手动重试）
-  //   silent    → merge：只把第 1 页合并进列表头部（sort=updated_at，新文章/刚处理完的必在第 1 页），
+  //   silent    → merge：只把第 1 页合并进列表头部（列表统一按发布时间倒序），
   //                深处已加载的卡片原样保留，按 article.id 复用 DOM，滚动位置不丢；失败静默待下轮重试。
   const fetchArticles = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true;

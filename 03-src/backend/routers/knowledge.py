@@ -318,7 +318,7 @@ async def get_graph(
         user_result = await db.execute(select(User).where(User.username == username_query))
         target_user = user_result.scalar_one_or_none()
         target_user_id = target_user.id if target_user else current_user.id
-    article_query = select(Article).where(Article.user_id == target_user_id).order_by(Article.created_at.desc()).limit(200)
+    article_query = select(Article).where(Article.user_id == target_user_id).order_by(func.coalesce(Article.published_at, Article.created_at).desc()).limit(200)
     result = await db.execute(article_query)
     articles = result.scalars().all()
 
