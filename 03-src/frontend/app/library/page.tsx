@@ -679,16 +679,6 @@ export default function LibraryPage() {
             >
               <User size={13} /> 主理人
             </button>
-            <button
-              onClick={() => setActiveLeftTab('tags')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded-md transition-all ${
-                activeLeftTab === 'tags'
-                  ? 'bg-[var(--bg-primary)] text-[var(--accent)] shadow-sm'
-                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <Tag size={13} /> 标签
-            </button>
           </div>
 
           {/* Folders Tab */}
