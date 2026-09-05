@@ -248,13 +248,29 @@ Page({
     if (!this.data.transcript && !this.data.transcriptLoading) this.loadTranscript();
   },
 
-  /** 页面滚动到标签条，让提词器窗口上沿贴屏顶 */
+  /**
+   * 页面滚动到标签条贴顶。起播会同时切 tab + 渲染 65vh 提词器，页面高度
+   * 突变会打断进行中的滚动动画——所以按「视口偏移 + 当前页滚距」算绝对
+   * 位置直接落点，并延迟两段校正（120ms / 480ms）兜住渲染时序。
+   */
   pinTabsTop() {
-    try {
-      wx.pageScrollTo({ selector: '#read-tabs', duration: 250 });
-    } catch {
-      /* 低版本无 selector，忽略 */
-    }
+    const scrollTabs = () => {
+      const q = wx.createSelectorQuery();
+      q.select('#read-tabs').boundingClientRect();
+      q.selectViewport().scrollOffset();
+      q.exec((res) => {
+        const rect = (res && res[0]) as { top: number } | null;
+        const sc = (res && res[1]) as { scrollTop: number } | null;
+        if (!rect || rect.top == null || !sc) return;
+        if (Math.abs(rect.top) < 4) return; // 已贴顶
+        wx.pageScrollTo({
+          scrollTop: Math.max(0, sc.scrollTop + rect.top),
+          duration: 200,
+        });
+      });
+    };
+    setTimeout(scrollTabs, 120);
+    setTimeout(scrollTabs, 480);
   },
 
   /** 章节点击 → 跳到起始秒播放 */
