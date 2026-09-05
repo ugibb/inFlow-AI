@@ -97,7 +97,7 @@
       />
       <block wx:else>
         <text wx:if="{{article.media_url}}" class="duration">点击句子时间可跳转播放</text>
-        <transcript-view segments="{{transcript.segments}}" bind:segmenttap="onSegmentTap" />
+        <transcript-view segments="{{transcript.segments}}" active-index="{{transcriptActiveIdx}}" bind:segmenttap="onSegmentTap" />
       </block>
     </view>
 

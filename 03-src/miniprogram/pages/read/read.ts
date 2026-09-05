@@ -36,6 +36,8 @@ Page({
     transcript: null as JobTranscript | null,
     transcriptLoading: false,
     transcriptError: '',
+    /** 提词器：当前播放所在句（transcript-view 高亮跟随用） */
+    transcriptActiveIdx: -1,
 
     // 播放器（音频内容；底部常驻播放条）
     playing: false,
@@ -176,6 +178,28 @@ Page({
     player.bind((s) => {
       const url = this.data.article && this.data.article.media_url;
       if (!url || s.src !== url) return;
+
+      // 提词器：按播放时间二分找当前句（翻译 Web timeupdate 高亮）
+      const segs = this.data.transcript && this.data.transcript.segments;
+      let idx = -1;
+      if (segs && segs.length && this.data.activeTab === 'transcript') {
+        const t = s.current;
+        let lo = 0;
+        let hi = segs.length - 1;
+        let found = -1;
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          if (segs[mid].start <= t) {
+            found = mid;
+            lo = mid + 1;
+          } else {
+            hi = mid - 1;
+          }
+        }
+        idx = found >= 0 && t <= segs[found].end ? found : -1;
+      }
+      if (idx !== this.data.transcriptActiveIdx) this.setData({ transcriptActiveIdx: idx });
+
       const curText = formatPlayerTime(s.current);
       const durText = s.duration ? formatPlayerTime(s.duration) : '';
       // 按秒粒度去重，避免 timeupdate 高频 setData
@@ -199,7 +223,17 @@ Page({
   onTogglePlay() {
     const meta = this.playMeta();
     if (!meta) return;
+    const starting = !this.data.playing;
     player.toggle(meta, this.data.audioCurrent);
+    // 对齐 Web onPlay 行为：点播放 → 切到全文转录看提词器跟随
+    if (starting) this.goTranscript();
+  },
+
+  /** 切到转录 tab 并懒加载（播放启动时用） */
+  goTranscript() {
+    if (!this.data.tabs.some((t) => t.key === 'transcript')) return;
+    this.setData({ activeTab: 'transcript' });
+    if (!this.data.transcript && !this.data.transcriptLoading) this.loadTranscript();
   },
 
   /** 章节点击 → 跳到起始秒播放 */

@@ -1,23 +1,52 @@
-.transcript {
-  display: flex;
-  flex-direction: column;
-  gap: 18rpx;
+.tl-wrap {
+  position: relative;
 }
-.seg {
+.tl-scroll {
+  height: 65vh;
+  border-radius: 14rpx;
+}
+.tl-inner {
+  padding: 0 8rpx;
+}
+/* 尾部留白 ≈ 窗口高 82%，让最后一句也能钉到 18% 处 */
+.tl-tail {
+  height: 53vh;
+}
+
+/* ── 三态句子 ── */
+.seg-item {
   display: flex;
-  gap: 18rpx;
+  gap: 16rpx;
   align-items: flex-start;
+  padding: 10rpx 20rpx;
+  border-left: 4rpx solid transparent;
+  border-radius: 12rpx;
 }
-.seg:active {
+.seg-item:active {
   opacity: 0.7;
+}
+.seg-past {
+  opacity: 0.3;
+}
+.seg-idle {
+  opacity: 0.8;
+}
+.seg-active {
+  opacity: 1;
+  background: rgba(0, 122, 255, 0.08);
+  border-left-color: #007aff;
 }
 .seg-time {
   flex-shrink: 0;
   font-size: 22rpx;
   color: var(--text-3);
   font-family: Menlo, Consolas, monospace;
-  padding-top: 4rpx;
-  min-width: 76rpx;
+  padding-top: 6rpx;
+  min-width: 84rpx;
+}
+.seg-time-active {
+  color: #007aff;
+  font-weight: 700;
 }
 .seg-text {
   flex: 1;
@@ -25,4 +54,42 @@
   font-size: 26rpx;
   line-height: 1.7;
   color: var(--text);
+}
+.seg-text-active {
+  color: #007aff;
+  font-weight: 600;
+}
+
+/* ── 上下渐隐（叠在 scroll-view 上，指针穿透） ── */
+.tl-fade {
+  position: absolute;
+  left: 8rpx;
+  right: 8rpx;
+  height: 10%;
+  pointer-events: none;
+}
+.tl-fade-top {
+  top: 0;
+  background: linear-gradient(var(--card), transparent);
+}
+.tl-fade-bottom {
+  bottom: 0;
+  background: linear-gradient(transparent, var(--card));
+}
+
+/* ── 返回播放位置胶囊 ── */
+.tl-pill {
+  position: absolute;
+  bottom: 28rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10rpx 26rpx;
+  border-radius: 999rpx;
+  background: rgba(29, 29, 31, 0.82);
+  color: #fff;
+  font-size: 22rpx;
+  white-space: nowrap;
+}
+.tl-pill-hover {
+  background: rgba(29, 29, 31, 1);
 }

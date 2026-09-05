@@ -1,6 +1,34 @@
-<view class="transcript">
-  <view class="seg" wx:for="{{view}}" wx:key="idx" data-idx="{{index}}" bindtap="onTap">
-    <text class="seg-time">{{item.time}}</text>
-    <text class="seg-text" user-select>{{item.text}}</text>
-  </view>
+<view class="tl-wrap">
+  <scroll-view
+    class="tl-scroll"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    scroll-top="{{scrollTop}}"
+    scroll-with-animation="{{scrollAnim}}"
+    bindscroll="onScroll"
+  >
+    <!-- 底部大留白：保证最后一句也能滚到 18% 钉位 -->
+    <view class="tl-inner">
+      <view
+        wx:for="{{view}}"
+        wx:key="idx"
+        id="seg-{{item.idx}}"
+        class="seg-item {{activeIdx === item.idx ? 'seg-active' : activeIdx > item.idx ? 'seg-past' : 'seg-idle'}}"
+        data-idx="{{index}}"
+        bindtap="onTap"
+      >
+        <text class="seg-time {{activeIdx === item.idx ? 'seg-time-active' : ''}}">{{item.time}}</text>
+        <text class="seg-text {{activeIdx === item.idx ? 'seg-text-active' : ''}}" user-select>{{item.text}}</text>
+      </view>
+      <view class="tl-tail" />
+    </view>
+  </scroll-view>
+
+  <!-- 上下渐隐遮罩 -->
+  <view class="tl-fade tl-fade-top" />
+  <view class="tl-fade tl-fade-bottom" />
+
+  <!-- 手动滚动后的「返回播放位置」胶囊 -->
+  <view wx:if="{{showPill}}" class="tl-pill" hover-class="tl-pill-hover" bindtap="onResumeFollow">↩ 返回播放位置</view>
 </view>
