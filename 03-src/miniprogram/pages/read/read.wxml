@@ -37,8 +37,8 @@
       </view>
     </view>
 
-    <!-- Tab 条（横向滚动，下划线激活态） -->
-    <scroll-view scroll-x class="tabbar" enhanced show-scrollbar="{{false}}">
+    <!-- Tab 条（横向滚动，下划线激活态；播放起播时页面滚动到这，让提词器窗口尽量占屏） -->
+    <scroll-view scroll-x class="tabbar" id="read-tabs" enhanced show-scrollbar="{{false}}">
       <view class="tabbar-inner">
         <view
           wx:for="{{tabs}}"

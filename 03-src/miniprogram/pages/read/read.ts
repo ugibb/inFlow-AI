@@ -234,8 +234,11 @@ Page({
     if (!meta) return;
     const starting = !this.data.playing;
     player.toggle(meta, this.data.audioCurrent);
-    // 对齐 Web onPlay 行为：点播放 → 切到全文转录看提词器跟随
-    if (starting) this.goTranscript();
+    // 对齐 Web onPlay 行为：点播放 → 切到全文转录 + 标签页滚到顶部（提词器尽量占屏）
+    if (starting) {
+      this.goTranscript();
+      this.pinTabsTop();
+    }
   },
 
   /** 切到转录 tab 并懒加载（播放启动时用） */
@@ -243,6 +246,15 @@ Page({
     if (!this.data.tabs.some((t) => t.key === 'transcript')) return;
     this.setData({ activeTab: 'transcript' });
     if (!this.data.transcript && !this.data.transcriptLoading) this.loadTranscript();
+  },
+
+  /** 页面滚动到标签条，让提词器窗口上沿贴屏顶 */
+  pinTabsTop() {
+    try {
+      wx.pageScrollTo({ selector: '#read-tabs', duration: 250 });
+    } catch {
+      /* 低版本无 selector，忽略 */
+    }
   },
 
   /** 章节点击 → 跳到起始秒播放 */
