@@ -1,5 +1,5 @@
 <view class="transcript">
-  <view class="seg" wx:for="{{view}}" wx:key="idx">
+  <view class="seg" wx:for="{{view}}" wx:key="idx" data-idx="{{index}}" bindtap="onTap">
     <text class="seg-time">{{item.time}}</text>
     <text class="seg-text" user-select>{{item.text}}</text>
   </view>

@@ -1,7 +1,8 @@
 import { api } from '../../utils/api';
 import { pageAuth } from '../../utils/auth';
 import { resolveImage } from '../../utils/image-url';
-import { formatDate, formatDuration, formatReadingTime } from '../../utils/format';
+import { formatDate, formatDuration, formatPlayerTime, formatReadingTime } from '../../utils/format';
+import * as player from '../../utils/player';
 import { PLATFORM_LABELS } from '../../config/index';
 
 interface TabItem {
@@ -35,7 +36,17 @@ Page({
     transcript: null as JobTranscript | null,
     transcriptLoading: false,
     transcriptError: '',
+
+    // 播放器（音频内容；底部常驻播放条）
+    playing: false,
+    audioCurrent: 0,
+    audioDuration: 0,
+    audioCurrentText: '0:00',
+    audioDurationText: '',
   },
+
+  /** 拖动进度条期间不响应 timeupdate 回写（避免滑块拉锯） */
+  scrubbing: false,
 
   onLoad(options: Record<string, string | undefined>) {
     const id = (options && options.id) || '';
@@ -86,6 +97,9 @@ Page({
         loading: false,
       });
       wx.setNavigationBarTitle({ title: a.title || '阅读' });
+
+      // 订阅全局播放器（详情重试/重新进入都会重绑，模块内是单槽回调）
+      this.bindPlayer();
 
       // 音频顺手预载章节（拿总时长展示）
       if (isAudio && chaptersApplicable) this.loadChapters();
@@ -147,6 +161,84 @@ Page({
       data: url,
       success: () => wx.showToast({ title: '节目链接已复制', icon: 'none' }),
     });
+  },
+
+  // ── 播放器（音频内容）────────────────────────────────────
+
+  playMeta(): player.PlayMeta | null {
+    const a = this.data.article;
+    if (!a || !a.media_url) return null;
+    return { src: a.media_url, title: a.title || '未命名节目', cover: this.data.cover || undefined };
+  },
+
+  /** 订阅全局播放器：只响应「本篇」的源（换篇/别的文章在播时本页播放条保持闲置） */
+  bindPlayer() {
+    player.bind((s) => {
+      const url = this.data.article && this.data.article.media_url;
+      if (!url || s.src !== url) return;
+      const curText = formatPlayerTime(s.current);
+      const durText = s.duration ? formatPlayerTime(s.duration) : '';
+      // 按秒粒度去重，避免 timeupdate 高频 setData
+      if (
+        this.data.playing === s.playing &&
+        this.data.audioCurrentText === curText &&
+        this.data.audioDurationText === durText
+      ) {
+        return;
+      }
+      this.setData({
+        playing: s.playing,
+        audioCurrent: s.current,
+        audioDuration: s.duration,
+        audioCurrentText: curText,
+        audioDurationText: durText,
+      });
+    });
+  },
+
+  onTogglePlay() {
+    const meta = this.playMeta();
+    if (!meta) return;
+    player.toggle(meta, this.data.audioCurrent);
+  },
+
+  /** 章节点击 → 跳到起始秒播放 */
+  onChapterTap(e: any) {
+    this.seekAudio(Number(e.detail.startTime) || 0);
+  },
+
+  /** 转录句点击 → 跳到起始秒播放 */
+  onSegmentTap(e: any) {
+    this.seekAudio(Number(e.detail.start) || 0);
+  },
+
+  seekAudio(sec: number) {
+    const meta = this.playMeta();
+    if (!meta) {
+      wx.showToast({ title: '该内容无音频可播放', icon: 'none' });
+      return;
+    }
+    player.seekPlay(meta, sec);
+    this.setData({ audioCurrent: sec, audioCurrentText: formatPlayerTime(sec) });
+  },
+
+  onScrubbing(e: any) {
+    const v = Number(e.detail.value) || 0;
+    this.scrubbing = true;
+    player.scrubStart();
+    this.setData({ audioCurrent: v, audioCurrentText: formatPlayerTime(v) });
+  },
+
+  onScrubEnd(e: any) {
+    const v = Number(e.detail.value) || 0;
+    this.scrubbing = false;
+    player.scrubEnd(v);
+    this.setData({ audioCurrent: v, audioCurrentText: formatPlayerTime(v) });
+  },
+
+  onUnload() {
+    // 只解绑 UI 订阅；音频本身继续播（后台/锁屏不打断）
+    player.bind(null);
   },
 
   onRetry() {

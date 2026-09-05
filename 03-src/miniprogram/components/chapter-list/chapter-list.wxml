@@ -1,5 +1,5 @@
 <view class="chapters">
-  <view class="chapter" wx:for="{{view}}" wx:key="indexLabel">
+  <view class="chapter" wx:for="{{view}}" wx:key="indexLabel" data-idx="{{index}}" bindtap="onTap">
     <view class="chapter-head">
       <text class="chapter-index">{{item.indexLabel}}</text>
       <text class="chapter-range">{{item.range}}</text>

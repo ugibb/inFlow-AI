@@ -209,3 +209,49 @@
   line-height: 1.7;
   color: var(--text-2);
 }
+
+/* ── 底部常驻播放条（音频内容） ── */
+.player {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 14rpx 24rpx;
+  padding-bottom: calc(14rpx + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1rpx solid var(--border);
+}
+.player-toggle {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 26rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.player-toggle-hover {
+  opacity: 0.8;
+}
+.player-main {
+  flex: 1;
+  min-width: 0;
+}
+.player-times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -8rpx;
+  padding: 0 6rpx;
+  font-size: 20rpx;
+  color: var(--text-3);
+}
+.player-spacer {
+  height: calc(140rpx + env(safe-area-inset-bottom));
+}
