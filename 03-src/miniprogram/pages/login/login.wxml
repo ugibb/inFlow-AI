@@ -5,33 +5,79 @@
     <text class="brand-desc">你的私人知识库</text>
   </view>
 
+  <!-- 微信一键登录（首次绑定：头像昵称选填——官方「头像昵称填写能力」） -->
   <view class="form">
-    <view class="field">
-      <text class="field-label">账号</text>
-      <input
-        class="field-input"
-        placeholder="用户名"
-        value="{{username}}"
-        bindinput="onUsername"
-      />
+    <view class="profile-row">
+      <button class="avatar-btn" open-type="chooseAvatar" bind:chooseavatar="onChooseAvatar">
+        <image wx:if="{{avatarTmp}}" class="avatar-img" src="{{avatarTmp}}" mode="aspectFill" />
+        <view wx:else class="avatar-placeholder">
+          <text wx:if="{{avatarInitial}}">{{avatarInitial}}</text>
+          <text wx:else class="avatar-plus">＋</text>
+        </view>
+        <text class="avatar-hint">头像</text>
+      </button>
+      <view class="nickname-field">
+        <text class="field-label">昵称</text>
+        <input
+          class="field-input"
+          type="nickname"
+          placeholder="选填，可快捷使用微信昵称"
+          value="{{nickname}}"
+          bindinput="onNickname"
+          bindblur="onNickname"
+        />
+      </view>
     </view>
-    <view class="field">
-      <text class="field-label">密码</text>
+
+    <view wx:if="{{needInvite}}" class="field">
+      <text class="field-label">邀请码</text>
       <input
         class="field-input"
-        placeholder="密码"
-        password
-        value="{{password}}"
-        bindinput="onPassword"
-        bindconfirm="onSubmit"
+        placeholder="请输入邀请码"
+        value="{{inviteCode}}"
+        bindinput="onInvite"
       />
     </view>
 
     <text wx:if="{{error}}" class="form-error">{{error}}</text>
 
-    <button class="submit-btn {{submitting ? 'submit-btn-loading' : ''}}" bindtap="onSubmit" disabled="{{submitting}}">
-      {{submitting ? '登录中…' : '登 录'}}
-    </button>
+    <button
+      class="wx-btn {{wxSubmitting ? 'wx-btn-loading' : ''}}"
+      bindtap="onWechatLogin"
+      disabled="{{wxSubmitting}}"
+    >{{wxSubmitting ? '登录中…' : '微信一键登录'}}</button>
+
+    <view class="divider"><view class="divider-line" /><text class="divider-text">或</text><view class="divider-line" /></view>
+
+    <view class="pw-toggle" bindtap="onTogglePw">{{showPw ? '收起账号密码登录' : '使用账号密码登录'}}</view>
+
+    <view wx:if="{{showPw}}" class="pw-form">
+      <view class="field">
+        <text class="field-label">账号</text>
+        <input
+          class="field-input"
+          placeholder="用户名"
+          value="{{username}}"
+          bindinput="onUsername"
+        />
+      </view>
+      <view class="field">
+        <text class="field-label">密码</text>
+        <input
+          class="field-input"
+          placeholder="密码"
+          password
+          value="{{password}}"
+          bindinput="onPassword"
+          bindconfirm="onSubmit"
+        />
+      </view>
+      <button
+        class="submit-btn {{submitting ? 'submit-btn-loading' : ''}}"
+        bindtap="onSubmit"
+        disabled="{{submitting}}"
+      >{{submitting ? '登录中…' : '登 录'}}</button>
+    </view>
   </view>
 
   <view class="footer">

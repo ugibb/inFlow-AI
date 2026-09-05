@@ -1,13 +1,41 @@
 <view class="me-page">
-  <!-- 用户卡片 -->
+  <!-- 用户卡片（微信头像昵称优先，未设置回退账号用户名首字母） -->
   <view class="user-card" wx:if="{{user}}">
-    <view class="avatar">{{initial}}</view>
+    <image wx:if="{{profile && profile.avatar}}" class="avatar avatar-img" src="{{profile.avatar}}" mode="aspectFill" />
+    <view wx:else class="avatar">{{initial}}</view>
     <view class="user-info">
       <view class="user-name-row">
-        <text class="user-name">{{user.username}}</text>
+        <text class="user-name">{{profile && profile.nickname ? profile.nickname : user.username}}</text>
         <text wx:if="{{user.is_super_admin}}" class="user-badge">管理员</text>
       </view>
-      <text class="user-sub">inFlow 知识库成员</text>
+      <text class="user-sub">{{profile && profile.nickname ? '账号 ' + user.username : 'inFlow 知识库成员'}}</text>
+    </view>
+    <view class="user-edit" bindtap="onEditProfile">✎ 编辑资料</view>
+  </view>
+
+  <!-- 编辑资料（官方头像昵称填写能力） -->
+  <view wx:if="{{editing}}" class="edit-panel">
+    <button class="edit-avatar-btn" open-type="chooseAvatar" bind:chooseavatar="onEditChooseAvatar">
+      <image wx:if="{{editAvatarSrc}}" class="edit-avatar-img" src="{{editAvatarSrc}}" mode="aspectFill" />
+      <view wx:else class="edit-avatar-placeholder">＋</view>
+      <text class="edit-avatar-hint">点此更换头像</text>
+    </button>
+    <view class="edit-field">
+      <text class="field-label">昵称</text>
+      <input
+        class="edit-input"
+        type="nickname"
+        placeholder="选填，可快捷使用微信昵称"
+        value="{{editNickname}}"
+        bindinput="onEditNickname"
+        bindblur="onEditNickname"
+      />
+    </view>
+    <view class="edit-actions">
+      <view class="edit-btn edit-btn-ghost" bindtap="onCancelEdit">取消</view>
+      <view class="edit-btn edit-btn-primary {{saving ? 'edit-btn-loading' : ''}}" bindtap="onSaveProfile">
+        {{saving ? '保存中…' : '保存'}}
+      </view>
     </view>
   </view>
 

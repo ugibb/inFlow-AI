@@ -79,6 +79,16 @@ class Settings(BaseSettings):
     # .env 中 SERVICE_TOKEN_WECHAT_BOT；wechat 插件启动 bot 进程时注入 inFlow_TOKEN。
     service_token_wechat_bot: str = ""
 
+    # ── 微信小程序「微信一键登录」─────────────────────────────
+    # AppID 非敏感（代码里兜底正式号）；AppSecret 仅 .env。
+    # openid 绑定到哪个账号：空 = 自动取第一个超管（个人库自用场景）。
+    # 邀请码：空 = 免验直进（体验版分发默认，体验成员白名单已是门禁）；
+    #         公开上架时必须设置，防止陌生人绑进账号看整库。
+    wechat_appid: str = "wxe091ce737f45cacc"
+    wechat_secret: str = ""
+    wechat_bind_username: str = ""
+    wechat_invite_code: str = ""
+
     # ── Logging — see 02-docs/20260623_06_的日志系统重构方案.md ──
     log_dir: str = "04-log/backend"
     log_level: str = "INFO"

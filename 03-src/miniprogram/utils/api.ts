@@ -21,6 +21,34 @@ export const api = {
     });
   },
 
+  /** 微信一键登录：wx.login 的一次性 code + 选填（邀请码/昵称/头像 base64） */
+  wechatLogin(
+    code: string,
+    opts?: { inviteCode?: string; nickname?: string; avatarBase64?: string },
+  ) {
+    return request<WechatLoginResponse>('/api/auth/wechat', {
+      method: 'POST',
+      skipAuth: true,
+      data: {
+        code,
+        invite_code: (opts && opts.inviteCode) || '',
+        nickname: (opts && opts.nickname) || '',
+        avatar_base64: (opts && opts.avatarBase64) || '',
+      },
+    });
+  },
+
+  /** 更新当前微信的昵称/头像（空字段 = 不变） */
+  updateWxProfile(payload: { nickname?: string; avatarBase64?: string }) {
+    return request<WxProfile>('/api/auth/wechat/profile', {
+      method: 'PATCH',
+      data: {
+        nickname: payload.nickname || '',
+        avatar_base64: payload.avatarBase64 || '',
+      },
+    });
+  },
+
   getMe() {
     return request<User>('/api/auth/me');
   },

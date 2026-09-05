@@ -3,6 +3,7 @@ import { BASE_URL } from '../config/index';
 /** Storage keys —— 与 Web 端 localStorage('inFlow_token') 各自独立，互不影响 */
 const TOKEN_KEY = 'inflow_token';
 const USER_KEY = 'inflow_user';
+const PROFILE_KEY = 'inflow_wx_profile';
 
 export function getToken(): string | null {
   try {
@@ -35,9 +36,85 @@ export function clearAuth(): void {
   try {
     wx.removeStorageSync(TOKEN_KEY);
     wx.removeStorageSync(USER_KEY);
+    wx.removeStorageSync(PROFILE_KEY);
   } catch {
     /* ignore */
   }
+}
+
+/** 微信绑定资料（头像 data URI + 昵称；登录/续登时随 wx_profile 刷新） */
+export function getWxProfile(): WxProfile | null {
+  try {
+    const v = wx.getStorageSync(PROFILE_KEY);
+    return v || null;
+  } catch {
+    return null;
+  }
+}
+
+export function setWxProfile(p: WxProfile | null): void {
+  try {
+    if (p) wx.setStorageSync(PROFILE_KEY, p);
+    else wx.removeStorageSync(PROFILE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** wx.login → 一次性 code（5 分钟有效） */
+export function wxLoginCode(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    wx.login({
+      success: (r) => (r.code ? resolve(r.code) : reject(new Error('未获取到微信登录凭证'))),
+      fail: () => reject(new Error('微信登录失败，请重试')),
+    });
+  });
+}
+
+export type SilentLoginResult = { token: string } | { invite: true } | null;
+
+/**
+ * 静默微信登录（app.onLaunch / 401 自愈用）：wx.login → POST /api/auth/wechat。
+ * 已绑定 openid 直接换新 JWT（后续访问的无感路径）；后端要求邀请码 →
+ * { invite: true }（登录页展示邀请码输入）；其他失败 → null。
+ * 直用 wx.request（与 validateStored 同风格），避免与 api.ts 循环 import。
+ */
+export function silentWechatLogin(): Promise<SilentLoginResult> {
+  return wxLoginCode()
+    .then(
+      (code) =>
+        new Promise<WechatLoginResponse>((resolve, reject) => {
+          wx.request({
+            url: BASE_URL + '/api/auth/wechat',
+            method: 'POST',
+            data: { code, invite_code: '', nickname: '', avatar_base64: '' },
+            timeout: 8000,
+            success: (res) => {
+              if (res.statusCode >= 200 && res.statusCode < 300) {
+                resolve(res.data as WechatLoginResponse);
+              } else {
+                const detail = ((res.data || {}) as { detail?: unknown }).detail;
+                reject({
+                  statusCode: res.statusCode,
+                  detail: typeof detail === 'string' ? detail : '',
+                });
+              }
+            },
+            fail: () => reject({ statusCode: 0, detail: '网络请求失败' }),
+          });
+        }),
+    )
+    .then((res) => {
+      setAuth(res.access_token, res.user);
+      setWxProfile(res.wx_profile || null);
+      return { token: res.access_token };
+    })
+    .catch((e: { statusCode?: number; detail?: string }) => {
+      if (e && e.statusCode === 403 && (e.detail || '').indexOf('invite') === 0) {
+        return { invite: true };
+      }
+      return null;
+    });
 }
 
 /** base64（含 URL-safe 变体）→ UTF-8 字符串。小程序环境无 atob，自实现 */

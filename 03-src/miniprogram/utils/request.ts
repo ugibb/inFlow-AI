@@ -1,5 +1,5 @@
 import { BASE_URL, REQUEST_TIMEOUT } from '../config/index';
-import { getToken, clearAuth } from './auth';
+import { getToken, clearAuth, silentWechatLogin } from './auth';
 
 export class ApiError extends Error {
   statusCode: number;
@@ -57,6 +57,22 @@ export interface RequestOptions {
   data?: Record<string, unknown>;
   /** 登录接口用：不注 token；其 401（密码错误）当普通错误展示而非跳转 */
   skipAuth?: boolean;
+  /** 内部用：401 静默重登后的重试轮，防循环 */
+  _retried?: boolean;
+}
+
+/** 401 自愈：静默微信重登（并发 401 共享一次尝试），成功后原请求重放 */
+let reloginPromise: Promise<string | null> | null = null;
+
+function silentRelogin(): Promise<string | null> {
+  if (!reloginPromise) {
+    const p = silentWechatLogin().then((r) => (r && 'token' in r ? r.token : null));
+    reloginPromise = p;
+    p.finally(() => {
+      if (reloginPromise === p) reloginPromise = null;
+    });
+  }
+  return reloginPromise;
 }
 
 /** wx.request Promise 封装 —— 页面永远不直接碰 wx.request，一律走 utils/api.ts */
@@ -78,6 +94,19 @@ export function request<T>(path: string, opts: RequestOptions = {}): Promise<T> 
           return;
         }
         if (res.statusCode === 401 && !opts.skipAuth) {
+          // token 中途过期：先静默微信重登一次（openid 已绑定则无感续期），
+          // 成功重放原请求；失败才真正跳登录页，不打断阅读
+          if (!opts._retried) {
+            silentRelogin().then((t) => {
+              if (t) {
+                request<T>(path, { ...opts, _retried: true }).then(resolve, reject);
+              } else {
+                redirectToLogin();
+                reject(new ApiError('登录已过期，请重新登录', 401));
+              }
+            });
+            return;
+          }
           redirectToLogin();
           reject(new ApiError('登录已过期，请重新登录', 401));
           return;

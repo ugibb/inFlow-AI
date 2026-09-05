@@ -13,6 +13,7 @@ from .article import (
 from ._misc import PluginState, ReviewSchedule, WechatAccount
 from .ingest_job import IngestJob
 from .wechat_callback import WechatCallbackQueue
+from .wechat_binding import WechatBinding
 
 __all__ = [
     "User",
@@ -28,4 +29,5 @@ __all__ = [
     "PluginState",
     "IngestJob",
     "WechatCallbackQueue",
+    "WechatBinding",
 ]

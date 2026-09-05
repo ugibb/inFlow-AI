@@ -76,6 +76,16 @@ interface LoginResponse {
   user: User;
 }
 
+/** 微信绑定的用户主动填写资料（「头像昵称填写能力」产物；avatar 为 data URI） */
+interface WxProfile {
+  nickname: string | null;
+  avatar: string | null;
+}
+
+interface WechatLoginResponse extends LoginResponse {
+  wx_profile: WxProfile;
+}
+
 interface PlatformCount {
   platform: string;
   count: number;
@@ -139,7 +149,9 @@ interface MdNode {
 interface IAppOption {
   globalData: {
     user: User | null;
-    /** 启动鉴权 Promise：resolve token（有效/乐观放行）或 null（需跳登录） */
+    /** 启动鉴权 Promise：resolve token（有效/乐观放行/静默微信登录成功）或 null（需跳登录） */
     authReady: Promise<string | null> | null;
+    /** 后端要求邀请码时置 true（登录页据此显示邀请码输入框） */
+    wechatNeedInvite: boolean;
   };
 }

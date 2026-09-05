@@ -11,7 +11,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 96rpx;
+  margin-bottom: 80rpx;
 }
 .brand-logo {
   width: 128rpx;
@@ -40,6 +40,69 @@
 .form {
   width: 100%;
 }
+
+/* ── 微信一键登录：头像 + 昵称（官方填写能力，均选填）── */
+.profile-row {
+  background: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: 20rpx;
+  padding: 24rpx 28rpx;
+  margin-bottom: 24rpx;
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+}
+.avatar-btn {
+  position: relative;
+  width: 128rpx;
+  height: 150rpx;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  line-height: 1.2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  flex-shrink: 0;
+}
+.avatar-btn::after {
+  border: none;
+}
+.avatar-img,
+.avatar-placeholder {
+  width: 108rpx;
+  height: 108rpx;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.avatar-placeholder {
+  background: var(--bg);
+  border: 1rpx dashed var(--border);
+  color: var(--text-3);
+  font-size: 40rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.avatar-plus {
+  font-size: 44rpx;
+  color: var(--text-3);
+}
+.avatar-hint {
+  font-size: 20rpx;
+  color: var(--text-3);
+}
+.nickname-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
 .field {
   background: var(--card);
   border: 1rpx solid var(--border);
@@ -67,6 +130,62 @@
   margin: 8rpx 8rpx 16rpx;
 }
 
+/* 微信品牌绿主按钮 */
+.wx-btn {
+  width: 100%;
+  height: 92rpx;
+  border-radius: 20rpx;
+  background: #07c160;
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wx-btn:active {
+  opacity: 0.85;
+}
+.wx-btn-loading {
+  opacity: 0.6;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin: 36rpx 0 8rpx;
+}
+.divider-line {
+  flex: 1;
+  height: 1rpx;
+  background: var(--border);
+}
+.divider-text {
+  font-size: 22rpx;
+  color: var(--text-3);
+}
+
+.pw-toggle {
+  text-align: center;
+  font-size: 26rpx;
+  color: var(--accent);
+  padding: 16rpx 0 24rpx;
+}
+.pw-form {
+  animation: pw-fade-in 0.18s ease-out;
+}
+@keyframes pw-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .submit-btn {
   width: 100%;
   height: 92rpx;
@@ -78,6 +197,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-top: 8rpx;
 }
 .submit-btn:active {
   opacity: 0.85;

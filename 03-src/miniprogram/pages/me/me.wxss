@@ -29,6 +29,109 @@
   justify-content: center;
   flex-shrink: 0;
 }
+.avatar-img {
+  background: var(--bg);
+}
+.user-edit {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: var(--accent);
+  padding: 8rpx 0 8rpx 16rpx;
+}
+
+/* ── 编辑资料面板 ── */
+.edit-panel {
+  background: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin-bottom: 32rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.edit-avatar-btn {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  line-height: 1.2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10rpx;
+}
+.edit-avatar-btn::after {
+  border: none;
+}
+.edit-avatar-img,
+.edit-avatar-placeholder {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.edit-avatar-placeholder {
+  background: var(--bg);
+  border: 1rpx dashed var(--border);
+  color: var(--text-3);
+  font-size: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.edit-avatar-hint {
+  font-size: 22rpx;
+  color: var(--text-3);
+}
+.edit-field {
+  width: 100%;
+  margin-top: 28rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+.field-label {
+  font-size: 22rpx;
+  color: var(--text-3);
+}
+.edit-input {
+  font-size: 30rpx;
+  color: var(--text);
+  min-height: 52rpx;
+  border-bottom: 1rpx solid var(--border);
+  padding-bottom: 8rpx;
+}
+.edit-actions {
+  width: 100%;
+  display: flex;
+  gap: 24rpx;
+  margin-top: 32rpx;
+}
+.edit-btn {
+  flex: 1;
+  height: 80rpx;
+  border-radius: 18rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+}
+.edit-btn-ghost {
+  background: var(--bg);
+  color: var(--text-2);
+}
+.edit-btn-primary {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.edit-btn:active {
+  opacity: 0.85;
+}
+.edit-btn-loading {
+  opacity: 0.6;
+}
 .user-info {
   flex: 1;
   min-width: 0;

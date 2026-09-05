@@ -48,7 +48,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 # ── JWT helpers ─────────────────────────────────────────────
-def create_access_token(user_id: UUID, username: str, is_super_admin: bool) -> str:
+def create_access_token(
+    user_id: UUID,
+    username: str,
+    is_super_admin: bool,
+    extra_claims: Optional[dict] = None,
+) -> str:
+    """登录 JWT。extra_claims 供特定签发方附加声明（如微信登录加 wx_openid）。"""
     expire = datetime.now(timezone.utc) + timedelta(
         hours=get_settings().get_access_token_expire_hours()
     )
@@ -58,6 +64,8 @@ def create_access_token(user_id: UUID, username: str, is_super_admin: bool) -> s
         "is_super_admin": is_super_admin,
         "exp": expire,
     }
+    if extra_claims:
+        payload.update(extra_claims)
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
