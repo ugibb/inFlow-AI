@@ -1,0 +1,10 @@
+<view class="chapters">
+  <view class="chapter" wx:for="{{view}}" wx:key="indexLabel">
+    <view class="chapter-head">
+      <text class="chapter-index">{{item.indexLabel}}</text>
+      <text class="chapter-range">{{item.range}}</text>
+    </view>
+    <text class="chapter-title" user-select>{{item.title}}</text>
+    <text wx:if="{{item.summary}}" class="chapter-summary" user-select>{{item.summary}}</text>
+  </view>
+</view>

@@ -1,0 +1,104 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 120rpx 64rpx 48rpx;
+  box-sizing: border-box;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 96rpx;
+}
+.brand-logo {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 32rpx;
+  background: linear-gradient(135deg, #007aff 0%, #0055cc 100%);
+  color: #fff;
+  font-size: 56rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+}
+.brand-name {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: var(--text);
+}
+.brand-desc {
+  margin-top: 8rpx;
+  font-size: 26rpx;
+  color: var(--text-3);
+}
+
+.form {
+  width: 100%;
+}
+.field {
+  background: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: 20rpx;
+  padding: 20rpx 28rpx;
+  margin-bottom: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+.field-label {
+  font-size: 22rpx;
+  color: var(--text-3);
+}
+.field-input {
+  font-size: 30rpx;
+  color: var(--text);
+  min-height: 52rpx;
+}
+
+.form-error {
+  display: block;
+  color: var(--danger);
+  font-size: 24rpx;
+  margin: 8rpx 8rpx 16rpx;
+}
+
+.submit-btn {
+  width: 100%;
+  height: 92rpx;
+  border-radius: 20rpx;
+  background: var(--accent);
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.submit-btn:active {
+  opacity: 0.85;
+}
+.submit-btn-loading {
+  opacity: 0.6;
+}
+
+.footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+}
+.footer-text {
+  font-size: 24rpx;
+  color: var(--text-3);
+}
+.footer-server {
+  font-size: 20rpx;
+  color: var(--text-3);
+  opacity: 0.7;
+}

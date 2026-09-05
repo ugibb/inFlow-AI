@@ -1,0 +1,241 @@
+.page {
+  padding: 20rpx 24rpx 0;
+}
+
+/* ── 搜索行 ── */
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+.search-box {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  background: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: 16rpx;
+  padding: 0 20rpx;
+  height: 72rpx;
+}
+.search-icon {
+  font-size: 26rpx;
+  opacity: 0.5;
+}
+.search-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 27rpx;
+  color: var(--text);
+}
+.search-placeholder {
+  color: var(--text-3);
+}
+.search-clear {
+  color: var(--text-3);
+  font-size: 26rpx;
+  padding: 8rpx;
+}
+.mode-toggle {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-radius: 999rpx;
+  padding: 8rpx 22rpx;
+}
+.mode-toggle:active {
+  opacity: 0.7;
+}
+
+/* ── 平台 chips ── */
+.platform-scroll {
+  width: 100%;
+  white-space: nowrap;
+  margin-bottom: 16rpx;
+}
+.chips {
+  display: inline-flex;
+  gap: 14rpx;
+  padding: 4rpx 2rpx 8rpx;
+}
+.chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  font-size: 24rpx;
+  color: var(--text-2);
+  background: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: 999rpx;
+  padding: 10rpx 26rpx;
+}
+.chip:active {
+  opacity: 0.7;
+}
+.chip-active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  font-weight: 600;
+}
+.chip-count {
+  font-size: 20rpx;
+  opacity: 0.65;
+}
+
+/* ── 主理人入口 ── */
+.author-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 20rpx;
+  font-size: 24rpx;
+  color: var(--text-2);
+  background: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: 999rpx;
+  padding: 8rpx 24rpx;
+}
+.author-entry:active {
+  opacity: 0.7;
+}
+.author-entry-active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  font-weight: 600;
+}
+.author-entry-arrow {
+  font-size: 20rpx;
+  color: var(--text-3);
+}
+
+/* ── 瀑布流 ── */
+.masonry {
+  display: flex;
+  gap: 20rpx;
+}
+.masonry-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+/* ── 骨架屏 ── */
+.skeleton {
+  background: var(--card);
+  border-radius: 20rpx;
+  border: 1rpx solid var(--border);
+  padding-bottom: 24rpx;
+  overflow: hidden;
+  animation: sk-pulse 1.4s ease-in-out infinite;
+}
+.sk-cover {
+  height: 260rpx;
+  background: #ececf0;
+}
+.sk-line {
+  height: 26rpx;
+  border-radius: 8rpx;
+  background: #ececf0;
+  margin: 20rpx 24rpx 0;
+}
+.sk-w80 { width: 80%; }
+.sk-w60 { width: 60%; }
+.sk-w50 { width: 50%; }
+@keyframes sk-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* ── 列表 footer ── */
+.list-footer {
+  text-align: center;
+  color: var(--text-3);
+  font-size: 24rpx;
+  padding: 32rpx 0;
+}
+
+/* ── 主理人弹层 ── */
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+}
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 101;
+  background: var(--card);
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 28rpx 32rpx calc(24rpx + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+}
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+.sheet-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--text);
+}
+.sheet-close {
+  color: var(--text-3);
+  font-size: 30rpx;
+  padding: 8rpx;
+}
+.sheet-search {
+  background: #f2f2f7;
+  border-radius: 14rpx;
+  padding: 14rpx 24rpx;
+  font-size: 26rpx;
+  margin-bottom: 16rpx;
+}
+.sheet-list {
+  flex: 1;
+  min-height: 200rpx;
+}
+.sheet-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 24rpx 12rpx;
+  border-bottom: 1rpx solid var(--border);
+}
+.sheet-item:active {
+  background: #f7f7fa;
+}
+.sheet-item-name {
+  font-size: 28rpx;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sheet-item-count {
+  font-size: 22rpx;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+.sheet-item-active .sheet-item-name {
+  color: var(--accent);
+  font-weight: 600;
+}

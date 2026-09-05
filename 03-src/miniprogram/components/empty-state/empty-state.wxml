@@ -1,0 +1,6 @@
+<view class="empty">
+  <text wx:if="{{icon}}" class="empty-icon">{{icon}}</text>
+  <text class="empty-title">{{title}}</text>
+  <text wx:if="{{desc}}" class="empty-desc">{{desc}}</text>
+  <view wx:if="{{retry}}" class="empty-btn" catchtap="onRetry">重试</view>
+</view>

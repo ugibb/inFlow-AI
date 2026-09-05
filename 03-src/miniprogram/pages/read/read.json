@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "阅读",
+  "usingComponents": {
+    "md-view": "/components/md-view/md-view",
+    "chapter-list": "/components/chapter-list/chapter-list",
+    "transcript-view": "/components/transcript-view/transcript-view",
+    "empty-state": "/components/empty-state/empty-state"
+  }
+}

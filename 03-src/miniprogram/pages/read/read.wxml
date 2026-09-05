@@ -1,0 +1,124 @@
+<view class="page">
+  <!-- 加载骨架 -->
+  <view wx:if="{{loading}}" class="read-loading">
+    <view class="rl-cover" />
+    <view class="rl-line rl-w70" />
+    <view class="rl-line rl-w50" />
+    <view class="rl-line rl-w90" />
+    <view class="rl-line rl-w80" />
+    <view class="rl-line rl-w60" />
+  </view>
+
+  <!-- 错误态 -->
+  <empty-state wx:elif="{{error}}" icon="⚠️" title="{{error}}" desc="请检查网络后重试" retry bind:retry="onRetry" />
+
+  <block wx:elif="{{article}}">
+    <!-- 头部：封面 + 标题 + 元信息 + 标签 -->
+    <view class="head">
+      <image wx:if="{{cover}}" class="head-cover" src="{{cover}}" mode="widthFix" />
+      <text class="head-title" user-select>{{article.title}}</text>
+      <view class="head-meta">
+        <text wx:if="{{platformLabel}}" class="head-chip">{{platformLabel}}</text>
+        <text wx:if="{{publishedDate}}" class="head-meta-text">{{publishedDate}}</text>
+        <text wx:if="{{readingTimeText}}" class="head-meta-text">{{readingTimeText}}</text>
+        <text wx:if="{{article.word_count}}" class="head-meta-text">{{article.word_count}} 字</text>
+      </view>
+      <text wx:if="{{article.author}}" class="head-author">主理人 · {{article.author}}</text>
+      <view wx:if="{{article.tags.length > 0}}" class="head-tags">
+        <text
+          wx:for="{{article.tags}}"
+          wx:key="id"
+          class="tag"
+          style="background: {{item.color}}18; color: {{item.color}};"
+        >{{item.name}}</text>
+      </view>
+      <view wx:if="{{article.url}}" class="head-actions">
+        <view class="btn-ghost" catchtap="onCopyUrl">复制原文链接</view>
+      </view>
+    </view>
+
+    <!-- Tab 条（横向滚动，下划线激活态） -->
+    <scroll-view scroll-x class="tabbar" enhanced show-scrollbar="{{false}}">
+      <view class="tabbar-inner">
+        <view
+          wx:for="{{tabs}}"
+          wx:key="key"
+          class="tab {{activeTab === item.key ? 'tab-active' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onTabTap"
+        >{{item.label}}</view>
+      </view>
+    </scroll-view>
+
+    <!-- 原文 / 节目信息 -->
+    <view wx:if="{{activeTab === 'raw'}}" class="tab-panel">
+      <block wx:if="{{article.content_type === 'audio'}}">
+        <view class="audio-card">
+          <image wx:if="{{cover}}" class="audio-cover" src="{{cover}}" mode="widthFix" />
+          <view class="audio-meta">
+            <text class="audio-line">时长：{{totalDurationText || '未知'}}</text>
+            <text wx:if="{{article.author}}" class="audio-line">主理人：{{article.author}}</text>
+          </view>
+          <view wx:if="{{article.media_url}}" class="btn-ghost" catchtap="onCopyMedia">复制节目链接</view>
+          <text class="audio-hint">小程序端暂不支持在线播放，可复制链接到播客 App 收听</text>
+        </view>
+        <md-view wx:if="{{article.clean_content}}" md="{{article.clean_content}}" />
+      </block>
+      <block wx:else>
+        <md-view md="{{article.clean_content || article.title}}" />
+      </block>
+    </view>
+
+    <!-- 章节速览 -->
+    <view wx:if="{{activeTab === 'chapters'}}" class="tab-panel">
+      <view wx:if="{{chaptersLoading}}" class="panel-loading">加载中…</view>
+      <empty-state wx:elif="{{chaptersError}}" icon="⚠️" title="{{chaptersError}}" retry bind:retry="loadChapters" />
+      <empty-state
+        wx:elif="{{!chapters || !chapters.chapters.length}}"
+        icon="🗂"
+        title="章节尚未生成"
+        desc="可在 Web 端阅读页发起单块重新生成"
+      />
+      <block wx:else>
+        <text wx:if="{{totalDurationText}}" class="duration">总时长 {{totalDurationText}}</text>
+        <chapter-list chapters="{{chapters.chapters}}" />
+      </block>
+    </view>
+
+    <!-- 全文转录 -->
+    <view wx:if="{{activeTab === 'transcript'}}" class="tab-panel">
+      <view wx:if="{{transcriptLoading}}" class="panel-loading">加载中…</view>
+      <empty-state wx:elif="{{transcriptError}}" icon="⚠️" title="{{transcriptError}}" retry bind:retry="loadTranscript" />
+      <empty-state
+        wx:elif="{{!transcript || !transcript.segments.length}}"
+        icon="📝"
+        title="转录尚未生成"
+        desc="可在 Web 端阅读页发起单块重新生成"
+      />
+      <transcript-view wx:else segments="{{transcript.segments}}" />
+    </view>
+
+    <!-- AI 摘要 -->
+    <view wx:if="{{activeTab === 'ai'}}" class="tab-panel">
+      <view wx:if="{{article.summary}}" class="ai-card">
+        <text class="ai-label">摘要</text>
+        <text class="ai-text" user-select>{{article.summary}}</text>
+      </view>
+      <view wx:if="{{article.key_points && article.key_points.length > 0}}" class="ai-card">
+        <text class="ai-label">要点</text>
+        <view class="kp" wx:for="{{article.key_points}}" wx:key="*this">
+          <text class="kp-dot">•</text>
+          <text class="kp-text" user-select>{{item}}</text>
+        </view>
+      </view>
+      <empty-state
+        wx:if="{{!article.summary && (!article.key_points || !article.key_points.length)}}"
+        icon="✨"
+        title="AI 摘要尚未生成"
+        desc="可在 Web 端阅读页发起重新生成"
+      />
+    </view>
+
+    <view class="safe-bottom" />
+  </block>
+</view>

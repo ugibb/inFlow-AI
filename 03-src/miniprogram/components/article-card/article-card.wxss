@@ -1,0 +1,129 @@
+.card {
+  background: var(--card);
+  border-radius: 20rpx;
+  border: 1rpx solid var(--border);
+  overflow: hidden;
+}
+.card:active {
+  opacity: 0.85;
+}
+
+.cover-wrap {
+  position: relative;
+  width: 100%;
+}
+.cover {
+  width: 100%;
+  display: block;
+}
+.cover-placeholder {
+  position: relative;
+  height: 288rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.placeholder-initial {
+  font-size: 96rpx;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.22);
+}
+.fav {
+  position: absolute;
+  top: 16rpx;
+  right: 16rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.3);
+  color: #ffdf6b;
+  font-size: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.info {
+  padding: 20rpx 24rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+.meta {
+  font-size: 22rpx;
+  color: var(--text-3);
+}
+.meta-audio {
+  color: var(--text-3);
+}
+.meta-date {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.summary {
+  font-size: 24rpx;
+  color: var(--text-2);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.status {
+  align-self: flex-start;
+  font-size: 22rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 12rpx;
+}
+.status-wait,
+.status-processing {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+.status-fail {
+  background: rgba(255, 59, 48, 0.1);
+  color: var(--danger);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  font-size: 22rpx;
+  color: var(--text-3);
+}
+.footer-author {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.footer-time {
+  flex-shrink: 0;
+}

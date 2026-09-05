@@ -1,0 +1,46 @@
+<view class="card" bindtap="onTap">
+  <!-- 封面：自然比例；加载失败回退渐变占位 -->
+  <block wx:if="{{article.cover_image && !coverFailed}}">
+    <view class="cover-wrap">
+      <image class="cover" src="{{article.cover_image}}" mode="widthFix" lazy-load binderror="onCoverError" />
+      <view wx:if="{{article.is_favorited}}" class="fav">★</view>
+    </view>
+  </block>
+  <block wx:else>
+    <view class="cover-placeholder" style="background: {{gradient}};">
+      <text class="placeholder-initial">{{initial}}</text>
+      <view wx:if="{{article.is_favorited}}" class="fav">★</view>
+    </view>
+  </block>
+
+  <view class="info">
+    <!-- 平台 + 类型 + 发布日期 -->
+    <view class="meta-row">
+      <text class="meta">{{platformLabel}}</text>
+      <text wx:if="{{isAudio}}" class="meta meta-audio">♪</text>
+      <text wx:if="{{publishedDate}}" class="meta meta-date">{{publishedDate}}</text>
+    </view>
+
+    <text class="title">{{article.title}}</text>
+
+    <!-- 摘要 / 处理状态（对齐 Web 卡片的三态） -->
+    <view wx:if="{{article.fetch_status === 'pending_agent'}}" class="status status-wait">⏳ 等待本地代采…</view>
+    <view wx:elif="{{article.fetch_status === 'failed'}}" class="status status-fail">✕ 代采失败</view>
+    <text wx:elif="{{article.summary}}" class="summary">{{article.summary}}</text>
+    <view wx:elif="{{article.content_type !== 'note'}}" class="status status-processing">AI 正在处理摘要…</view>
+
+    <view wx:if="{{article.tags.length > 0}}" class="tags">
+      <text
+        wx:for="{{article.tags}}"
+        wx:key="id"
+        class="tag"
+        style="background: {{item.color}}18; color: {{item.color}};"
+      >{{item.name}}</text>
+    </view>
+
+    <view class="footer">
+      <text wx:if="{{article.author}}" class="footer-author">{{article.author}}</text>
+      <text class="footer-time">{{article.reading_time || 1}} min</text>
+    </view>
+  </view>
+</view>

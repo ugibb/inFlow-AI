@@ -1,0 +1,13 @@
+{
+  "name": "inflow-miniprogram",
+  "version": "0.1.0",
+  "private": true,
+  "description": "inFlow 微信小程序（浏览 + 阅读 MVP），API 复用 https://inflow.huituai.site",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "miniprogram-api-typings": "^3.12.1",
+    "typescript": "^5.5.4"
+  }
+}

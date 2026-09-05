@@ -1,0 +1,63 @@
+<view class="md">
+  <block wx:for="{{nodes}}" wx:key="kk" wx:for-item="node">
+
+    <!-- 标题 -->
+    <text wx:if="{{node.type === 'heading'}}" class="h h{{node.level}}" user-select>{{node.text}}</text>
+
+    <!-- 段落（行内样式分类型渲染） -->
+    <text wx:elif="{{node.type === 'p'}}" class="p" user-select>
+      <text
+        wx:for="{{node.inlines}}"
+        wx:key="kk"
+        wx:for-item="seg"
+        class="{{seg.t === 'bold' ? 'seg-bold' : seg.t === 'italic' ? 'seg-italic' : seg.t === 'code' ? 'seg-code' : seg.t === 'link' ? 'seg-link' : ''}}"
+        data-t="{{seg.t}}"
+        data-href="{{seg.href}}"
+        catchtap="onSegTap"
+      >{{seg.text}}</text>
+    </text>
+
+    <!-- 独立图片：点击多图连播 -->
+    <image
+      wx:elif="{{node.type === 'image'}}"
+      class="md-img"
+      src="{{node.src}}"
+      mode="widthFix"
+      lazy-load
+      data-src="{{node.src}}"
+      bindtap="onImageTap"
+    />
+
+    <!-- 列表 -->
+    <view wx:elif="{{node.type === 'list'}}" class="list">
+      <view wx:for="{{node.items}}" wx:key="index" wx:for-item="item" wx:for-index="itemIdx" class="list-item">
+        <text class="list-bullet">{{node.ordered ? itemIdx + 1 + '.' : '•'}}</text>
+        <text class="list-text" user-select>
+          <text
+            wx:for="{{item}}"
+            wx:key="kk"
+            wx:for-item="seg"
+            class="{{seg.t === 'bold' ? 'seg-bold' : seg.t === 'italic' ? 'seg-italic' : seg.t === 'code' ? 'seg-code' : seg.t === 'link' ? 'seg-link' : ''}}"
+            data-t="{{seg.t}}"
+            data-href="{{seg.href}}"
+            catchtap="onSegTap"
+          >{{seg.text}}</text>
+        </text>
+      </view>
+    </view>
+
+    <!-- 引用 -->
+    <view wx:elif="{{node.type === 'quote'}}" class="quote">
+      <text user-select>{{node.text}}</text>
+    </view>
+
+    <!-- 代码块 -->
+    <view wx:elif="{{node.type === 'codeblock'}}" class="codeblock">
+      <text wx:if="{{node.lang}}" class="codeblock-lang">{{node.lang}}</text>
+      <text class="codeblock-text" user-select>{{node.text}}</text>
+    </view>
+
+    <!-- 分隔线 -->
+    <view wx:elif="{{node.type === 'hr'}}" class="hr" />
+  </block>
+</view>

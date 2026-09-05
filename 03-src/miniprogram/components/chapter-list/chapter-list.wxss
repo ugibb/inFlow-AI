@@ -1,0 +1,41 @@
+.chapters {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+.chapter {
+  background: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: 18rpx;
+  padding: 22rpx 26rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+.chapter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.chapter-index {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--accent);
+  font-family: Menlo, Consolas, monospace;
+}
+.chapter-range {
+  font-size: 22rpx;
+  color: var(--text-3);
+  font-family: Menlo, Consolas, monospace;
+}
+.chapter-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.45;
+}
+.chapter-summary {
+  font-size: 24rpx;
+  color: var(--text-2);
+  line-height: 1.6;
+}

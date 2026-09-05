@@ -1,0 +1,115 @@
+<view class="page">
+  <!-- 搜索行：输入框 + 语义/关键词 toggle -->
+  <view class="search-row">
+    <view class="search-box">
+      <text class="search-icon">🔍</text>
+      <input
+        class="search-input"
+        placeholder="搜索你的知识库"
+        placeholder-class="search-placeholder"
+        value="{{keyword}}"
+        confirm-type="search"
+        bindinput="onSearchInput"
+        bindconfirm="onSearchConfirm"
+      />
+      <text wx:if="{{keyword}}" class="search-clear" catchtap="onClearSearch">✕</text>
+    </view>
+    <view class="mode-toggle" bindtap="onToggleSearchMode">{{searchMode === 'semantic' ? '语义' : '关键词'}}</view>
+  </view>
+
+  <!-- 平台 chips（横向滚动） -->
+  <scroll-view class="platform-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+    <view class="chips">
+      <view class="chip {{platform === '' ? 'chip-active' : ''}}" bindtap="onSelectPlatform" data-platform="">
+        全部
+      </view>
+      <view
+        wx:for="{{platformCounts}}"
+        wx:key="platform"
+        class="chip {{platform === item.platform ? 'chip-active' : ''}}"
+        bindtap="onSelectPlatform"
+        data-platform="{{item.platform}}"
+      >
+        {{item.label}}<text class="chip-count">{{item.count}}</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 主理人入口 -->
+  <view class="author-entry" bindtap="onOpenAuthorPicker">
+    <text class="author-entry-label {{author ? 'author-entry-active' : ''}}">{{author || '全部主理人'}}</text>
+    <text class="author-entry-arrow">▾</text>
+  </view>
+
+  <!-- 骨架屏 -->
+  <view wx:if="{{loading}}" class="masonry">
+    <view class="masonry-col" wx:for="{{skeletonCols}}" wx:key="*this">
+      <view class="skeleton" wx:for="{{[0, 1, 2]}}" wx:key="*this">
+        <view class="sk-cover" />
+        <view class="sk-line sk-w50" />
+        <view class="sk-line sk-w80" />
+        <view class="sk-line sk-w60" />
+      </view>
+    </view>
+  </view>
+
+  <!-- 错误态 -->
+  <empty-state wx:elif="{{error}}" icon="⚠️" title="{{error}}" desc="请检查网络后重试" retry bind:retry="onRetry" />
+
+  <!-- 空态 -->
+  <empty-state
+    wx:elif="{{itemCount === 0}}"
+    icon="📚"
+    title="还没有文章"
+    desc="先在 Web 端或微信 Bot 添加内容吧"
+  />
+
+  <!-- 瀑布流 -->
+  <view wx:else class="masonry">
+    <view class="masonry-col" wx:for="{{columns}}" wx:for-item="col" wx:key="k">
+      <article-card
+        wx:for="{{col.items}}"
+        wx:key="id"
+        article="{{item}}"
+        bind:cardtap="onCardTap"
+      />
+    </view>
+  </view>
+
+  <view wx:if="{{loadingMore}}" class="list-footer">加载中…</view>
+  <view wx:if="{{!hasMore && itemCount > 24 && !loading}}" class="list-footer">已经到底啦</view>
+
+  <view class="safe-bottom" />
+</view>
+
+<!-- 主理人选择弹层 -->
+<view wx:if="{{showAuthorPicker}}" class="mask" bindtap="onCloseAuthorPicker" />
+<view wx:if="{{showAuthorPicker}}" class="sheet">
+  <view class="sheet-header">
+    <text class="sheet-title">选择主理人</text>
+    <text class="sheet-close" catchtap="onCloseAuthorPicker">✕</text>
+  </view>
+  <input
+    class="sheet-search"
+    placeholder="搜索主理人"
+    placeholder-class="search-placeholder"
+    value="{{authorKeyword}}"
+    bindinput="onAuthorKeywordInput"
+  />
+  <scroll-view scroll-y class="sheet-list">
+    <view class="sheet-item {{author === '' ? 'sheet-item-active' : ''}}" bindtap="onClearAuthor">
+      <text class="sheet-item-name">全部主理人</text>
+    </view>
+    <block wx:for="{{authorCounts}}" wx:key="author">
+      <view
+        wx:if="{{!authorKeyword || item.author.indexOf(authorKeyword) > -1}}"
+        class="sheet-item {{author === item.author ? 'sheet-item-active' : ''}}"
+        bindtap="onSelectAuthor"
+        data-author="{{item.author}}"
+      >
+        <text class="sheet-item-name">{{item.author}}</text>
+        <text class="sheet-item-count">{{item.count}} 篇</text>
+      </view>
+    </block>
+  </scroll-view>
+</view>

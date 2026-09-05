@@ -1,0 +1,25 @@
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+.seg {
+  display: flex;
+  gap: 18rpx;
+  align-items: flex-start;
+}
+.seg-time {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: var(--text-3);
+  font-family: Menlo, Consolas, monospace;
+  padding-top: 4rpx;
+  min-width: 76rpx;
+}
+.seg-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: var(--text);
+}

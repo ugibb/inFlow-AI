@@ -1,0 +1,6 @@
+<view class="transcript">
+  <view class="seg" wx:for="{{view}}" wx:key="idx">
+    <text class="seg-time">{{item.time}}</text>
+    <text class="seg-text" user-select>{{item.text}}</text>
+  </view>
+</view>

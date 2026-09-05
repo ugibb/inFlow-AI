@@ -1,0 +1,109 @@
+.me-page {
+  padding: 32rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.user-card {
+  background: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: 24rpx;
+  padding: 36rpx 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+  margin-bottom: 32rpx;
+}
+.avatar {
+  width: 108rpx;
+  height: 108rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #007aff 0%, #0055cc 100%);
+  color: #fff;
+  font-size: 48rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.user-info {
+  flex: 1;
+  min-width: 0;
+}
+.user-name-row {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+.user-name {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--text);
+}
+.user-badge {
+  font-size: 20rpx;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-radius: 999rpx;
+  padding: 2rpx 16rpx;
+}
+.user-sub {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: var(--text-3);
+}
+
+.actions {
+  background: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: 24rpx;
+  overflow: hidden;
+}
+.action {
+  padding: 30rpx 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  border-bottom: 1rpx solid var(--border);
+}
+.action:last-child {
+  border-bottom: none;
+}
+.action:active {
+  background: #f7f7fa;
+}
+.action-title {
+  font-size: 28rpx;
+  color: var(--text);
+  flex-shrink: 0;
+}
+.action-value {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: 22rpx;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.action-arrow {
+  color: var(--text-3);
+  font-size: 34rpx;
+  margin-left: auto;
+}
+.action-danger .action-title {
+  color: var(--danger);
+}
+
+.version {
+  margin-top: auto;
+  padding-top: 48rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--text-3);
+}

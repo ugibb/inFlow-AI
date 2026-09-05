@@ -1,0 +1,27 @@
+<view class="me-page">
+  <!-- 用户卡片 -->
+  <view class="user-card" wx:if="{{user}}">
+    <view class="avatar">{{initial}}</view>
+    <view class="user-info">
+      <view class="user-name-row">
+        <text class="user-name">{{user.username}}</text>
+        <text wx:if="{{user.is_super_admin}}" class="user-badge">管理员</text>
+      </view>
+      <text class="user-sub">inFlow 知识库成员</text>
+    </view>
+  </view>
+
+  <!-- 操作列表 -->
+  <view class="actions">
+    <view class="action" bindtap="onCopyWeb">
+      <text class="action-title">复制 Web 端地址</text>
+      <text class="action-value">{{webUrl}}</text>
+    </view>
+    <view class="action action-danger" bindtap="onLogout">
+      <text class="action-title">退出登录</text>
+      <text class="action-arrow">›</text>
+    </view>
+  </view>
+
+  <text class="version">inFlow 小程序 v{{version}}</text>
+</view>
