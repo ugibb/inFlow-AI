@@ -8,20 +8,20 @@
     scroll-with-animation="{{scrollAnim}}"
     bindscroll="onScroll"
   >
-    <!-- 底部大留白：保证最后一句也能滚到 18% 钉位 -->
+    <!-- 虚拟列表：上下占位 + 窗口内 ~100 句 -->
     <view class="tl-inner">
+      <view style="height: {{padTop}}px;" />
       <view
         wx:for="{{view}}"
-        wx:key="idx"
-        id="seg-{{item.idx}}"
-        class="seg-item {{activeIdx === item.idx ? 'seg-active' : activeIdx > item.idx ? 'seg-past' : 'seg-idle'}}"
-        data-idx="{{index}}"
+        wx:key="ai"
+        class="seg-item {{activeIdx === item.ai ? 'seg-active' : activeIdx > item.ai ? 'seg-past' : 'seg-idle'}}"
+        data-ai="{{item.ai}}"
         bindtap="onTap"
       >
-        <text class="seg-time {{activeIdx === item.idx ? 'seg-time-active' : ''}}">{{item.time}}</text>
-        <text class="seg-text {{activeIdx === item.idx ? 'seg-text-active' : ''}}" user-select>{{item.text}}</text>
+        <text class="seg-time {{activeIdx === item.ai ? 'seg-time-active' : ''}}">{{item.time}}</text>
+        <text class="seg-text {{activeIdx === item.ai ? 'seg-text-active' : ''}}" user-select>{{item.text}}</text>
       </view>
-      <view class="tl-tail" />
+      <view style="height: {{padBottom}}px;" />
     </view>
   </scroll-view>
 

@@ -1,5 +1,6 @@
 import { api } from '../../utils/api';
 import { pageAuth } from '../../utils/auth';
+import { logInfo } from '../../utils/log';
 import { distributeColumns, MasonryColumn } from '../../utils/masonry';
 import { resolveImage } from '../../utils/image-url';
 import { PLATFORM_LABELS, PAGE_SIZE } from '../../config/index';
@@ -100,6 +101,7 @@ Page({
     this.setData({ loading: true, error: '' });
     try {
       const data = await api.getArticles(this.buildParams(1));
+      logInfo('lib', 'list ok', { total: data.total, got: data.items.length });
       this.items = data.items.map(decorate);
       this.page = 1;
       this.setData({

@@ -8,10 +8,6 @@
 .tl-inner {
   padding: 0 8rpx;
 }
-/* 尾部留白 ≈ 窗口高 82%，让最后一句也能钉到 18% 处 */
-.tl-tail {
-  height: 53vh;
-}
 
 /* ── 三态句子 ── */
 .seg-item {

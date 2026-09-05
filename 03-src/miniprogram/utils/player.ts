@@ -4,7 +4,11 @@
  * bind() 即可恢复 UI；换一篇文章播放则自动切源。
  * 注意：playing 自维护（onPlay/onPause/onStop/onEnded 置位），
  * 不读 bgm.paused——部分基础库首次播放前该值不可靠。
+ * iOS 真机：src 设置后到 onCanplay 之前 seek 会异常/闪退——
+ * 全部 seek 经 ready 门卫，未就绪的排队 pendingSeek 到 onCanplay 再执行。
  */
+
+import { logInfo, logError } from './log';
 
 export interface PlayerState {
   src: string;
@@ -31,6 +35,34 @@ let playing = false;
 let scrubbing = false;
 /** 换源后等 onCanplay 再执行的 seek 位置 */
 let pendingSeek = 0;
+/** onCanplay 置位、换源清零：iOS 未就绪时 seek 会出问题 */
+let ready = false;
+
+/** 安全 seek：未就绪就排队 */
+function safeSeek(sec: number): void {
+  if (!bgm) {
+    pendingSeek = sec;
+    return;
+  }
+  if (!ready) {
+    pendingSeek = sec;
+    return;
+  }
+  try {
+    bgm.seek(Math.max(0, sec));
+  } catch {
+    pendingSeek = sec;
+  }
+}
+
+function safePlay(): void {
+  if (!bgm) return;
+  try {
+    bgm.play();
+  } catch {
+    /* 个别平台 play 抛异常，忽略：onError 会兜底 */
+  }
+}
 
 function emit(): void {
   if (!listener) return;
@@ -62,13 +94,20 @@ function ensure(): WechatMiniprogram.BackgroundAudioManager {
   bgm.onError(() => {
     // 源失效/格式不支持：清掉占住的 src，让下次点击走重新起播
     playing = false;
+    ready = false;
     currentSrc = '';
     emit();
+    logError('player', 'bgm onError');
     wx.showToast({ title: '播放失败，节目源可能失效', icon: 'none' });
   });
   bgm.onCanplay(() => {
+    ready = true;
     if (pendingSeek > 0 && bgm) {
-      bgm.seek(pendingSeek);
+      try {
+        bgm.seek(pendingSeek);
+      } catch {
+        /* ignore */
+      }
       pendingSeek = 0;
     }
   });
@@ -97,9 +136,11 @@ export function getState(): PlayerState {
 function start(meta: PlayMeta, startSec: number): void {
   const m = ensure();
   currentSrc = meta.src;
+  ready = false;
   pendingSeek = startSec > 0 ? startSec : 0;
   m.title = (meta.title || '未命名节目').slice(0, 100);
   if (meta.cover) m.coverImgUrl = meta.cover;
+  logInfo('player', 'start', { startSec, host: meta.src.slice(0, 40) });
   m.src = meta.src; // 设置 src 即自动播放
   playing = true;
   emit();
@@ -120,9 +161,9 @@ export function toggle(meta: PlayMeta, resumeSec?: number): void {
     return;
   }
   if (resumeSec != null && Math.abs((m.currentTime || 0) - resumeSec) > 1) {
-    m.seek(resumeSec);
+    safeSeek(resumeSec);
   }
-  m.play();
+  safePlay();
 }
 
 /** 跳到指定秒并确保在播（章节/转录句点击） */
@@ -131,9 +172,8 @@ export function seekPlay(meta: PlayMeta, sec: number): void {
     start(meta, sec);
     return;
   }
-  const m = ensure();
-  m.seek(Math.max(0, sec));
-  if (!playing) m.play();
+  safeSeek(sec);
+  if (!playing) safePlay();
 }
 
 /** 拖动进度条开始：挂起 timeupdate 回写 */
@@ -141,8 +181,8 @@ export function scrubStart(): void {
   scrubbing = true;
 }
 
-/** 拖动结束：落位到目标秒（同源已加载才真正 seek，否则等起播时用） */
+/** 拖动结束：落位到目标秒（未就绪则排队 pendingSeek） */
 export function scrubEnd(sec: number): void {
   scrubbing = false;
-  if (bgm && currentSrc) bgm.seek(Math.max(0, sec));
+  if (bgm && currentSrc) safeSeek(sec);
 }

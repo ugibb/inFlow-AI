@@ -3,6 +3,7 @@ import { pageAuth } from '../../utils/auth';
 import { resolveImage } from '../../utils/image-url';
 import { formatDate, formatDuration, formatPlayerTime, formatReadingTime } from '../../utils/format';
 import * as player from '../../utils/player';
+import { logInfo, logError } from '../../utils/log';
 import { PLATFORM_LABELS } from '../../config/index';
 
 interface TabItem {
@@ -99,6 +100,12 @@ Page({
         loading: false,
       });
       wx.setNavigationBarTitle({ title: a.title || '阅读' });
+      logInfo('read', 'detail ok', {
+        id: this.data.id,
+        ctype: a.content_type,
+        media: !!a.media_url,
+        contentLen: (a.clean_content || '').length,
+      });
 
       // 订阅全局播放器（详情重试/重新进入都会重绑，模块内是单槽回调）
       this.bindPlayer();
@@ -106,6 +113,7 @@ Page({
       // 音频顺手预载章节（拿总时长展示）
       if (isAudio && chaptersApplicable) this.loadChapters();
     } catch (e) {
+      logError('read', 'detail fail', { msg: (e as Error).message });
       this.setData({ loading: false, error: (e as Error).message || '加载失败' });
     }
   },
@@ -141,6 +149,7 @@ Page({
     this.setData({ transcriptLoading: true, transcriptError: '' });
     try {
       const data = await api.getTranscript(this.data.id);
+      logInfo('read', 'transcript ok', { segs: (data.segments || []).length });
       this.setData({ transcript: data, transcriptLoading: false });
     } catch (e) {
       this.setData({ transcriptLoading: false, transcriptError: (e as Error).message || '加载失败' });
@@ -260,7 +269,11 @@ Page({
     const v = Number(e.detail.value) || 0;
     this.scrubbing = true;
     player.scrubStart();
-    this.setData({ audioCurrent: v, audioCurrentText: formatPlayerTime(v) });
+    // 按秒去重：bindchanging 高频触发，真机全程 setData 会卡顿
+    const t = formatPlayerTime(v);
+    if (t !== this.data.audioCurrentText) {
+      this.setData({ audioCurrent: v, audioCurrentText: t });
+    }
   },
 
   onScrubEnd(e: any) {

@@ -1,5 +1,6 @@
 import { api } from '../../utils/api';
 import { setAuth } from '../../utils/auth';
+import { logInfo } from '../../utils/log';
 import { BASE_URL } from '../../config/index';
 
 /** 登录页：账号密码 → JWT（30 天）→ reLaunch 回 redirect 或首页 */
@@ -46,6 +47,7 @@ Page({
     this.setData({ submitting: true, error: '' });
     try {
       const res = await api.login(username, password);
+      logInfo('auth', 'login ok', { user: res.user && res.user.username });
       setAuth(res.access_token, res.user);
       // 启动时的 authReady 已按未登录 settle 为 null，必须刷新，
       // 否则 reLaunch 回来的页面 / 静默刷新消费到过期 null
