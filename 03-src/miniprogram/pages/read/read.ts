@@ -1,4 +1,5 @@
 import { api } from '../../utils/api';
+import { pageAuth } from '../../utils/auth';
 import { resolveImage } from '../../utils/image-url';
 import { formatDate, formatDuration, formatReadingTime } from '../../utils/format';
 import { PLATFORM_LABELS } from '../../config/index';
@@ -43,9 +44,7 @@ Page({
       this.setData({ loading: false, error: '缺少文章参数' });
       return;
     }
-    const app = getApp<IAppOption>();
-    if (!app.globalData.authReady) return;
-    app.globalData.authReady.then((token) => {
+    pageAuth().then((token) => {
       if (!token) {
         wx.reLaunch({
           url:

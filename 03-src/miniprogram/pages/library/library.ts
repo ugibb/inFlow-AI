@@ -1,4 +1,5 @@
 import { api } from '../../utils/api';
+import { pageAuth } from '../../utils/auth';
 import { distributeColumns, MasonryColumn } from '../../utils/masonry';
 import { resolveImage } from '../../utils/image-url';
 import { PLATFORM_LABELS, PAGE_SIZE } from '../../config/index';
@@ -50,9 +51,7 @@ Page({
   searchTimer: 0,
 
   onLoad() {
-    const app = getApp<IAppOption>();
-    if (!app.globalData.authReady) return;
-    app.globalData.authReady.then((token) => {
+    pageAuth().then((token) => {
       if (!token) {
         wx.reLaunch({
           url: '/pages/login/login?redirect=' + encodeURIComponent('/pages/library/library'),
@@ -71,14 +70,11 @@ Page({
       return;
     }
     // 从 read 页返回 / tab 切回：静默合并第一页（保滚动位置）+ 刷新筛选计数
-    const app = getApp<IAppOption>();
-    if (app.globalData.authReady) {
-      app.globalData.authReady.then((t) => {
-        if (!t) return;
-        this.fetchArticles(true);
-        this.fetchCounts();
-      });
-    }
+    pageAuth().then((t) => {
+      if (!t) return;
+      this.fetchArticles(true);
+      this.fetchCounts();
+    });
   },
 
   onUnload() {

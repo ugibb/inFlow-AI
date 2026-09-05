@@ -140,3 +140,17 @@ export function validateStored(onUser?: (u: User) => void): Promise<string | nul
     });
   });
 }
+
+/**
+ * 页面级守卫（onLoad/onShow 用）：本地 token 未过期直接放行；
+ * 否则回落启动校验 Promise（覆盖冷启动 /me 一次性校验场景）。
+ * authReady 只反映冷启动时刻的状态且只 settle 一次——登录成功 reLaunch
+ * 回来的新页面实例若还 await 它，会拿到过期的 null 被误弹回登录页（死循环），
+ * 所以守卫一律本地 token 优先，不依赖 login 页是否刷新了 authReady。
+ */
+export function pageAuth(): Promise<string | null> {
+  const t = getToken();
+  if (t && !tokenExpired(t)) return Promise.resolve(t);
+  const app = getApp<IAppOption>();
+  return app.globalData.authReady || Promise.resolve(null);
+}

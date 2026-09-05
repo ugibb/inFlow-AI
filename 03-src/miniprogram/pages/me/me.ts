@@ -50,7 +50,9 @@ Page({
       success: (r) => {
         if (!r.confirm) return;
         clearAuth();
-        getApp<IAppOption>().globalData.user = null;
+        const app = getApp<IAppOption>();
+        app.globalData.user = null;
+        app.globalData.authReady = Promise.resolve(null);
         wx.reLaunch({ url: '/pages/login/login' });
       },
     });
