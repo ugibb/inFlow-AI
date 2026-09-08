@@ -81,4 +81,17 @@ export const api = {
   getTranscript(id: string) {
     return request<JobTranscript>('/api/articles/' + id + '/transcript');
   },
+
+  // 游客只读通道（页脚小程序码扫码进入；UUID 即阅读凭证，不注 token）
+  getArticleGuest(id: string) {
+    return request<ArticleDetail>('/api/articles/' + id + '/guest', { skipAuth: true });
+  },
+
+  getChaptersGuest(id: string) {
+    return request<ArticleChaptersResponse>('/api/articles/' + id + '/guest/chapters', { skipAuth: true });
+  },
+
+  getTranscriptGuest(id: string) {
+    return request<JobTranscript>('/api/articles/' + id + '/guest/transcript', { skipAuth: true });
+  },
 };

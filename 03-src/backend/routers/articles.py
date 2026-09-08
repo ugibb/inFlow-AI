@@ -801,6 +801,85 @@ async def get_article_transcript(
     }
 
 
+# ── 游客只读通道（精华卡页脚小程序码扫码进入）────────────────────────
+# 语义：文章 UUID 即阅读凭证（capability URL）——持有二维码/链接即可读，
+# 对应「精华卡分享出去，任何人扫码都能看本文」的产品决策。
+# 仅 GET、无写操作；响应剥除用户态字段（收藏/文件夹/标签）与 raw_content；
+# UUID 不可枚举，未持凭证者无法探测其他文章。
+
+
+@router.get("/{article_id}/guest", response_model=ArticleDetailResponse)
+async def get_article_guest(
+    article_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Guest read-only article detail (mini-program QR entry, no auth)."""
+    article = await db.get(Article, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    media_url, ingest_raw_text, ingest_cover, ingest_content_type = await _get_ingest_extras(db, article_id)
+    detail = ArticleDetailResponse.model_validate(article)
+    detail.media_url = article.media_url or media_url
+    if not detail.cover_image and ingest_cover:
+        detail.cover_image = ingest_cover
+    if ingest_content_type and ingest_content_type != 'article' and detail.content_type == 'article':
+        detail.content_type = ingest_content_type
+    detail.content_blocks = _content_block_summary(
+        article, raw_fallback=ingest_raw_text, content_type=detail.content_type
+    )
+    # 游客剥离：用户态字段与原始 HTML 大块（read 页不消费 raw_content）
+    detail.raw_content = None
+    detail.is_favorited = False
+    detail.folder_id = None
+    detail.folder = None
+    detail.tags = []
+    return detail
+
+
+@router.get("/{article_id}/guest/chapters")
+async def get_article_guest_chapters(
+    article_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Guest read-only chapter data (mirrors /chapters without auth)."""
+    article = await db.get(Article, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    data = article.chapters
+    if not data or not data.get("chapters"):
+        raise HTTPException(status_code=404, detail="Chapters not yet generated")
+
+    if not data.get("total_duration") and article.transcript:
+        real_dur = float((article.transcript or {}).get("duration") or 0)
+        if real_dur > 0:
+            data = {**data, "total_duration": real_dur}
+
+    return data
+
+
+@router.get("/{article_id}/guest/transcript")
+async def get_article_guest_transcript(
+    article_id: UUID,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Guest read-only ASR transcript (mirrors /transcript without auth)."""
+    article = await db.get(Article, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    data = article.transcript
+    if not data:
+        raise HTTPException(status_code=404, detail="Transcript not yet available")
+
+    return {
+        "language": data.get("language"),
+        "duration": data.get("duration"),
+        "segments": data.get("segments") or [],
+    }
+
+
 @router.get("/{article_id}/deep-read", response_class=HTMLResponse)
 async def get_article_deep_read(
     article_id: UUID,

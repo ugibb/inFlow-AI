@@ -12,8 +12,30 @@ interface TabItem {
 }
 
 /**
+ * 入口参数解析：普通/分享卡片走 options.id；精华卡页脚小程序码走 options.scene
+ * （getwxacodeunlimit 的 scene = 文章 UUID 去横线的 32 位 hex，恰好卡 32 字符上限）。
+ */
+function resolveEntryId(options: Record<string, string | undefined>): string {
+  const id = (options && options.id) || '';
+  if (id) return id;
+  const scene = (options && options.scene) || '';
+  if (!scene) return '';
+  let hex = '';
+  try {
+    hex = decodeURIComponent(scene).replace(/[^0-9a-fA-F]/g, '');
+  } catch {
+    hex = scene.replace(/[^0-9a-fA-F]/g, '');
+  }
+  if (hex.length !== 32) return '';
+  const s = hex.toLowerCase();
+  return `${s.slice(0, 8)}-${s.slice(8, 12)}-${s.slice(12, 16)}-${s.slice(16, 20)}-${s.slice(20)}`;
+}
+
+/**
  * 阅读页：detail 一次拉全（含 content_blocks 存在性快照），tab 显示由快照驱动；
  * 章节/转录切到时才懒加载并缓存本页内存。可被分享卡片直达（无 token 走登录闭环）。
+ * 小程序码（scene）进入额外支持游客只读：无 token 或文章非本账号时走 /guest 通道，
+ * 持码即可读（UUID 即阅读凭证），音频播放/章节/转录照常。
  */
 Page({
   data: {
@@ -51,8 +73,14 @@ Page({
   /** 拖动进度条期间不响应 timeupdate 回写（避免滑块拉锯） */
   scrubbing: false,
 
+  /** 小程序码（scene）进入：允许无 token 游客只读 */
+  fromScene: false,
+  /** 已转入游客只读模式（后续章节/转录也走 /guest 通道） */
+  guest: false,
+
   onLoad(options: Record<string, string | undefined>) {
-    const id = (options && options.id) || '';
+    this.fromScene = !(options && options.id) && !!(options && options.scene);
+    const id = resolveEntryId(options);
     this.setData({ id });
     if (!id) {
       this.setData({ loading: false, error: '缺少文章参数' });
@@ -60,6 +88,11 @@ Page({
     }
     pageAuth().then((token) => {
       if (!token) {
+        // 小程序码进入 → 游客只读；普通进入（分享卡片）维持登录闭环
+        if (this.fromScene) {
+          this.enterGuest();
+          return;
+        }
         wx.reLaunch({
           url:
             '/pages/login/login?redirect=' +
@@ -75,47 +108,74 @@ Page({
     this.setData({ loading: true, error: '' });
     try {
       const a = await api.getArticle(this.data.id);
-      const blocks = a.content_blocks || {};
-      const isAudio = a.content_type === 'audio';
-
-      // tab 可见性 = 后端 content_blocks 快照（缺快照的老数据按内容类型兜底）
-      const chaptersApplicable = blocks.chapters ? blocks.chapters.applicable : isAudio || a.content_type === 'article';
-      const transcriptApplicable = blocks.transcript ? blocks.transcript.applicable : isAudio;
-
-      const tabs: TabItem[] = [{ key: 'raw', label: isAudio ? '节目信息' : '原文' }];
-      if (chaptersApplicable) tabs.push({ key: 'chapters', label: '章节速览' });
-      if (transcriptApplicable) tabs.push({ key: 'transcript', label: '全文转录' });
-      tabs.push({ key: 'ai', label: 'AI 摘要' });
-      // MVP 隐藏 deepRead（HTML 精读小程序无法承载，二期卡片化）
-
-      this.setData({
-        article: a,
-        cover: resolveImage(a.cover_image),
-        platformLabel: PLATFORM_LABELS[a.source_platform || 'generic'] || a.source_platform || '',
-        publishedDate: formatDate(a.published_at),
-        readingTimeText: formatReadingTime(a.reading_time || 0),
-        tabs,
-        // 音频默认落在章节速览（MVP 无播放器，章节是最有用入口）
-        activeTab: isAudio && chaptersApplicable ? 'chapters' : 'raw',
-        loading: false,
-      });
-      wx.setNavigationBarTitle({ title: a.title || '阅读' });
-      logInfo('read', 'detail ok', {
-        id: this.data.id,
-        ctype: a.content_type,
-        media: !!a.media_url,
-        contentLen: (a.clean_content || '').length,
-      });
-
-      // 订阅全局播放器（详情重试/重新进入都会重绑，模块内是单槽回调）
-      this.bindPlayer();
-
-      // 音频顺手预载章节（拿总时长展示）
-      if (isAudio && chaptersApplicable) this.loadChapters();
+      this.applyDetail(a);
     } catch (e) {
+      // 小程序码进入 + 文章非当前账号（404）→ 转游客只读
+      if (this.fromScene && !this.guest && (e as { statusCode?: number }).statusCode === 404) {
+        this.enterGuest();
+        return;
+      }
       logError('read', 'detail fail', { msg: (e as Error).message });
       this.setData({ loading: false, error: (e as Error).message || '加载失败' });
     }
+  },
+
+  /** 转入游客只读模式并加载（scene 进入且无 token / 非本账号文章） */
+  enterGuest() {
+    this.guest = true;
+    this.loadDetailGuest();
+  },
+
+  async loadDetailGuest() {
+    this.setData({ loading: true, error: '' });
+    try {
+      const a = await api.getArticleGuest(this.data.id);
+      this.applyDetail(a);
+    } catch (e) {
+      logError('read', 'guest detail fail', { msg: (e as Error).message });
+      this.setData({ loading: false, error: (e as Error).message || '加载失败' });
+    }
+  },
+
+  /** detail 响应落屏（登录/游客两路共用） */
+  applyDetail(a: ArticleDetail) {
+    const blocks = a.content_blocks || {};
+    const isAudio = a.content_type === 'audio';
+
+    // tab 可见性 = 后端 content_blocks 快照（缺快照的老数据按内容类型兜底）
+    const chaptersApplicable = blocks.chapters ? blocks.chapters.applicable : isAudio || a.content_type === 'article';
+    const transcriptApplicable = blocks.transcript ? blocks.transcript.applicable : isAudio;
+
+    const tabs: TabItem[] = [{ key: 'raw', label: isAudio ? '节目信息' : '原文' }];
+    if (chaptersApplicable) tabs.push({ key: 'chapters', label: '章节速览' });
+    if (transcriptApplicable) tabs.push({ key: 'transcript', label: '全文转录' });
+    tabs.push({ key: 'ai', label: 'AI 摘要' });
+    // MVP 隐藏 deepRead（HTML 精读小程序无法承载，二期卡片化）
+
+    this.setData({
+      article: a,
+      cover: resolveImage(a.cover_image),
+      platformLabel: PLATFORM_LABELS[a.source_platform || 'generic'] || a.source_platform || '',
+      publishedDate: formatDate(a.published_at),
+      readingTimeText: formatReadingTime(a.reading_time || 0),
+      tabs,
+      // 音频默认落在章节速览（MVP 无播放器，章节是最有用入口）
+      activeTab: isAudio && chaptersApplicable ? 'chapters' : 'raw',
+      loading: false,
+    });
+    wx.setNavigationBarTitle({ title: a.title || '阅读' });
+    logInfo('read', 'detail ok', {
+      id: this.data.id,
+      ctype: a.content_type,
+      media: !!a.media_url,
+      contentLen: (a.clean_content || '').length,
+    });
+
+    // 订阅全局播放器（详情重试/重新进入都会重绑，模块内是单槽回调）
+    this.bindPlayer();
+
+    // 音频顺手预载章节（拿总时长展示）
+    if (isAudio && chaptersApplicable) this.loadChapters();
   },
 
   onTabTap(e: any) {
@@ -133,7 +193,9 @@ Page({
     if (this.data.chaptersLoading) return;
     this.setData({ chaptersLoading: true, chaptersError: '' });
     try {
-      const data = await api.getChapters(this.data.id);
+      const data = this.guest
+        ? await api.getChaptersGuest(this.data.id)
+        : await api.getChapters(this.data.id);
       this.setData({
         chapters: data,
         chaptersLoading: false,
@@ -148,7 +210,9 @@ Page({
     if (this.data.transcriptLoading) return;
     this.setData({ transcriptLoading: true, transcriptError: '' });
     try {
-      const data = await api.getTranscript(this.data.id);
+      const data = this.guest
+        ? await api.getTranscriptGuest(this.data.id)
+        : await api.getTranscript(this.data.id);
       logInfo('read', 'transcript ok', { segs: (data.segments || []).length });
       this.setData({ transcript: data, transcriptLoading: false });
     } catch (e) {
@@ -317,7 +381,8 @@ Page({
   },
 
   onRetry() {
-    this.loadDetail();
+    if (this.guest) this.loadDetailGuest();
+    else this.loadDetail();
   },
 
   // ── 分享（个人主体可用）──────────────────────────────────
