@@ -1,6 +1,14 @@
 <view class="me-page">
+  <!-- 未登录（游客浏览态）：登录引导 -->
+  <view wx:if="{{loggedOut}}" class="loggedout-card">
+    <view class="loggedout-avatar">in</view>
+    <view class="loggedout-title">登录 inFlow</view>
+    <view class="loggedout-desc">微信一键登录，同步你的播客与文章收藏库</view>
+    <view class="loggedout-btn" bindtap="onGoLogin">微信一键登录</view>
+  </view>
+
   <!-- 用户卡片（微信头像昵称优先，未设置回退账号用户名首字母） -->
-  <view class="user-card" wx:if="{{user}}">
+  <view class="user-card" wx:if="{{!loggedOut && user}}">
     <image wx:if="{{profile && profile.avatar}}" class="avatar avatar-img" src="{{profile.avatar}}" mode="aspectFill" />
     <view wx:else class="avatar">{{initial}}</view>
     <view class="user-info">
@@ -45,7 +53,7 @@
       <text class="action-title">复制 Web 端地址</text>
       <text class="action-value">{{webUrl}}</text>
     </view>
-    <view class="action action-danger" bindtap="onLogout">
+    <view wx:if="{{!loggedOut}}" class="action action-danger" bindtap="onLogout">
       <text class="action-title">退出登录</text>
       <text class="action-arrow">›</text>
     </view>

@@ -21,6 +21,8 @@ function decorate(a: Article): Article {
 /**
  * 首页（tab1）：瀑布流 + 搜索（语义/关键词）+ 平台 chips + 主理人弹层 +
  * 无限滚动 + 下拉刷新静默合并（翻译 Web library/page.tsx 的数据流）。
+ * 未登录不强踢登录页（审核要求「未登录可体验基本功能」）：进游客视图，
+ * 展示示例文章（/api/articles/demo，无鉴权）+ 登录引导；空库也展示示例。
  */
 Page({
   data: {
@@ -43,6 +45,11 @@ Page({
 
     showAuthorPicker: false,
     authorKeyword: '',
+
+    /** 游客态（未登录浏览）：隐藏搜索/筛选，展示引导 + 示例文章 */
+    guest: false,
+    demo: null as Article | null,
+    demoLoading: false,
   },
 
   /** 全量有序源（不进 data，减小 setData 体积；columns 是它的分列派生） */
@@ -54,9 +61,7 @@ Page({
   onLoad() {
     pageAuth().then((token) => {
       if (!token) {
-        wx.reLaunch({
-          url: '/pages/login/login?redirect=' + encodeURIComponent('/pages/library/library'),
-        });
+        this.enterGuestView();
         return;
       }
       this.reload();
@@ -70,9 +75,16 @@ Page({
       this.firstShow = false;
       return;
     }
-    // 从 read 页返回 / tab 切回：静默合并第一页（保滚动位置）+ 刷新筛选计数
     pageAuth().then((t) => {
       if (!t) return;
+      // 游客态中完成登录（login redirect / 静默登录生效）→ 切回正式列表
+      if (this.data.guest) {
+        this.setData({ guest: false, loading: true, demo: null });
+        this.reload();
+        this.fetchCounts();
+        return;
+      }
+      // 从 read 页返回 / tab 切回：静默合并第一页（保滚动位置）+ 刷新筛选计数
       this.fetchArticles(true);
       this.fetchCounts();
     });
@@ -111,6 +123,8 @@ Page({
         hasMore: this.items.length < data.total,
         loading: false,
       });
+      // 新账号空库（审核员/新用户首屏）：补展示示例文章
+      if (!this.items.length) this.loadDemo();
     } catch (e) {
       this.setData({ loading: false, error: (e as Error).message || '加载失败' });
     }
@@ -252,6 +266,32 @@ Page({
 
   onRetry() {
     this.reload();
+  },
+
+  // ── 游客态（未登录浏览）────────────────────────────────────
+
+  /** 进入游客视图：不拉列表，加载示例文章（失败静默退回纯引导） */
+  enterGuestView() {
+    this.setData({ guest: true, loading: false, error: '' });
+    this.loadDemo();
+  },
+
+  async loadDemo() {
+    this.setData({ demoLoading: true });
+    try {
+      const a = await api.getArticleDemo();
+      this.setData({ demo: decorate(a), demoLoading: false });
+    } catch {
+      // 云端未配置 DEMO_ARTICLE_ID / 网络失败：引导卡仍完整可用
+      this.setData({ demo: null, demoLoading: false });
+    }
+  },
+
+  /** 登录引导 → 登录页（登录成功 reLaunch 回首页转正式列表） */
+  onGoLogin() {
+    wx.navigateTo({
+      url: '/pages/login/login?redirect=' + encodeURIComponent('/pages/library/library'),
+    });
   },
 
   onCardTap(e: any) {

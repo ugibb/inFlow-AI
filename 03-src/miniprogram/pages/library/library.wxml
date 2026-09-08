@@ -1,4 +1,16 @@
 <view class="page">
+  <!-- 游客视图（未登录浏览，不强制登录） -->
+  <block wx:if="{{guest}}">
+    <view class="guest-hero">
+      <view class="guest-logo">inFlow</view>
+      <view class="guest-title">你的 AI 知识库</view>
+      <view class="guest-desc">收藏播客与文章，AI 帮你提炼摘要、章节与金句，随时回听复习</view>
+      <view class="guest-login-btn" bindtap="onGoLogin">微信一键登录</view>
+      <view class="guest-login-hint">登录后即可同步你的收藏库</view>
+    </view>
+  </block>
+
+  <block wx:else>
   <!-- 搜索行：输入框 + 语义/关键词 toggle -->
   <view class="search-row">
     <view class="search-box">
@@ -58,10 +70,10 @@
 
   <!-- 空态 -->
   <empty-state
-    wx:elif="{{itemCount === 0}}"
+    wx:elif="{{itemCount === 0 && !loading}}"
     icon="📚"
-    title="还没有文章"
-    desc="先在 Web 端或微信 Bot 添加内容吧"
+    title="还没有收藏"
+    desc="把播客或文章链接发给微信 Bot，或粘贴到 Web 端"
   />
 
   <!-- 瀑布流 -->
@@ -75,6 +87,14 @@
       />
     </view>
   </view>
+  </block>
+
+  <!-- 示例文章：游客态 & 登录后空库都展示（新用户/审核员首屏有内容可读） -->
+  <view wx:if="{{demo && (guest || itemCount === 0)}}" class="demo-section">
+    <view class="demo-label">{{guest ? '先看一篇示例' : '不知道从哪开始？看篇示例'}}</view>
+    <article-card article="{{demo}}" bind:cardtap="onCardTap" />
+  </view>
+  <view wx:if="{{guest && demoLoading}}" class="demo-label">示例加载中…</view>
 
   <view wx:if="{{loadingMore}}" class="list-footer">加载中…</view>
   <view wx:if="{{!hasMore && itemCount > 24 && !loading}}" class="list-footer">已经到底啦</view>

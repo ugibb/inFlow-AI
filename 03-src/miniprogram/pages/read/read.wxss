@@ -27,6 +27,27 @@
 .rl-w60 { width: 60%; }
 .rl-w50 { width: 50%; }
 
+/* ── 游客引导条 ── */
+.guest-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card);
+  border: 1rpx solid var(--border);
+  border-radius: 16rpx;
+  padding: 18rpx 24rpx;
+  margin-bottom: 20rpx;
+}
+.guest-bar-text {
+  font-size: 24rpx;
+  color: var(--text-2, #86868b);
+}
+.guest-bar-cta {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #007aff;
+}
+
 /* ── 头部 ── */
 .head {
   background: var(--card);

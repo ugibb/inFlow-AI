@@ -13,6 +13,8 @@ Page({
     profile: null as WxProfile | null,
     version: APP_VERSION,
     webUrl: BASE_URL,
+    /** 未登录浏览态（游客）：展示登录引导，不强踢登录页 */
+    loggedOut: false,
 
     editing: false,
     editNickname: '',
@@ -25,10 +27,10 @@ Page({
 
   onShow() {
     if (!getToken()) {
-      wx.reLaunch({ url: '/pages/login/login' });
+      this.setData({ loggedOut: true, user: null, profile: null });
       return;
     }
-    this.setData({ profile: getWxProfile() });
+    this.setData({ loggedOut: false, profile: getWxProfile() });
     const cached = getUser();
     this.applyUser(cached);
     // 静默刷新（失败用 storage 缓存兜底）
@@ -39,6 +41,13 @@ Page({
         getApp<IAppOption>().globalData.user = u;
       })
       .catch(() => {});
+  },
+
+  /** 未登录引导 → 登录页（登录成功 reLaunch 回本页转正式视图） */
+  onGoLogin() {
+    wx.navigateTo({
+      url: '/pages/login/login?redirect=' + encodeURIComponent('/pages/me/me'),
+    });
   },
 
   applyUser(u: User | null) {
@@ -138,7 +147,8 @@ Page({
         const app = getApp<IAppOption>();
         app.globalData.user = null;
         app.globalData.authReady = Promise.resolve(null);
-        wx.reLaunch({ url: '/pages/login/login' });
+        // 退出后回首页游客视图（不强踢登录页）
+        wx.reLaunch({ url: '/pages/library/library' });
       },
     });
   },

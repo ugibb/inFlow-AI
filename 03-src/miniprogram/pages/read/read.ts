@@ -33,9 +33,10 @@ function resolveEntryId(options: Record<string, string | undefined>): string {
 
 /**
  * 阅读页：detail 一次拉全（含 content_blocks 存在性快照），tab 显示由快照驱动；
- * 章节/转录切到时才懒加载并缓存本页内存。可被分享卡片直达（无 token 走登录闭环）。
- * 小程序码（scene）进入额外支持游客只读：无 token 或文章非本账号时走 /guest 通道，
- * 持码即可读（UUID 即阅读凭证），音频播放/章节/转录照常。
+ * 章节/转录切到时才懒加载并缓存本页内存。可被分享卡片/小程序码直达。
+ * 游客只读：无 token（静默登录失败/邀请码未过/分享进入未登录），或已登录但
+ * 文章非本账号（404）时走 /guest 通道，持链接/码即可读（UUID 即阅读凭证），
+ * 音频播放/章节/转录照常，页面顶部给登录引导条。
  */
 Page({
   data: {
@@ -68,18 +69,15 @@ Page({
     audioDuration: 0,
     audioCurrentText: '0:00',
     audioDurationText: '',
+
+    /** 游客只读模式（章节/转录走 /guest 通道 + 顶部登录引导条） */
+    guest: false,
   },
 
   /** 拖动进度条期间不响应 timeupdate 回写（避免滑块拉锯） */
   scrubbing: false,
 
-  /** 小程序码（scene）进入：允许无 token 游客只读 */
-  fromScene: false,
-  /** 已转入游客只读模式（后续章节/转录也走 /guest 通道） */
-  guest: false,
-
   onLoad(options: Record<string, string | undefined>) {
-    this.fromScene = !(options && options.id) && !!(options && options.scene);
     const id = resolveEntryId(options);
     this.setData({ id });
     if (!id) {
@@ -88,16 +86,8 @@ Page({
     }
     pageAuth().then((token) => {
       if (!token) {
-        // 小程序码进入 → 游客只读；普通进入（分享卡片）维持登录闭环
-        if (this.fromScene) {
-          this.enterGuest();
-          return;
-        }
-        wx.reLaunch({
-          url:
-            '/pages/login/login?redirect=' +
-            encodeURIComponent('/pages/read/read?id=' + id),
-        });
+        // 未登录（静默登录失败/邀请码门槛/分享直达）→ 游客只读，不强制登录
+        this.enterGuest();
         return;
       }
       this.loadDetail();
@@ -110,8 +100,8 @@ Page({
       const a = await api.getArticle(this.data.id);
       this.applyDetail(a);
     } catch (e) {
-      // 小程序码进入 + 文章非当前账号（404）→ 转游客只读
-      if (this.fromScene && !this.guest && (e as { statusCode?: number }).statusCode === 404) {
+      // 文章非当前账号（404）→ 转游客只读；真不存在则 guest 请求同样 404 落错误态
+      if (!this.data.guest && (e as { statusCode?: number }).statusCode === 404) {
         this.enterGuest();
         return;
       }
@@ -120,9 +110,9 @@ Page({
     }
   },
 
-  /** 转入游客只读模式并加载（scene 进入且无 token / 非本账号文章） */
+  /** 转入游客只读模式并加载（无 token / 非本账号文章） */
   enterGuest() {
-    this.guest = true;
+    this.setData({ guest: true });
     this.loadDetailGuest();
   },
 
@@ -193,7 +183,7 @@ Page({
     if (this.data.chaptersLoading) return;
     this.setData({ chaptersLoading: true, chaptersError: '' });
     try {
-      const data = this.guest
+      const data = this.data.guest
         ? await api.getChaptersGuest(this.data.id)
         : await api.getChapters(this.data.id);
       this.setData({
@@ -210,7 +200,7 @@ Page({
     if (this.data.transcriptLoading) return;
     this.setData({ transcriptLoading: true, transcriptError: '' });
     try {
-      const data = this.guest
+      const data = this.data.guest
         ? await api.getTranscriptGuest(this.data.id)
         : await api.getTranscript(this.data.id);
       logInfo('read', 'transcript ok', { segs: (data.segments || []).length });
@@ -381,8 +371,15 @@ Page({
   },
 
   onRetry() {
-    if (this.guest) this.loadDetailGuest();
+    if (this.data.guest) this.loadDetailGuest();
     else this.loadDetail();
+  },
+
+  /** 游客引导条 → 登录页（登录后回到本篇，转正常模式） */
+  onGuestLogin() {
+    wx.navigateTo({
+      url: '/pages/login/login?redirect=' + encodeURIComponent('/pages/read/read?id=' + this.data.id),
+    });
   },
 
   // ── 分享（个人主体可用）──────────────────────────────────

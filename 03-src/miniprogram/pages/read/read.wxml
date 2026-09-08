@@ -13,6 +13,12 @@
   <empty-state wx:elif="{{error}}" icon="⚠️" title="{{error}}" desc="请检查网络后重试" retry bind:retry="onRetry" />
 
   <block wx:elif="{{article}}">
+    <!-- 游客引导条（游客只读模式时显示） -->
+    <view wx:if="{{guest}}" class="guest-bar" bindtap="onGuestLogin">
+      <text class="guest-bar-text">游客模式阅读中</text>
+      <text class="guest-bar-cta">登录同步你的知识库 ›</text>
+    </view>
+
     <!-- 头部：封面 + 标题 + 元信息 + 标签 -->
     <view class="head">
       <image wx:if="{{cover}}" class="head-cover" src="{{cover}}" mode="widthFix" />

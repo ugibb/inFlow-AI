@@ -94,4 +94,9 @@ export const api = {
   getTranscriptGuest(id: string) {
     return request<JobTranscript>('/api/articles/' + id + '/guest/transcript', { skipAuth: true });
   },
+
+  /** 示例文章（云端 env DEMO_ARTICLE_ID 指定）：游客首页/空库「先看一篇」 */
+  getArticleDemo() {
+    return request<ArticleDetail>('/api/articles/demo', { skipAuth: true });
+  },
 };

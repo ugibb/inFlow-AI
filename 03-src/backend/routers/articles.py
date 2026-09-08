@@ -808,12 +808,19 @@ async def get_article_transcript(
 # UUID 不可枚举，未持凭证者无法探测其他文章。
 
 
-@router.get("/{article_id}/guest", response_model=ArticleDetailResponse)
-async def get_article_guest(
-    article_id: UUID,
-    db: AsyncSession = Depends(get_db),
-):
-    """Guest read-only article detail (mini-program QR entry, no auth)."""
+def _guest_strip(detail: ArticleDetailResponse, *, strip_tags: bool = True) -> ArticleDetailResponse:
+    """游客/示例响应统一剥除用户态字段与原始大块（read 页不消费 raw_content）。"""
+    detail.raw_content = None
+    detail.is_favorited = False
+    detail.folder_id = None
+    detail.folder = None
+    if strip_tags:
+        detail.tags = []
+    return detail
+
+
+async def _load_guest_detail(db: AsyncSession, article_id: UUID) -> ArticleDetailResponse:
+    """登录版 detail 的无鉴权镜像（guest 路由与 demo 示例共用）。"""
     article = await db.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
@@ -828,13 +835,16 @@ async def get_article_guest(
     detail.content_blocks = _content_block_summary(
         article, raw_fallback=ingest_raw_text, content_type=detail.content_type
     )
-    # 游客剥离：用户态字段与原始 HTML 大块（read 页不消费 raw_content）
-    detail.raw_content = None
-    detail.is_favorited = False
-    detail.folder_id = None
-    detail.folder = None
-    detail.tags = []
     return detail
+
+
+@router.get("/{article_id}/guest", response_model=ArticleDetailResponse)
+async def get_article_guest(
+    article_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Guest read-only article detail (mini-program QR entry, no auth)."""
+    return _guest_strip(await _load_guest_detail(db, article_id))
 
 
 @router.get("/{article_id}/guest/chapters")
@@ -878,6 +888,25 @@ async def get_article_guest_transcript(
         "duration": data.get("duration"),
         "segments": data.get("segments") or [],
     }
+
+
+@router.get("/demo", response_model=ArticleDetailResponse)
+async def get_article_demo(
+    db: AsyncSession = Depends(get_db),
+):
+    """示例文章（无鉴权）：env DEMO_ARTICLE_ID 指定，游客语义同 /guest。
+
+    供小程序未登录首页 / 新用户空库展示「先看一篇」，也即审核员的落地体验——
+    未配置或文章不存在时 404，小程序端静默退回纯引导。保留 tags 供卡片展示。
+    """
+    raw = os.getenv("DEMO_ARTICLE_ID", "").strip()
+    if not raw:
+        raise HTTPException(status_code=404, detail="Demo article not configured")
+    try:
+        demo_id = UUID(raw)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Demo article not configured")
+    return _guest_strip(await _load_guest_detail(db, demo_id), strip_tags=False)
 
 
 @router.get("/{article_id}/deep-read", response_class=HTMLResponse)
