@@ -144,7 +144,8 @@ export default function HomePage() {
     setArticlesLoading(true);
     setArticlesError(null);
     try {
-      const params: any = { page: 1, page_size: 8, sort: 'published_at' };
+      // 「最近添加」按入库/抓取时间倒序，而非原文发布时间
+      const params: any = { page: 1, page_size: 8, sort: 'created_at' };
       if (viewUsername) params.username = viewUsername;
       const data = await api.getArticles(params);
       // API returns ArticleListResponse with .items

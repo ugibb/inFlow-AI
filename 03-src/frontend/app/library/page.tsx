@@ -771,6 +771,13 @@ export default function LibraryPage() {
                 <span className="text-[11px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">主理人</span>
               </div>
 
+              <button onClick={() => setAuthorFilter('')}
+                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors mb-0.5 ${
+                  !authorFilter ? 'bg-[var(--accent-light)] text-[var(--accent)] font-medium' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'
+                }`}>
+                <LayoutGrid size={14} /> <span className="truncate flex-1 text-left">全部文章</span>
+              </button>
+
               <div className="flex-1 overflow-y-auto mt-1 space-y-0.5">
                 {authorCounts.map(a => {
                   const active = authorFilter === a.author;
