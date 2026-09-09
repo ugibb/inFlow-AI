@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     # openid 绑定到哪个账号：空 = 自动取第一个超管（个人库自用场景）。
     # 邀请码：空 = 免验直进（体验版分发默认，体验成员白名单已是门禁）；
     #         公开上架时必须设置，防止陌生人绑进账号看整库。
-    wechat_appid: str = "wxe091ce737f45cacc"
+    wechat_appid: str = "wx931e087caa6673f3"
     wechat_secret: str = ""
     wechat_bind_username: str = ""
     wechat_invite_code: str = ""
