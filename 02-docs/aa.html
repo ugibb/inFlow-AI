@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Player Component</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #121212;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: #FFFFFF;
+        }
+
+        /* 主播放器容器 */
+        .player-card {
+            width: 580px;
+            background: linear-gradient(180deg, #362e2a 0%, #29221e 100%);
+            padding: 24px 28px 32px 28px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            user-select: none;
+        }
+
+        /* 时间显示区域 */
+        .time-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 26px;
+            font-weight: 500;
+            color: #FFFFFF;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        /* 进度条外壳 */
+        .waveform-container {
+            position: relative;
+            width: 100%;
+            height: 84px;
+            background-color: rgba(0, 0, 0, 0.35);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+            margin-bottom: 36px;
+        }
+
+        /* 波形图层包裹 */
+        .waveform-wrapper {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            padding: 0 12px;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 柱状波形单元 */
+        .bar {
+            width: 7px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        /* 已播放波形颜色 (亮黄) */
+        .bar.played {
+            background-color: #E2BC51;
+        }
+
+        /* 未播放波形颜色 (暗灰) */
+        .bar.unplayed {
+            background-color: rgba(255, 255, 255, 0.12);
+        }
+
+        /* 播放进度分割指针 */
+        .playhead-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: #FFFFFF;
+            box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+            z-index: 10;
+        }
+
+        /* 底部控制按键区域 */
+        .controls-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            outline: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.15s ease;
+        }
+
+        .btn:hover {
+            opacity: 0.85;
+        }
+
+        .btn:active {
+            transform: scale(0.96);
+        }
+
+        /* 按键间距与布局 */
+        .btn-skip-back {
+            margin-right: 52px;
+        }
+
+        .btn-pause {
+            margin-right: 52px;
+        }
+
+        .btn-speed {
+            position: absolute;
+            right: 0;
+        }
+
+        /* SVG 图标精准尺寸 */
+        .icon-skip {
+            width: 58px;
+            height: 58px;
+        }
+
+        .icon-pause {
+            width: 56px;
+            height: 64px;
+        }
+
+        .icon-speed {
+            width: 54px;
+            height: 44px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="player-card">
+        <!-- 顶部时间显示 -->
+        <div class="time-header">
+            <span>25:56</span>
+            <span>-25:59</span>
+        </div>
+
+        <!-- 音频波形进度条区域 -->
+        <div class="waveform-container" id="waveformContainer">
+            <div class="waveform-wrapper" id="waveformWrapper"></div>
+            <div class="playhead-line" id="playheadLine"></div>
+        </div>
+
+        <!-- 底部控制按键 -->
+        <div class="controls-row">
+            <!-- 快退 15 秒 -->
+            <button class="btn btn-skip-back" title="快退15秒">
+                <svg class="icon-skip" viewBox="0 0 58 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- 弧线与逆时针箭头 -->
+                    <path d="M 29 11 A 18 18 0 1 0 47 29" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round"/>
+                    <path d="M 29 5 L 29 11 L 35 11" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    <!-- 数字 15 -->
+                    <text x="29" y="35" fill="#FFFFFF" font-size="14" font-weight="bold" text-anchor="middle" font-family="sans-serif">15</text>
+                </svg>
+            </button>
+
+            <!-- 暂停按钮 -->
+            <button class="btn btn-pause" title="暂停">
+                <svg class="icon-pause" viewBox="0 0 56 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="8" y="4" width="14" height="56" rx="4" fill="#FFFFFF"/>
+                    <rect x="34" y="4" width="14" height="56" rx="4" fill="#FFFFFF"/>
+                </svg>
+            </button>
+
+            <!-- 快进 30 秒 -->
+            <button class="btn btn-skip-forward" title="快进30秒">
+                <svg class="icon-skip" viewBox="0 0 58 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- 弧线与顺时针箭头 -->
+                    <path d="M 29 11 A 18 18 0 1 1 11 29" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round"/>
+                    <path d="M 29 5 L 29 11 L 23 11" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    <!-- 数字 30 -->
+                    <text x="29" y="35" fill="#FFFFFF" font-size="14" font-weight="bold" text-anchor="middle" font-family="sans-serif">30</text>
+                </svg>
+            </button>
+
+            <!-- 倍速按钮 -->
+            <button class="btn btn-speed" title="倍速设置">
+                <svg class="icon-speed" viewBox="0 0 70 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- 六角形螺母 -->
+                    <polygon points="20,8 33,15.5 33,30.5 20,38 7,30.5 7,15.5" stroke="#FFFFFF" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+                    <!-- 六角形中心圆点 -->
+                    <circle cx="20" cy="23" r="3" fill="#FFFFFF"/>
+                    <!-- 1.2x 文本 -->
+                    <text x="42" y="16" fill="#FFFFFF" font-size="14" font-weight="600" font-family="sans-serif">1.2x</text>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 按照原型图片 1:1 还原高度比例数组（包含主音量峰值及右侧两个高耸的波形峰）
+        const heightsPercent = [
+            58, 22, 38, 28, 42, 32, 28, 30, 42, 34,
+            30, 28, 26, 26, 26, 26, 24, 24, 22, 22,
+            20, 18, 18, 16, 16, 18, 18, 22, 22, 22,
+            22, 24, 24, 24, 22, 22, 24, 68, 24, 24,
+            26, 26, 28, 28, 28, 30, 30, 78
+        ];
+
+        // 播放切割点位置索引（第 26 个柱子左侧分割）
+        const playheadIndex = 25; 
+
+        const wrapper = document.getElementById('waveformWrapper');
+        const playhead = document.getElementById('playheadLine');
+
+        heightsPercent.forEach((h, index) => {
+            const bar = document.createElement('div');
+            bar.classList.add('bar');
+            
+            // 设置计算后的实际高度
+            bar.style.height = `${h}%`;
+
+            // 判断已播放（黄色）与未播放（暗灰）
+            if (index < playheadIndex) {
+                bar.classList.add('played');
+            } else {
+                bar.classList.add('unplayed');
+            }
+
+            wrapper.appendChild(bar);
+        });
+
+        // 自动计算并精确对齐白色的分割线位置
+        window.addEventListener('load', () => {
+            const bars = wrapper.querySelectorAll('.bar');
+            if (bars.length > playheadIndex) {
+                const targetBar = bars[playheadIndex];
+                const rect = targetBar.getBoundingClientRect();
+                const containerRect = document.getElementById('waveformContainer').getBoundingClientRect();
+                
+                // 将分割线精准停靠在已播放区域的右侧边缘
+                const leftOffset = rect.left - containerRect.left - 2;
+                playhead.style.left = `${leftOffset}px`;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -17,6 +17,8 @@ export interface PlayerState {
   current: number;
   /** 秒 */
   duration: number;
+  /** 播放倍速 0.5–2（bgm 起播默认 1） */
+  rate: number;
 }
 
 export interface PlayMeta {
@@ -37,6 +39,19 @@ let scrubbing = false;
 let pendingSeek = 0;
 /** onCanplay 置位、换源清零：iOS 未就绪时 seek 会出问题 */
 let ready = false;
+/** 播放倍速：随 bgm 应用；切源/部分平台会把系统倍速重置回 1，onCanplay/onPlay 兜底重落 */
+const RATE_KEY = 'inflow_player_rate';
+export const RATE_OPTIONS = [0.75, 1, 1.25, 1.5, 2];
+let rate = loadRate();
+
+function loadRate(): number {
+  try {
+    const v = wx.getStorageSync(RATE_KEY) as unknown;
+    return typeof v === 'number' && v >= 0.5 && v <= 2 ? v : 1;
+  } catch {
+    return 1;
+  }
+}
 
 /** 安全 seek：未就绪就排队 */
 function safeSeek(sec: number): void {
@@ -64,6 +79,16 @@ function safePlay(): void {
   }
 }
 
+/** 把当前倍速应用到 bgm。类型包个别版本未收录该字段，用结构化兜底；不支持倍速的平台静默忽略 */
+function applyRate(): void {
+  if (!bgm || !currentSrc) return;
+  try {
+    (bgm as unknown as { playbackRate?: number }).playbackRate = rate;
+  } catch {
+    /* ignore */
+  }
+}
+
 function emit(): void {
   if (!listener) return;
   listener({
@@ -71,6 +96,7 @@ function emit(): void {
     playing,
     current: bgm ? Math.max(0, bgm.currentTime || 0) : 0,
     duration: bgm ? Math.max(0, bgm.duration || 0) : 0,
+    rate,
   });
 }
 
@@ -79,6 +105,7 @@ function ensure(): WechatMiniprogram.BackgroundAudioManager {
   bgm = wx.getBackgroundAudioManager();
   bgm.onPlay(() => {
     playing = true;
+    applyRate(); // Android 暂停态改速不生效，onPlay 处于在播状态再落一次
     emit();
   });
   const stop = () => {
@@ -102,6 +129,7 @@ function ensure(): WechatMiniprogram.BackgroundAudioManager {
   });
   bgm.onCanplay(() => {
     ready = true;
+    applyRate(); // 切源后系统可能把倍速重置回 1，就绪点重落
     if (pendingSeek > 0 && bgm) {
       try {
         bgm.seek(pendingSeek);
@@ -129,6 +157,7 @@ export function getState(): PlayerState {
     playing,
     current: bgm ? Math.max(0, bgm.currentTime || 0) : 0,
     duration: bgm ? Math.max(0, bgm.duration || 0) : 0,
+    rate,
   };
 }
 
@@ -142,6 +171,7 @@ function start(meta: PlayMeta, startSec: number): void {
   if (meta.cover) m.coverImgUrl = meta.cover;
   logInfo('player', 'start', { startSec, host: meta.src.slice(0, 40) });
   m.src = meta.src; // 设置 src 即自动播放
+  applyRate();
   playing = true;
   emit();
 }
@@ -174,6 +204,31 @@ export function seekPlay(meta: PlayMeta, sec: number): void {
   }
   safeSeek(sec);
   if (!playing) safePlay();
+}
+
+/** 跳到绝对秒但保留当前播放/暂停态（±5s / 进度条落位共用；未起播则忽略，由页面镜像兜位） */
+export function seekTo(sec: number): void {
+  if (!bgm || !currentSrc) return;
+  safeSeek(Math.max(0, sec));
+}
+
+/** 当前记忆的倍速（含尚未起播、未应用 bgm 时） */
+export function getRate(): number {
+  return rate;
+}
+
+/** 设定播放倍速：写缓存、落 bgm 并广播刷 UI；0.5–2，越界收敛 */
+export function setRate(r: number): void {
+  const v = Math.min(2, Math.max(0.5, r));
+  if (v === rate) return;
+  rate = v;
+  try {
+    wx.setStorageSync(RATE_KEY, v);
+  } catch {
+    /* 存储失败不影响本次播放 */
+  }
+  applyRate();
+  emit();
 }
 
 /** 拖动进度条开始：挂起 timeupdate 回写 */

@@ -11,6 +11,21 @@ interface TabItem {
   label: string;
 }
 
+/** 倍速展示文案：1 → 1x，1.25 → 1.25x（避免浮点噪声） */
+function formatRate(r: number): string {
+  return Math.round(r * 100) / 100 + 'x';
+}
+
+/** 剩余时长文案：未载入时长返回 ''（播放条右上不显示 -0:00） */
+function remainingText(dur: number, cur: number): string {
+  return dur > 0 ? formatPlayerTime(Math.max(0, dur - cur)) : '';
+}
+
+/** 进度百分比 0–100：时长未知归 0（自绘进度条用，保留小数让长节目也平滑） */
+function progressPct(dur: number, cur: number): number {
+  return dur > 0 ? Math.min(100, Math.max(0, (cur / dur) * 100)) : 0;
+}
+
 /**
  * 入口参数解析：普通/分享卡片走 options.id；精华卡页脚小程序码走 options.scene
  * （getwxacodeunlimit 的 scene = 文章 UUID 去横线的 32 位 hex，恰好卡 32 字符上限）。
@@ -68,7 +83,12 @@ Page({
     audioCurrent: 0,
     audioDuration: 0,
     audioCurrentText: '0:00',
-    audioDurationText: '',
+    /** 播放条右上「-剩余」文案（时长未知时为空不显示） */
+    audioLeftText: '',
+    /** 底部播放条当前倍速文案（1x/1.25x…） */
+    rateText: '1x',
+    /** 自绘进度条百分比 0–100（时长未知时 0） */
+    progPercent: 0,
 
     /** 游客只读模式（章节/转录走 /guest 通道 + 顶部登录引导条） */
     guest: false,
@@ -76,10 +96,14 @@ Page({
 
   /** 拖动进度条期间不响应 timeupdate 回写（避免滑块拉锯） */
   scrubbing: false,
+  /** 自绘进度条：条几何缓存 + 当前触点（手势内避免重复查询） */
+  progRect: null as { left: number; width: number } | null,
+  progGesturing: false,
+  progX: -1,
 
   onLoad(options: Record<string, string | undefined>) {
     const id = resolveEntryId(options);
-    this.setData({ id });
+    this.setData({ id, rateText: formatRate(player.getRate()) }); // 胶囊先显示记忆倍速，bindPlayer 再接管
     if (!id) {
       this.setData({ loading: false, error: '缺少文章参数' });
       return;
@@ -264,12 +288,15 @@ Page({
       if (idx !== this.data.transcriptActiveIdx) this.setData({ transcriptActiveIdx: idx });
 
       const curText = formatPlayerTime(s.current);
-      const durText = s.duration ? formatPlayerTime(s.duration) : '';
+      const leftText = remainingText(s.duration, s.current);
+      const rateText = formatRate(s.rate || 1);
+      const pct = progressPct(s.duration, s.current);
       // 按秒粒度去重，避免 timeupdate 高频 setData
       if (
         this.data.playing === s.playing &&
         this.data.audioCurrentText === curText &&
-        this.data.audioDurationText === durText
+        this.data.audioLeftText === leftText &&
+        this.data.rateText === rateText
       ) {
         return;
       }
@@ -278,7 +305,9 @@ Page({
         audioCurrent: s.current,
         audioDuration: s.duration,
         audioCurrentText: curText,
-        audioDurationText: durText,
+        audioLeftText: leftText,
+        rateText,
+        progPercent: pct,
       });
     });
   },
@@ -344,25 +373,139 @@ Page({
       return;
     }
     player.seekPlay(meta, sec);
-    this.setData({ audioCurrent: sec, audioCurrentText: formatPlayerTime(sec) });
+    this.setData({
+      audioCurrent: sec,
+      audioCurrentText: formatPlayerTime(sec),
+      audioLeftText: remainingText(this.data.audioDuration, sec),
+      progPercent: progressPct(this.data.audioDuration, sec),
+    });
   },
 
-  onScrubbing(e: any) {
-    const v = Number(e.detail.value) || 0;
+  /**
+   * 自绘进度条：点按/拖动跳转。
+   * touchstart 挂起 timeupdate 回写（scrubStart），touchmove 按触点把 clientX 映射成
+   * 秒并镜像 UI，touchend 用最终值 seek（scrubEnd）。条几何只在首次测量并缓存，
+   * 快速点按恰逢几何未就绪时，measure 完成回调里补做 seek。
+   */
+  measureProg(): Promise<{ left: number; width: number } | null> {
+    if (this.progRect) return Promise.resolve(this.progRect);
+    return new Promise((resolve) => {
+      const q = wx.createSelectorQuery().in(this);
+      q.select('#player-prog').boundingClientRect();
+      q.exec((res: any) => {
+        const r = res && res[0];
+        this.progRect = r && r.width ? { left: r.left, width: r.width } : null;
+        resolve(this.progRect);
+      });
+    });
+  },
+
+  touchX(e: any): number {
+    const arr = (e && (e.touches || e.changedTouches || [])) as { clientX: number }[];
+    const t = arr[0];
+    return t ? t.clientX : -1;
+  },
+
+  /** clientX → 秒，写镜像 UI；返回落点秒 */
+  progXtoSec(clientX: number): number {
+    const dur = this.data.audioDuration;
+    const rect = this.progRect;
+    if (!(dur > 0) || !rect || !rect.width) return this.data.audioCurrent;
+    let ratio = (clientX - rect.left) / rect.width;
+    ratio = Math.max(0, Math.min(1, ratio));
+    const v = ratio * dur;
+    this.setData({
+      audioCurrent: v,
+      audioCurrentText: formatPlayerTime(v),
+      audioLeftText: remainingText(dur, v),
+      progPercent: progressPct(dur, v),
+    });
+    return v;
+  },
+
+  onProgStart(e: any) {
+    if (!(this.data.audioDuration > 0)) return;
     this.scrubbing = true;
+    this.progGesturing = true;
+    this.progX = this.touchX(e);
+    if (this.progX < 0) return;
     player.scrubStart();
-    // 按秒去重：bindchanging 高频触发，真机全程 setData 会卡顿
-    const t = formatPlayerTime(v);
-    if (t !== this.data.audioCurrentText) {
-      this.setData({ audioCurrent: v, audioCurrentText: t });
+    if (this.progRect) {
+      this.progXtoSec(this.progX);
+    } else {
+      this.measureProg().then(() => {
+        if (this.data.audioDuration > 0) this.progXtoSec(this.progX);
+      });
     }
   },
 
-  onScrubEnd(e: any) {
-    const v = Number(e.detail.value) || 0;
-    this.scrubbing = false;
-    player.scrubEnd(v);
-    this.setData({ audioCurrent: v, audioCurrentText: formatPlayerTime(v) });
+  onProgMove(e: any) {
+    if (!this.progGesturing) return;
+    const x = this.touchX(e);
+    if (x < 0) return;
+    this.progX = x;
+    if (this.progRect) this.progXtoSec(x);
+  },
+
+  onProgEnd(e: any) {
+    if (!this.progGesturing) return;
+    const x = this.touchX(e);
+    if (x < 0) {
+      // touchcancel / 无结束触点：seek 到拖动最后一次落点
+      this.progGesturing = false;
+      this.scrubbing = false;
+      player.scrubEnd(this.data.audioCurrent);
+      return;
+    }
+    this.progX = x;
+    if (this.progRect) {
+      const v = this.progXtoSec(x);
+      this.progGesturing = false;
+      this.scrubbing = false;
+      player.scrubEnd(v);
+    } else {
+      // 快速点按，几何尚未就绪：measure 完成后再统一落位并 seek，避免先跳旧值再跳目标
+      this.progGesturing = false;
+      this.measureProg().then(() => {
+        if (this.data.audioDuration > 0) {
+          const sec = this.progXtoSec(this.progX);
+          this.scrubbing = false;
+          player.scrubEnd(sec);
+        }
+      });
+    }
+  },
+
+  /**
+   * 回退/快进按钮：秒数由 data-delta 决定（−15 回退 / 30 快进，与参考图一致）。
+   * 已起播走 seek（播放中不打断、暂停仅移位）；未起播只挪页面镜像位置，
+   * 等用户点播放（toggle 以 audioCurrent 为 resumeSec）时从该秒开始。
+   */
+  onSkip(e: any) {
+    const meta = this.playMeta();
+    if (!meta) return;
+    const delta = Number(e.currentTarget.dataset.delta) || 0;
+    const st = player.getState();
+    // 基准取整秒：确定性 ±5 步进，避免浮点累积漂移
+    const now = Math.round(st.src === meta.src ? st.current : this.data.audioCurrent);
+    const dur = this.data.audioDuration;
+    const target = Math.max(0, dur > 0 ? Math.min(now + delta, Math.floor(dur)) : now + delta);
+    if (target === now) return;
+    if (st.src === meta.src) player.seekTo(target);
+    this.setData({
+      audioCurrent: target,
+      audioCurrentText: formatPlayerTime(target),
+      audioLeftText: remainingText(this.data.audioDuration, target),
+      progPercent: progressPct(this.data.audioDuration, target),
+    });
+  },
+
+  /** 倍速切换：点按前进一档，环形 0.75→1→1.25→1.5→2→0.75…（异常速率兜底到 1x 再进档） */
+  onRateCycle() {
+    const opts = player.RATE_OPTIONS;
+    let idx = opts.indexOf(player.getRate());
+    if (idx < 0) idx = opts.indexOf(1);
+    player.setRate(opts[(idx + 1) % opts.length]);
   },
 
   onUnload() {

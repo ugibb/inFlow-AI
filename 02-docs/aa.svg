@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 300" width="100%" height="100%" style="background-color: #0d0d0d;">
+  <defs>
+    <!-- 背景渐变色 -->
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3a3028"/>
+      <stop offset="100%" stop-color="#2a221c"/>
+    </linearGradient>
+
+    <!-- 进度条轨道内阴影滤镜 -->
+    <filter id="inner-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feOffset dx="0" dy="3"/>
+      <feGaussianBlur stdDeviation="3" result="offset-blur"/>
+      <feComposite operator="out" in="SourceGraphic" in2="offset-blur" result="inverse"/>
+      <feFlood flood-color="black" flood-opacity="0.8" result="color"/>
+      <feComposite operator="in" in="color" in2="inverse" result="shadow"/>
+      <feComposite operator="over" in="shadow" in2="SourceGraphic"/>
+    </filter>
+  </defs>
+
+  <!-- 主外壳容器 -->
+  <rect x="20" y="20" width="560" height="260" rx="16" fill="url(#bg-gradient)" />
+
+  <!-- 1. 顶部时间文本 -->
+  <text x="52" y="60" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="500" letter-spacing="-0.5">25:56</text>
+  <text x="548" y="60" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="500" letter-spacing="-0.5" text-anchor="end">-25:59</text>
+
+  <!-- 2. 中央波形进度条背景框 -->
+  <rect x="50" y="78" width="500" height="80" rx="10" fill="#181411" fill-opacity="0.8" filter="url(#inner-shadow)"/>
+
+  <!-- 波形柱状图（已播放部分 - 亮黄色 #E5BA49） -->
+  <g fill="#E5BA49">
+    <rect x="62" y="112" width="7" height="42" rx="3.5"/>
+    <rect x="73" y="132" width="7" height="22" rx="3.5"/>
+    <rect x="84" y="122" width="7" height="32" rx="3.5"/>
+    <rect x="95" y="128" width="7" height="26" rx="3.5"/>
+    <rect x="106" y="120" width="7" height="34" rx="3.5"/>
+    <rect x="117" y="126" width="7" height="28" rx="3.5"/>
+    <rect x="128" y="128" width="7" height="26" rx="3.5"/>
+    <rect x="139" y="127" width="7" height="27" rx="3.5"/>
+    <rect x="150" y="120" width="7" height="34" rx="3.5"/>
+    <rect x="161" y="125" width="7" height="29" rx="3.5"/>
+    <rect x="172" y="128" width="7" height="26" rx="3.5"/>
+    <rect x="183" y="130" width="7" height="24" rx="3.5"/>
+    <rect x="194" y="131" width="7" height="23" rx="3.5"/>
+    <rect x="205" y="131" width="7" height="23" rx="3.5"/>
+    <rect x="216" y="131" width="7" height="23" rx="3.5"/>
+    <rect x="227" y="131" width="7" height="23" rx="3.5"/>
+    <rect x="238" y="132" width="7" height="22" rx="3.5"/>
+    <rect x="249" y="132" width="7" height="22" rx="3.5"/>
+    <rect x="260" y="133" width="7" height="21" rx="3.5"/>
+    <rect x="271" y="133" width="7" height="21" rx="3.5"/>
+    <rect x="282" y="134" width="7" height="20" rx="3.5"/>
+    <rect x="293" y="135" width="7" height="19" rx="3.5"/>
+  </g>
+
+  <!-- 白色进度分割指针线 -->
+  <line x1="303" y1="78" x2="303" y2="158" stroke="#ffffff" stroke-width="2.5"/>
+
+  <!-- 波形柱状图（未播放部分 - 半透明暗灰色） -->
+  <g fill="#ffffff" fill-opacity="0.12">
+    <rect x="306" y="135" width="7" height="19" rx="3.5"/>
+    <rect x="317" y="134" width="7" height="20" rx="3.5"/>
+    <rect x="328" y="134" width="7" height="20" rx="3.5"/>
+    <rect x="339" y="132" width="7" height="22" rx="3.5"/>
+    <rect x="350" y="132" width="7" height="22" rx="3.5"/>
+    <rect x="361" y="130" width="7" height="24" rx="3.5"/>
+    <rect x="372" y="130" width="7" height="24" rx="3.5"/>
+    <rect x="383" y="130" width="7" height="24" rx="3.5"/>
+    <rect x="394" y="132" width="7" height="22" rx="3.5"/>
+    <rect x="405" y="132" width="7" height="22" rx="3.5"/>
+    <rect x="416" y="130" width="7" height="24" rx="3.5"/>
+    <rect x="427" y="102" width="7" height="52" rx="3.5"/>
+    <rect x="438" y="130" width="7" height="24" rx="3.5"/>
+    <rect x="449" y="130" width="7" height="24" rx="3.5"/>
+    <rect x="460" y="129" width="7" height="25" rx="3.5"/>
+    <rect x="471" y="129" width="7" height="25" rx="3.5"/>
+    <rect x="482" y="127" width="7" height="27" rx="3.5"/>
+    <rect x="493" y="127" width="7" height="27" rx="3.5"/>
+    <rect x="504" y="126" width="7" height="28" rx="3.5"/>
+    <rect x="515" y="124" width="7" height="30" rx="3.5"/>
+    <rect x="526" y="124" width="7" height="30" rx="3.5"/>
+    <rect x="537" y="94"  width="7" height="60" rx="3.5"/>
+  </g>
+
+  <!-- 3. 底部控制按键区域 -->
+
+  <!-- [按钮 1] 快退 15 秒 (逆时针箭头) -->
+  <g transform="translate(148, 192)">
+    <!-- 带有顶部缺口的逆时针圆弧 -->
+    <path d="M 27 6 A 21 21 0 1 0 48 27" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+    <!-- 逆时针实心/线框箭头 (指向左) -->
+    <path d="M 19 12 L 27 6 L 27 16 Z" fill="#ffffff" stroke="#ffffff" stroke-width="1" stroke-linejoin="round"/>
+    <!-- 数字 15 -->
+    <text x="27" y="34" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">15</text>
+  </g>
+
+  <!-- [按钮 2] 暂停键 (正中央) -->
+  <g transform="translate(268, 190)">
+    <rect x="0" y="0" width="16" height="54" rx="4" fill="#ffffff"/>
+    <rect x="30" y="0" width="16" height="54" rx="4" fill="#ffffff"/>
+  </g>
+
+  <!-- [按钮 3] 快进 30 秒 (顺时针箭头) -->
+  <g transform="translate(390, 192)">
+    <!-- 带有顶部缺口的顺时针圆弧 -->
+    <path d="M 27 6 A 21 21 0 1 1 6 27" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+    <!-- 顺时针实心/线框箭头 (指向右) -->
+    <path d="M 35 12 L 27 6 L 27 16 Z" fill="#ffffff" stroke="#ffffff" stroke-width="1" stroke-linejoin="round"/>
+    <!-- 数字 30 -->
+    <text x="27" y="34" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">30</text>
+  </g>
+
+  <!-- [按钮 4] 倍速播放 (最右侧螺母 + 1.2x) -->
+  <g transform="translate(500, 203)">
+    <!-- 六角形螺母外框 -->
+    <polygon points="17,0 30,7.5 30,22.5 17,30 4,22.5 4,7.5" fill="none" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/>
+    <!-- 中心圆点 -->
+    <circle cx="17" cy="15" r="3.5" fill="#ffffff"/>
+    <!-- 1.2x 文本 -->
+    <text x="36" y="10" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, Arial, sans-serif" font-size="15" font-weight="bold">1.2x</text>
+  </g>
+</svg>

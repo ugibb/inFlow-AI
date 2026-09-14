@@ -132,25 +132,44 @@
     <view class="safe-bottom" />
   </block>
 
-  <!-- 底部常驻播放条（音频内容） -->
+  <!-- 底部常驻播放条（音频内容）：悬浮圆角卡片 —— 时间行 · 自绘细进度 · 控制行（↺15/主蓝播放/↻30 + 右端倍速胶囊） -->
   <view wx:if="{{article && article.media_url}}" class="player">
-    <view class="player-toggle" hover-class="player-toggle-hover" bindtap="onTogglePlay">{{playing ? '⏸' : '▶'}}</view>
-    <view class="player-main">
-      <slider
-        class="player-slider"
-        min="0"
-        max="{{audioDuration > 0 ? audioDuration : 1}}"
-        value="{{audioCurrent}}"
-        activeColor="#007aff"
-        backgroundColor="#e5e5ea"
-        block-size="14"
-        block-color="#007aff"
-        bindchanging="onScrubbing"
-        bindchange="onScrubEnd"
-      />
-      <view class="player-times">
-        <text>{{audioCurrentText}}</text>
-        <text>{{audioDurationText}}</text>
+    <view class="player-time-row">
+      <text class="pt-cur">{{audioCurrentText}}</text>
+      <text wx:if="{{audioLeftText}}" class="pt-left">-{{audioLeftText}}</text>
+    </view>
+
+    <!-- 自绘细进度条：点按/拖动跳转（原生 slider 样式受限，改为自绘，宽度百分比驱动） -->
+    <view
+      class="prog"
+      id="player-prog"
+      bindtouchstart="onProgStart"
+      catchtouchmove="onProgMove"
+      bindtouchend="onProgEnd"
+      bindtouchcancel="onProgEnd"
+    >
+      <view class="prog-track">
+        <view class="prog-fill" style="width: {{progPercent}}%" />
+      </view>
+      <view wx:if="{{audioDuration > 0}}" class="prog-knob" style="left: {{progPercent}}%" />
+    </view>
+
+    <view class="player-ctrl">
+      <!-- 左右等宽占位：三键组真正居中，倍速胶囊固定右端不贴边 -->
+      <view class="ctrl-side" />
+      <view class="ctrl-cluster">
+        <view class="ctrl-skip" hover-class="tap-hover" catchtap="onSkip" data-delta="-15">
+          <image class="ctrl-skip-ico" src="/assets/icons/player-back15.png" mode="aspectFit" />
+        </view>
+        <view class="ctrl-play" hover-class="tap-hover" bindtap="onTogglePlay">
+          <image class="ctrl-play-ico" src="{{playing ? '/assets/icons/player-pause.png' : '/assets/icons/player-play.png'}}" mode="aspectFit" />
+        </view>
+        <view class="ctrl-skip" hover-class="tap-hover" catchtap="onSkip" data-delta="30">
+          <image class="ctrl-skip-ico" src="/assets/icons/player-fwd30.png" mode="aspectFit" />
+        </view>
+      </view>
+      <view class="ctrl-side">
+        <view class="rate-pill {{rateText === '1x' ? '' : 'rate-on'}}" hover-class="tap-hover" catchtap="onRateCycle">{{rateText}}</view>
       </view>
     </view>
   </view>

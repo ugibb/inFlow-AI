@@ -231,48 +231,156 @@
   color: var(--text-2);
 }
 
-/* ── 底部常驻播放条（音频内容） ── */
+/* ── 底部常驻播放条（音频内容）：贴底圆角卡片 —— 时间行 · 自绘细进度 · 控制行 ──
+   与页面卡片语言一致：左右留白 + 上圆角下贴底 + 轻阴影；浅色主色适配
+   （var(--text) 文字、#007aff 主蓝高亮、--text-3 次要）。 */
 .player {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: 0; /* 贴底停放：卡片下沿与屏幕底对齐 */
   z-index: 50;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 18rpx 28rpx 0;
+  padding-bottom: calc(8rpx + env(safe-area-inset-bottom));
+  background: var(--card, #fff);
+  border: 1rpx solid var(--border);
+  border-radius: 28rpx 28rpx 0 0;
+  box-shadow: 0 -4rpx 20rpx rgba(29, 29, 31, 0.06);
+}
+/* 行1 时间：当前(左) · -剩余(右)，等宽数字避免跳动 */
+.player-time-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0 2rpx 10rpx;
+}
+.pt-cur {
+  font-size: 24rpx;
+  font-weight: 500;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.pt-left {
+  font-size: 22rpx;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+/* 行2 自绘细进度：整条作热区，轨道 6rpx 圆头、主蓝填充、白钮带轻影 */
+.prog {
+  position: relative;
+  height: 44rpx;
   display: flex;
   align-items: center;
-  gap: 20rpx;
-  padding: 14rpx 24rpx;
-  padding-bottom: calc(14rpx + env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.96);
-  border-top: 1rpx solid var(--border);
 }
-.player-toggle {
-  width: 72rpx;
-  height: 72rpx;
+.prog-track {
+  position: relative;
+  width: 100%;
+  height: 6rpx;
+  border-radius: 999rpx;
+  background: var(--border, #e5e5ea);
+  overflow: hidden;
+}
+.prog-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-radius: 999rpx;
+  background: var(--accent, #007aff);
+}
+.prog-knob {
+  position: absolute;
+  top: 50%;
+  width: 24rpx;
+  height: 24rpx;
+  margin: -12rpx 0 0 -12rpx; /* 以百分比落点为圆心 */
   border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  font-size: 26rpx;
+  background: #fff;
+  border: 1rpx solid rgba(29, 29, 31, 0.08);
+  box-shadow: 0 2rpx 8rpx rgba(29, 29, 31, 0.18);
+}
+/* 行3 控制：三键组居中（左右等宽占位）、倍速胶囊固定右端有内衬不贴边 */
+.player-ctrl {
+  display: flex;
+  align-items: center;
+  margin-top: 6rpx;
+}
+.ctrl-side {
+  width: 128rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.ctrl-cluster {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ctrl-skip {
+  width: 76rpx;
+  height: 96rpx;
+  margin: 0 18rpx;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-.player-toggle-hover {
-  opacity: 0.8;
+/* 后退15/前进30 回环箭头图标（本地 PNG，规避 ↺/↻ 字体缺失） */
+.ctrl-skip-ico {
+  width: 72rpx;
+  height: 72rpx;
+  display: block;
 }
-.player-main {
-  flex: 1;
-  min-width: 0;
-}
-.player-times {
+/* 中央播放/暂停：主蓝实心圆钮 + 白色图标 */
+.ctrl-play {
+  width: 104rpx;
+  height: 104rpx;
+  margin: 0 18rpx;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--accent, #007aff);
   display: flex;
-  justify-content: space-between;
-  margin-top: -8rpx;
-  padding: 0 6rpx;
-  font-size: 20rpx;
-  color: var(--text-3);
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 8rpx 20rpx rgba(0, 122, 255, 0.28);
+}
+.ctrl-play-ico {
+  width: 46rpx;
+  height: 46rpx;
+  display: block;
+  margin-left: 3rpx; /* 三角视觉重心补偿 */
+}
+/* 倍速胶囊：点按循环切速；≠1x 主蓝高亮 */
+.rate-pill {
+  min-width: 84rpx;
+  height: 52rpx;
+  padding: 0 20rpx;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--bg, #f5f5f7);
+}
+.rate-on {
+  color: var(--accent);
+  background: var(--accent-bg, #e8f2ff);
+}
+.tap-hover {
+  opacity: 0.55;
 }
 .player-spacer {
-  height: calc(140rpx + env(safe-area-inset-bottom));
+  height: calc(250rpx + env(safe-area-inset-bottom));
 }
