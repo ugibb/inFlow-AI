@@ -256,6 +256,21 @@ def card_png_candidates(
     return candidates
 
 
+def display_dir_candidates(raw_file_path: str, pipeline_data_dir: str = "") -> list[str]:
+    """03_display 目录在云端的候选路径（card_png_candidates 的目录版）。
+
+    用于扫目录型产物（如视频截图 ``{job_id}_NNN.png``）：
+    新旧管线登记形态各一个候选（旧管线绝对形态 + worker 相对形态拼 SFTP
+    回传根），调用方按序取第一个存在的目录。
+    """
+    direct = _swap_step(os.path.dirname(raw_file_path), "01_ingest", "03_display")
+    candidates = [direct]
+    rel = direct.removeprefix("data/").removeprefix("04-output/")
+    if pipeline_data_dir and rel != direct:
+        candidates.append(f"{pipeline_data_dir.rstrip('/')}/{rel}")
+    return candidates
+
+
 def parse_transcript_base(raw_file_path: str, job_id: UUID) -> str:
     """Base path for ASR transcript files (WhisperTranscriber appends suffixes).
 

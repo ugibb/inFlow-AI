@@ -508,6 +508,25 @@ class ApiClient {
     return this.request(`/api/articles/${articleId}/chapters`);
   }
 
+  // ── 视频截图（worker 预处理产物，经 SFTP 回传云端）─────────────────
+  async getArticleScreenshots(articleId: string): Promise<{ items: number[] }> {
+    return this.request(`/api/articles/${articleId}/screenshots`);
+  }
+
+  async getArticleScreenshot(articleId: string, index: number): Promise<Blob> {
+    const url = `${this.baseUrl}/api/articles/${articleId}/screenshots/${index}`;
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: res.statusText }));
+      const msg = typeof error.detail === 'string' ? error.detail : 'Screenshot not available';
+      throw new Error(msg);
+    }
+    return res.blob();
+  }
+
   async getArticleDeepReadHtml(articleId: string): Promise<string> {
     const url = `${this.baseUrl}/api/articles/${articleId}/deep-read`;
     const token = getToken();

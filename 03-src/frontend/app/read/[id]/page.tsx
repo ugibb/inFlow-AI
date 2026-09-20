@@ -25,6 +25,8 @@ import {
   Tag,
   Folder,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Share2,
   Loader2,
   AlertCircle,
@@ -91,9 +93,14 @@ function formatHMS(seconds: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-/** 音频与图文（article）均支持章节速览；笔记除外 */
+/** 音频/视频/图文（article）均支持章节速览；笔记除外 */
 function supportsChapterOverview(contentType?: string): boolean {
-  return contentType === 'audio' || contentType === 'article';
+  return contentType === 'audio' || contentType === 'article' || contentType === 'video';
+}
+
+/** 有逐句转录（teleprompter）的类型：音频站内播、视频跳原平台看 */
+function hasTranscript(contentType?: string): boolean {
+  return contentType === 'audio' || contentType === 'video';
 }
 
 function chaptersHaveTimestamps(chapters: ArticleChaptersResponse): boolean {
@@ -155,10 +162,12 @@ function getPlatformLabel(platform?: string): string {
   return map[platform.toLowerCase()] || platform;
 }
 
-/** 音频 CDN 链接缺失/过期时的兜底入口：跳转原平台收听（小宇宙 episode 链接永久有效） */
-function ExternalListenLink({ url, platform }: { url?: string; platform?: string }) {
-  if (!url) return <p className="text-sm text-[#aeaeb2]">音频链接暂不可用</p>;
-  const label = platform?.toLowerCase() === 'xiaoyuzhou' ? '在小宇宙收听' : '在原平台收听';
+/** 音频 CDN 链接缺失/过期时的兜底入口：跳转原平台收听（小宇宙 episode 链接永久有效）；视频无站内播放，直接跳原平台观看 */
+function ExternalListenLink({ url, platform, kind = 'audio' }: { url?: string; platform?: string; kind?: 'audio' | 'video' }) {
+  if (!url) return <p className="text-sm text-[#aeaeb2]">{kind === 'video' ? '视频链接暂不可用' : '音频链接暂不可用'}</p>;
+  const label = kind === 'video'
+    ? '去原平台观看'
+    : platform?.toLowerCase() === 'xiaoyuzhou' ? '在小宇宙收听' : '在原平台收听';
   return (
     <a
       href={url}
@@ -343,6 +352,12 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
   // worker 异步块由 job 轮询到终态后收尾（见 handleRegenerateBlock 下方 effect）。
   const [pendingBlock, setPendingBlock] = useState<ContentBlockKey | null>(null);
 
+  // 视频截图画廊（worker 预处理产物 {job_id}_NNN.png，经 SFTP 回传云端）：
+  // 鉴权走 Bearer，img 不能直接带 src → 逐张 fetch 转 blob URL
+  const [videoShots, setVideoShots] = useState<{ index: number; url: string }[]>([]);
+  const [videoShotLoading, setVideoShotLoading] = useState(false);
+  const [videoShotViewer, setVideoShotViewer] = useState<number | null>(null);
+
   // ── Custom audio player handlers ────────────────────────────────────────
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
@@ -426,6 +441,36 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
       .finally(() => setDeepReadLoading(false));
   }, [article, deepReadHtml, deepReadLoading]);
 
+  // ── 视频截图画廊：拉列表后逐张转 blob URL（Bearer 鉴权，<img> 无法带 token）──
+  useEffect(() => {
+    if (!article || article.content_type !== 'video') return;
+    const articleId = article.id;
+    let cancelled = false;
+    const created: string[] = [];
+    setVideoShotLoading(true);
+    api.getArticleScreenshots(articleId)
+      .then(async (res) => {
+        const shots: { index: number; url: string }[] = [];
+        for (const idx of res.items || []) {
+          try {
+            const blob = await api.getArticleScreenshot(articleId, idx);
+            if (cancelled) return;
+            const url = URL.createObjectURL(blob);
+            created.push(url);
+            shots.push({ index: idx, url });
+          } catch { /* 单张缺失（SFTP 未回传完）跳过 */ }
+        }
+        if (!cancelled) setVideoShots(shots);
+      })
+      .catch(() => { /* 无截图（老文章）→ 画廊整体不渲染 */ })
+      .finally(() => setVideoShotLoading(false));
+    return () => {
+      cancelled = true;
+      created.forEach((u) => URL.revokeObjectURL(u));
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [article?.id, article?.content_type]);
+
   useEffect(() => {
     setDeepReadHtml(null);
     setDeepReadLoading(false);
@@ -464,26 +509,6 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [article?.id, jobId]);
 
-  // Poll processing job status (from /processing redirect OR auto-resolved job).
-  useEffect(() => {
-    if (!resolvedJobId) return;
-    let stopped = false;
-    const poll = async () => {
-      try {
-        const job = await api.getIngestJob(resolvedJobId);
-        if (!stopped) {
-          setProcessingJob(job);
-          if (job.status === 'ready' || job.status === 'failed' || job.status === 'cancelled') {
-            stopped = true;
-          }
-        }
-      } catch { /* silently ignore — PipelineBar is supplementary */ }
-    };
-    poll();
-    const iv = window.setInterval(() => { if (!stopped) poll(); }, 3000);
-    return () => { stopped = true; window.clearInterval(iv); };
-  }, [resolvedJobId, pollTrigger]);
-
   // Poll regen-status every 2s while regenerating
   useEffect(() => {
     if (!regenerating || !article) {
@@ -510,6 +535,12 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
       .catch(() => setTranscript(null))
       .finally(() => setTranscriptLoading(false));
   }, [article, transcript, transcriptLoading]);
+
+  // 视频头部卡需要时长（transcript.duration）→ 进入页面即预载一次转录
+  useEffect(() => {
+    if (article?.content_type === 'video') loadTranscript();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [article?.id, article?.content_type]);
 
   // ── Audio play/pause/metadata → update custom player state ────────────
   useEffect(() => {
@@ -702,6 +733,28 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
     fetchArticle();
     fetchFolders();
   }, [authLoading, token, fetchArticle, fetchFolders]);
+
+  // Poll processing job status (from /processing redirect OR auto-resolved job).
+  useEffect(() => {
+    if (!resolvedJobId) return;
+    let stopped = false;
+    const poll = async () => {
+      try {
+        const job = await api.getIngestJob(resolvedJobId);
+        if (!stopped) {
+          setProcessingJob(job);
+          if (job.status === 'ready' || job.status === 'failed' || job.status === 'cancelled') {
+            stopped = true;
+            // 终态收尾：worker 直写库（真实标题/封面/转录等），静默刷新避免残留 stub 期的 URL 标题
+            fetchArticle(true);
+          }
+        }
+      } catch { /* silently ignore — PipelineBar is supplementary */ }
+    };
+    poll();
+    const iv = window.setInterval(() => { if (!stopped) poll(); }, 3000);
+    return () => { stopped = true; window.clearInterval(iv); };
+  }, [resolvedJobId, pollTrigger, fetchArticle]);
 
   // Auto-poll while article is being ingested, pending agent fetch, or AI summarizing.
   const pollRef = useRef(0);
@@ -978,11 +1031,12 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
     }
   }, [processingJob, pendingBlock, article, fetchArticle, reloadTabBlock, showToast]);
 
-  // 顶部统一「重新生成」按钮：audio/article 走 worker 重跑（云端只登记转交，
-  // 不跑任何 LLM/管道）；note 无流水线任务，走云端辅助重算。
+  // 顶部统一「重新生成」按钮：audio/article/video 走 worker 重跑（云端只登记
+  // 转交，不跑任何 LLM/管道；视频同音频复用转写、从 parsing 续跑）；
+  // note 无流水线任务，走云端辅助重算。
   const handleFullRegenerate = useCallback(async () => {
     if (!article) return;
-    if (article.content_type === 'audio' || article.content_type === 'article') {
+    if (article.content_type === 'audio' || article.content_type === 'article' || article.content_type === 'video') {
       await handleRegenerate();
       return;
     }
@@ -1518,8 +1572,8 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
             )}
           </div>
 
-          {/* Cover image — full-width for non-audio articles */}
-          {article.cover_image && article.content_type !== 'audio' && (
+          {/* Cover image — full-width for 图文 articles（音/视频封面在各自卡片内展示，避免重复） */}
+          {article.cover_image && article.content_type !== 'audio' && article.content_type !== 'video' && (
             <div className="mb-6 rounded-2xl overflow-hidden shadow-md">
               <img
                 src={article.cover_image}
@@ -1529,6 +1583,38 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
               />
+            </div>
+          )}
+
+          {/* Video card — 站内不托管 mp4（不回传），封面卡 + 跳原平台观看 */}
+          {article.content_type === 'video' && (
+            <div className="mb-5 bg-[#f5f5f7] rounded-2xl p-4 border border-[#e5e5ea]">
+              <div className="flex items-center gap-4">
+                {article.cover_image && (
+                  <div className="relative flex-shrink-0">
+                    <img
+                      src={article.cover_image}
+                      alt={article.title}
+                      className="w-32 h-[4.5rem] rounded-xl object-cover shadow-sm"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span className="w-7 h-7 rounded-full bg-black/50 flex items-center justify-center">
+                        <Play size={13} className="text-white ml-0.5" fill="currentColor" strokeWidth={0} />
+                      </span>
+                    </span>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-[#6e6e73] uppercase tracking-wider truncate mb-2">
+                    {getPlatformLabel(article.source_platform)} · 视频
+                    {transcript?.duration
+                      ? ` · ${formatDuration(transcript.duration)}`
+                      : article.reading_time > 0 ? ` · 约 ${formatReadingTime(article.reading_time)}` : ''}
+                  </p>
+                  <ExternalListenLink url={article.url} platform={article.source_platform} kind="video" />
+                </div>
+              </div>
             </div>
           )}
 
@@ -1766,7 +1852,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                 : 'border-transparent text-[#6e6e73] hover:text-[#1d1d1f]'
             }`}
           >
-            {article.content_type === 'audio' ? '节目信息' : '原始内容'}
+            {article.content_type === 'audio' ? '节目信息' : article.content_type === 'video' ? '视频信息' : '原始内容'}
           </button>
           {supportsChapterOverview(article.content_type) && (
             <button
@@ -1796,7 +1882,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
           >
             AI精读
           </button>
-          {article.content_type === 'audio' && (
+          {hasTranscript(article.content_type) && (
             <button
               onClick={() => { setActiveTab('transcript'); loadTranscript(); }}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
@@ -1930,6 +2016,36 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                 </div>
               )}
             </article>
+
+            {/* 视频截图画廊 — worker 提取的关键帧（{job_id}_NNN.png），横向滚动，点击放大 */}
+            {article.content_type === 'video' && (videoShotLoading || videoShots.length > 0) && (
+              <div className="mt-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">视频截图</span>
+                  {!videoShotLoading && (
+                    <span className="text-xs text-[var(--text-tertiary)]">{videoShots.length} 张关键帧 · 点击放大</span>
+                  )}
+                </div>
+                {videoShotLoading ? (
+                  <div className="flex justify-center py-6">
+                    <Loader2 size={22} className="animate-spin text-[var(--text-tertiary)]" />
+                  </div>
+                ) : (
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {videoShots.map((shot) => (
+                      <button
+                        key={shot.index}
+                        onClick={() => setVideoShotViewer(shot.index)}
+                        className="flex-shrink-0 rounded-xl overflow-hidden border border-[#e5e5ea] hover:border-[#007aff] transition-colors shadow-sm"
+                        title="点击放大查看"
+                      >
+                        <img src={shot.url} alt={`截图 ${shot.index}`} className="h-28 w-auto object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {renderBlockRegenFooter('raw')}
           </>
         )}
@@ -1957,7 +2073,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                             }
                           }}
                           className="w-16 flex-shrink-0 text-right text-xs font-mono text-[#8e8e93] hover:text-[#007aff] pt-0.5 transition-colors"
-                          title="点击跳转到此章节"
+                          title={article.content_type === 'audio' ? '点击跳转到此章节' : '章节时间点'}
                         >
                           {formatHMS(ch.start_time)}
                         </button>
@@ -2012,7 +2128,9 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                 <p className="text-[var(--text-tertiary)] text-sm">
                   {article.content_type === 'audio'
                     ? 'AI 正在分析音频内容并生成章节'
-                    : 'AI 正在分析文章内容并生成章节'}
+                    : article.content_type === 'video'
+                      ? 'AI 正在分析视频内容并生成章节'
+                      : 'AI 正在分析文章内容并生成章节'}
                 </p>
               </div>
             ) : (
@@ -2054,7 +2172,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* ── Tab: 全文转录 (audio only) ─────────────────────────────────── */}
+        {/* ── Tab: 全文转录（audio 站内跟播可点选 / video 静态逐句列表） ───── */}
         {activeTab === 'transcript' && (
           <div className="relative">
             {transcriptLoading ? (
@@ -2092,7 +2210,9 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                               audioRef.current.play();
                             }
                           }}
-                          className={`flex gap-3 py-1.5 px-3 rounded-lg cursor-pointer border-l-2 transition-all duration-300 ${
+                          className={`flex gap-3 py-1.5 px-3 rounded-lg border-l-2 transition-all duration-300 ${
+                            article.content_type === 'audio' ? 'cursor-pointer' : ''
+                          } ${
                             isActive
                               ? 'bg-[#007aff]/8 border-[#007aff]'
                               : 'border-transparent hover:bg-[var(--bg-secondary)]'
@@ -2123,7 +2243,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
               <div className="text-center py-16">
                 <BookOpen size={40} className="mx-auto text-[var(--text-tertiary)] mb-4" />
                 <p className="text-[var(--text-primary)] text-base mb-2">转录内容暂不可用</p>
-                <p className="text-[var(--text-tertiary)] text-sm">音频转录尚未完成，请稍后再试</p>
+                <p className="text-[var(--text-tertiary)] text-sm">{article.content_type === 'video' ? '视频转录尚未完成，请稍后再试' : '音频转录尚未完成，请稍后再试'}</p>
               </div>
             )}
             {renderBlockRegenFooter('transcript')}
@@ -2154,7 +2274,11 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                   <Loader2 size={40} className="mx-auto text-[var(--accent)] mb-4 animate-spin" />
                   <p className="text-[#1d1d1f] text-base mb-2 font-medium">AI 解析中，请稍后</p>
                   <p className="text-[#aeaeb2] text-sm">
-                    {article.content_type === 'audio' ? '正在转写音频并生成摘要…' : '正在生成摘要和关键要点…'}
+                    {article.content_type === 'audio'
+                      ? '正在转写音频并生成摘要…'
+                      : article.content_type === 'video'
+                        ? '正在转写视频并生成摘要…'
+                        : '正在生成摘要和关键要点…'}
                   </p>
                 </div>
               )
@@ -2313,6 +2437,54 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
         {/* ── Bottom spacer for sticky bar ───────────────────────────────── */}
         <div className="h-16" />
       </div>
+
+      {/* ─── 视频截图放大查看（左右切换 / 点击背景关闭） ─────────────────────── */}
+      {videoShotViewer !== null && (() => {
+        const pos = videoShots.findIndex((s) => s.index === videoShotViewer);
+        if (pos < 0) return null;
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+            onClick={() => setVideoShotViewer(null)}
+          >
+            <div className="relative max-w-4xl" onClick={(e) => e.stopPropagation()}>
+              <img
+                src={videoShots[pos].url}
+                alt={`截图 ${videoShots[pos].index}`}
+                className="max-h-[78vh] w-auto rounded-xl shadow-2xl"
+              />
+              <button
+                onClick={() => setVideoShotViewer(null)}
+                className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-white text-[#1d1d1f] flex items-center justify-center shadow-lg hover:bg-[#f5f5f7]"
+                title="关闭"
+              >
+                <X size={16} />
+              </button>
+              {pos > 0 && (
+                <button
+                  onClick={() => setVideoShotViewer(videoShots[pos - 1].index)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 text-[#1d1d1f] flex items-center justify-center shadow-lg hover:bg-white"
+                  title="上一张"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+              )}
+              {pos < videoShots.length - 1 && (
+                <button
+                  onClick={() => setVideoShotViewer(videoShots[pos + 1].index)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 text-[#1d1d1f] flex items-center justify-center shadow-lg hover:bg-white"
+                  title="下一张"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              )}
+              <span className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-full bg-black/60 text-white text-xs">
+                {pos + 1} / {videoShots.length}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ─── Sticky Bottom Bar ───────────────────────────────────────────── */}
       <div className="fixed bottom-0 left-0 md:left-60 right-0 z-30 bg-[#f5f5f7]/90 backdrop-blur-xl border-t border-[#e5e5ea]">

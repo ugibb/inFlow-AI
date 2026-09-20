@@ -24,7 +24,7 @@ export interface Article {
   id: string;
   title: string;
   url?: string;
-  content_type?: 'article' | 'note' | 'audio';
+  content_type?: 'article' | 'note' | 'audio' | 'video';
   source_platform?: string;
   author?: string;
   published_at?: string;

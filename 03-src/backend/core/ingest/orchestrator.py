@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from uuid import UUID
 
 from fastapi import BackgroundTasks, HTTPException
@@ -34,9 +35,25 @@ settings = get_settings()
 
 # Platforms inferred as audio before capture begins
 _AUDIO_PLATFORMS = frozenset({"xiaoyuzhou", "bilibili"})
+# Platforms that only ever produce video (content_type 可在采集前确定)
+_VIDEO_PLATFORMS = frozenset({"youtube", "douyin"})
+
+# bilibili 站内音/视频混布，采集前按 URL 路径区分：
+# /video/ 与 /BV… 是视频分区，其余（/audio/、audio 区播客等）维持音频推断
+_BILI_VIDEO_URL_RE = re.compile(r"bilibili\.com/(video/|BV[0-9A-Za-z]+)|b23\.tv/(BV[0-9A-Za-z]+|av\d+)", re.IGNORECASE)
 
 
-def _infer_content_type(platform: str | None) -> str:
+def _infer_content_type(platform: str | None, url: str | None = None) -> str:
+    """URL 验证后对 stub content_type 的最优猜测（worker capture 后会以 raw 为准修正）。
+
+    - 纯视频平台（youtube / douyin）→ video：read 页从创建起即视频布局
+    - bilibili 音视频混布 → 按 URL 路径区分，缺省维持 audio
+    - 其余 → article
+    """
+    if platform in _VIDEO_PLATFORMS:
+        return "video"
+    if platform == "bilibili" and url and _BILI_VIDEO_URL_RE.search(url):
+        return "video"
     return "audio" if platform in _AUDIO_PLATFORMS else "article"
 
 
@@ -168,7 +185,7 @@ async def ingest_url(
         article_id = existing_article.id
         existing_article.fetch_status = "ingesting"
         existing_article.source_platform = adapter.platform
-        existing_article.content_type = _infer_content_type(adapter.platform)
+        existing_article.content_type = _infer_content_type(adapter.platform, clean_url)
         if peeked_title:
             existing_article.title = peeked_title[:500]
     else:
@@ -177,7 +194,7 @@ async def ingest_url(
             url=clean_url,
             title=(peeked_title or clean_url)[:500],
             source_platform=adapter.platform,
-            content_type=_infer_content_type(adapter.platform),
+            content_type=_infer_content_type(adapter.platform, clean_url),
             fetch_status="ingesting",
         )
         db.add(article_stub)

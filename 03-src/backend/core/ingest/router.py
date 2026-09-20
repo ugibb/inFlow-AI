@@ -96,9 +96,20 @@ class IngestJobResponse(BaseModel):
     pipeline_steps: list[PipelineStepView] | None = None
 
 
-def _job_content_type(job: IngestJob, raw_preview: RawPreview | None) -> str:
+def _job_content_type(
+    job: IngestJob,
+    raw_preview: RawPreview | None,
+    article: "Article | None" = None,
+) -> str:
+    """job 内容类型：raw 文件优先；external job 云端无文件，退回 Article 行。
+
+    Article.content_type 由 stub 推断写入、worker capture 后按 raw 修正直写，
+    对 external job 是云端唯一可靠来源（否则视频 job 永远按 article 8 步算步骤链）。
+    """
     if raw_preview and raw_preview.content_type:
         return raw_preview.content_type
+    if article is not None and article.content_type:
+        return article.content_type
     return "article"
 
 
@@ -107,8 +118,9 @@ def _build_job_response(
     *,
     raw_preview: RawPreview | None,
     parsed_preview: ParsedPreview | None,
+    article: "Article | None" = None,
 ) -> IngestJobResponse:
-    content_type = _job_content_type(job, raw_preview)
+    content_type = _job_content_type(job, raw_preview, article)
     steps = compute_pipeline_steps(job, content_type=content_type)
     return IngestJobResponse(
         job_id=job.id,
@@ -334,8 +346,12 @@ async def list_active_jobs(
                 )
             except Exception:
                 pass
+        # external job 云端无 raw 文件 → 用 Article.content_type 兜底算步骤链
+        article = (
+            await db.get(Article, job.article_id) if job.article_id else None
+        )
         responses.append(_build_job_response(
-            job, raw_preview=raw_preview, parsed_preview=None,
+            job, raw_preview=raw_preview, parsed_preview=None, article=article,
         ))
 
     return responses
@@ -370,44 +386,44 @@ async def get_job_status(
         except Exception:
             pass
 
+    # external job 云端无 raw 文件 → Article.content_type 兜底（视频 11 步链）
+    article = await db.get(Article, job.article_id) if job.article_id else None
+
     parsed_preview: ParsedPreview | None = None
-    if job.article_id:
+    if article is not None:
         try:
-            from backend.core.models.article import Article
-            article = await db.get(Article, job.article_id)
-            if article:
-                kp = article.key_points
-                if isinstance(kp, str):
-                    import json as _json
-                    try:
-                        kp = _json.loads(kp)
-                    except Exception:
-                        kp = None
-                chapters_raw = article.chapters or []
-                # worker 直写富格式 {"chapters":[{index,start_time,...}]}；老数据可能是裸 list
-                if isinstance(chapters_raw, dict):
-                    chapters_raw = chapters_raw.get("chapters") or []
-                chapters = [
-                    ChapterPreview(
-                        start_min=int(c.get("start_min") or (c.get("start_time") or 0) // 60),
-                        title=str(c.get("title", "")),
-                        description=str(c.get("description") or c.get("summary") or ""),
-                    )
-                    for c in chapters_raw
-                    if isinstance(c, dict) and c.get("title")
-                ]
-                parsed_preview = ParsedPreview(
-                    summary=article.summary or None,
-                    key_points=kp if isinstance(kp, list) else None,
-                    reading_time=article.reading_time or None,
-                    word_count=article.word_count or None,
-                    chapters=chapters or None,
+            kp = article.key_points
+            if isinstance(kp, str):
+                import json as _json
+                try:
+                    kp = _json.loads(kp)
+                except Exception:
+                    kp = None
+            chapters_raw = article.chapters or []
+            # worker 直写富格式 {"chapters":[{index,start_time,...}]}；老数据可能是裸 list
+            if isinstance(chapters_raw, dict):
+                chapters_raw = chapters_raw.get("chapters") or []
+            chapters = [
+                ChapterPreview(
+                    start_min=int(c.get("start_min") or (c.get("start_time") or 0) // 60),
+                    title=str(c.get("title", "")),
+                    description=str(c.get("description") or c.get("summary") or ""),
                 )
+                for c in chapters_raw
+                if isinstance(c, dict) and c.get("title")
+            ]
+            parsed_preview = ParsedPreview(
+                summary=article.summary or None,
+                key_points=kp if isinstance(kp, list) else None,
+                reading_time=article.reading_time or None,
+                word_count=article.word_count or None,
+                chapters=chapters or None,
+            )
         except Exception:
             pass
 
     return _build_job_response(
-        job, raw_preview=raw_preview, parsed_preview=parsed_preview,
+        job, raw_preview=raw_preview, parsed_preview=parsed_preview, article=article,
     )
 
 

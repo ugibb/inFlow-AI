@@ -228,3 +228,38 @@ def test_content_blocks_video_and_fallback_raw():
     cb = _content_block_summary(article, raw_fallback="文件兜底原文")
     assert cb["raw"] == {"applicable": True, "present": True}
     assert cb["ai"]["present"] is False
+
+
+def test_content_blocks_video_full_pipeline_all_present():
+    """视频与音频同构：转录/章节均适用且就绪时全块 present。"""
+    article = _article(
+        content_type="video",
+        raw_content="视频描述",
+        chapters=_rich_chapters(),
+        transcript={"language": "zh", "duration": 122, "segments": [
+            {"start": 0, "end": 5, "text": "大家好"},
+        ]},
+        deep_read_html="<html>卡片</html>",
+        summary="摘要",
+        key_points=["要点1"],
+    )
+    cb = _content_block_summary(article)
+    assert cb["raw"] == {"applicable": True, "present": True}
+    assert cb["transcript"] == {"applicable": True, "present": True}
+    assert cb["chapters"] == {"applicable": True, "present": True}
+    assert cb["deepRead"] == {"applicable": True, "present": True}
+    assert cb["ai"] == {"applicable": True, "present": True}
+
+
+def test_content_blocks_video_missing_transcript_still_applicable():
+    """老视频文章（legacy 管线无转录）：transcript 适用但缺失，供单块补生成入口。"""
+    article = _article(
+        content_type="video",
+        raw_content="视频描述",
+        transcript=None,
+        chapters=None,
+        summary="摘要",
+    )
+    cb = _content_block_summary(article)
+    assert cb["transcript"] == {"applicable": True, "present": False}
+    assert cb["chapters"] == {"applicable": True, "present": False}

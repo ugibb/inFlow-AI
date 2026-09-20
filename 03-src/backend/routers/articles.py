@@ -670,10 +670,11 @@ async def _get_ingest_extras(
 
 # 内容类型门控：与 read 页 tab 展示规则一致。哪些 tab（内容块）对该类型可见，
 # 以及该块产出位于 worker 流水线哪一阶段入口（用于单块重新生成的续跑点）。
+# 视频与音频同构（转录/章节同链路产出），transcript/chapters 均对 video 开放。
 _BLOCK_APPLICABLE = {
     "raw":        {"article", "video"},
-    "transcript": {"audio"},
-    "chapters":   {"audio", "article"},
+    "transcript": {"audio", "video"},
+    "chapters":   {"audio", "article", "video"},
     "deepRead":   {"article", "audio", "video"},
     "ai":         {"article", "audio", "video", "note"},
 }
@@ -681,10 +682,10 @@ _BLOCK_APPLICABLE = {
 # 不入此表；audio 的 ai 与章节同源于 parsing 续跑。
 _BLOCK_WORKER_STEP = {
     "raw":        ("capturing",    {"article", "video"}),
-    "transcript": ("transcribing", {"audio"}),
-    "chapters":   ("parsing",      {"audio", "article"}),
+    "transcript": ("transcribing", {"audio", "video"}),
+    "chapters":   ("parsing",      {"audio", "article", "video"}),
     "deepRead":   ("composing",    {"article", "audio", "video"}),
-    "ai":         ("parsing",      {"audio"}),  # 仅音频：AI 依赖转写链，需 worker 续跑
+    "ai":         ("parsing",      {"audio"}),  # 仅音频：AI 依赖转写链，需 worker 续跑（video 走云端同步分支）
 }
 
 
@@ -978,6 +979,99 @@ async def capture_article_deep_read_screenshot(
     return Response(content=png_bytes, media_type="image/png")
 
 
+# ── 视频截图（worker 预处理产物 {job_id}_NNN.png，经 SFTP 回传云端）────────
+
+
+def _list_screenshot_indices(raw_file_path: str, job_id: UUID) -> list[int]:
+    """扫描 03_display 目录下 {job_id}_NNN.png，返回升序序号列表（无截图 → 空表）。"""
+    import re as _re
+    from pathlib import Path as _Path
+    from backend.core.config import get_settings as _get_settings
+    from backend.core.shared.storage.conventions import display_dir_candidates as _display_dir_candidates
+
+    settings = _get_settings()
+    pattern = _re.compile(rf"^{_re.escape(str(job_id))}_(\d{{3}})\.png$")
+    indices: set[int] = set()
+    for dir_candidate in _display_dir_candidates(
+        raw_file_path, pipeline_data_dir=settings.inflow_pipeline_data_dir
+    ):
+        d = _Path(dir_candidate)
+        if not d.is_dir():
+            continue
+        for p in d.iterdir():
+            m = pattern.match(p.name)
+            if m and p.is_file() and p.stat().st_size > 0:
+                indices.add(int(m.group(1)))
+    return sorted(indices)
+
+
+async def _find_article_job_or_404(db: AsyncSession, article_id: UUID) -> IngestJob:
+    """截图/媒体类文件端点共用：取文章最近 job 并校验归属。"""
+    job = await _find_article_job(db, article_id)
+    if not job or not job.raw_file_path:
+        raise HTTPException(status_code=404, detail="No pipeline artifacts for this article")
+    return job
+
+
+@router.get("/{article_id}/screenshots")
+async def list_article_screenshots(
+    article_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """视频截图序号列表（read 页视频信息 tab 的截图画廊数据源）。"""
+    article = await db.get(Article, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    if not current_user.is_super_admin and article.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Article not found")
+    job = await _find_article_job_or_404(db, article_id)
+    return {"items": _list_screenshot_indices(job.raw_file_path, job.id)}
+
+
+@router.get("/{article_id}/screenshots/{index}")
+async def get_article_screenshot(
+    article_id: UUID,
+    index: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """单张视频截图 PNG（前端以 blob URL 渲染，鉴权走 Bearer）。"""
+    article = await db.get(Article, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    if not current_user.is_super_admin and article.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Article not found")
+    if index < 1 or index > 999:
+        raise HTTPException(status_code=404, detail="Screenshot not found")
+    job = await _find_article_job_or_404(db, article_id)
+
+    from pathlib import Path as _Path
+    from backend.core.config import get_settings as _get_settings
+    from backend.core.shared.storage.conventions import display_dir_candidates as _display_dir_candidates
+
+    settings = _get_settings()
+    name = f"{job.id}_{index:03d}.png"
+    png_path = next(
+        (
+            str(_Path(d) / name)
+            for d in _display_dir_candidates(
+                job.raw_file_path, pipeline_data_dir=settings.inflow_pipeline_data_dir
+            )
+            if (_Path(d) / name).is_file() and (_Path(d) / name).stat().st_size > 0
+        ),
+        None,
+    )
+    if not png_path:
+        raise HTTPException(status_code=404, detail="Screenshot not found")
+
+    try:
+        png_bytes = _Path(png_path).read_bytes()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to read screenshot: {exc}") from exc
+    return Response(content=png_bytes, media_type="image/png")
+
+
 @router.post("/{article_id}/regenerate-ai", status_code=202)
 async def regenerate_article_ai(
     article_id: UUID,
@@ -987,17 +1081,18 @@ async def regenerate_article_ai(
 ) -> dict:
     """Re-run the full AI chain for an article, handing off to the local worker.
 
-    - audio：复用已转写文本（asr_file_path），重跑 parse→compose→index，不重转录。
+    - audio / video：复用已转写文本（asr_file_path），重跑 parse→compose→index，
+      不重转录（视频同样从 transcribed 检查点续跑，与音频同构）。
     - article（图文/公众号等）：复用已抓 raw_file_path，worker 从 captured 起重跑
       normalize→parse→compose→index，不重新抓取网络。
-    - note / video：无此流水线形态，拒绝（note 走云端 reprocess）。
+    - note：无此流水线形态，拒绝（note 走云端 reprocess）。
     """
     article = await db.get(Article, article_id)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     if not current_user.is_super_admin and article.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Article not found")
-    if article.content_type not in ("audio", "article"):
+    if article.content_type not in ("audio", "article", "video"):
         raise HTTPException(
             status_code=400,
             detail=f"该内容类型（{article.content_type}）不支持从 worker 重新生成",

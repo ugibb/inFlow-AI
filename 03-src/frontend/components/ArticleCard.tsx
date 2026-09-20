@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback } from 'react';
-import { Clock, Star, Loader2, Hourglass, XCircle, Headphones, FileText } from 'lucide-react';
+import { Clock, Star, Loader2, Hourglass, XCircle, Headphones, FileText, Video } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Article } from '@/lib/types';
@@ -55,6 +55,7 @@ export default function ArticleCard({ article }: ArticleCardProps) {
 
   const platform = article.source_platform || 'generic';
   const isAudio = article.content_type === 'audio';
+  const isVideo = article.content_type === 'video';
   const gradient = PLATFORM_GRADIENTS[platform] || PLATFORM_GRADIENTS.generic;
   const initial = (PLATFORM_LABELS[platform] || platform).charAt(0).toUpperCase();
 
@@ -101,7 +102,9 @@ export default function ArticleCard({ article }: ArticleCardProps) {
           </span>
           {isAudio
             ? <Headphones size={12} className="text-[var(--text-tertiary)]" />
-            : <FileText size={12} className="text-[var(--text-tertiary)]" />
+            : isVideo
+              ? <Video size={12} className="text-[var(--text-tertiary)]" />
+              : <FileText size={12} className="text-[var(--text-tertiary)]" />
           }
           {article.published_at && (
             <span className="text-xs text-[var(--text-tertiary)] ml-auto shrink-0">
