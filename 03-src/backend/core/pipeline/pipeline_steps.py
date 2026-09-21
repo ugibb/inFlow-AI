@@ -29,8 +29,11 @@ _VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".mov", ".avi"}
 
 # 外部 worker job 的步骤完成判定：按状态排名（云端看不到本地文件，_step_done 全 False）。
 # 状态 → 数值排名，单调递增；数值越大表示 pipeline 走得越深。
+# preprocessing/preprocessed 用分数档插在 captured(2) 与 normalizing(3) 之间：视频管线
+# 走 captured → preprocessing → preprocessed → transcribing，音频/图文管线不经此二态。
 _EXT_RANK = {
     "pending": 0, "capturing": 1, "captured": 2,
+    "preprocessing": 2.5, "preprocessed": 3,
     "normalizing": 3, "normalized": 4,
     "transcribing": 3, "transcribed": 4,
     "parsing": 5, "parsed": 6,
@@ -41,6 +44,8 @@ _EXT_RANK = {
 # 每个步骤完成所需的排名阈值（rank >= 阈值 → done）
 _EXT_STEP_DONE_RANK = {
     "capture": 2, "media_download": 2, "video_download": 2,
+    # 抽离音频/截图在 preprocessed 才算完成（preprocessing 期间为 active）
+    "extract_audio": 3, "screenshots": 3,
     "normalize": 4, "transcribe": 4,
     # chapters 在 parsing 开始即视为完成（rank 5），否则 parsing 期间
     # "章节解析"显示 active 而真正在跑的 "AI 解析"却显示 pending。
@@ -119,7 +124,8 @@ def _build_specs(content_type: str, raw_file_path: str, job_id: UUID) -> list[St
         return [
             StepSpec("capture", "资源下载", "资源", "capturing", raw_file_path,
                      active_statuses=frozenset({"pending", "capturing"}),
-                     error_keys=frozenset({"capturing"})),
+                     # manual_action：视频号等需人工介入的失败也归到「资源」步
+                     error_keys=frozenset({"capturing", "manual_action"})),
             StepSpec("media_download", "音频下载", "音频", "capturing", media,
                      active_statuses=frozenset({"capturing"}),
                      error_keys=frozenset({"capturing"})),
@@ -151,7 +157,8 @@ def _build_specs(content_type: str, raw_file_path: str, job_id: UUID) -> list[St
         return [
             StepSpec("capture", "资源下载", "资源", "capturing", raw_file_path,
                      active_statuses=frozenset({"pending", "capturing"}),
-                     error_keys=frozenset({"capturing"})),
+                     # manual_action：视频号等需人工介入的失败也归到「资源」步
+                     error_keys=frozenset({"capturing", "manual_action"})),
             StepSpec("video_download", "视频下载", "视频", "capturing", media,
                      active_statuses=frozenset({"capturing"}),
                      error_keys=frozenset({"capturing"})),
@@ -188,7 +195,7 @@ def _build_specs(content_type: str, raw_file_path: str, job_id: UUID) -> list[St
     return [
         StepSpec("capture", "资源下载", "资源", "capturing", raw_file_path,
                  active_statuses=frozenset({"pending", "capturing"}),
-                 error_keys=frozenset({"capturing"})),
+                 error_keys=frozenset({"capturing", "manual_action"})),
         StepSpec("normalize", "音频转录", "转录", "normalizing", parse_asr_txt_path(raw_file_path, jid),
                  active_statuses=frozenset({"normalizing"}),
                  error_keys=frozenset({"normalizing"})),

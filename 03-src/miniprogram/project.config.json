@@ -36,5 +36,7 @@
   "packOptions": {
     "ignore": [],
     "include": []
-  }
+  },
+  "libVersion": "3.17.3",
+  "condition": {}
 }

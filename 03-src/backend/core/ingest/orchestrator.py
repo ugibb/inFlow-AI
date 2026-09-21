@@ -36,23 +36,32 @@ settings = get_settings()
 # Platforms inferred as audio before capture begins
 _AUDIO_PLATFORMS = frozenset({"xiaoyuzhou", "bilibili"})
 # Platforms that only ever produce video (content_type 可在采集前确定)
-_VIDEO_PLATFORMS = frozenset({"youtube", "douyin"})
+# wechat_channels：视频号只有视频，无图文形态
+_VIDEO_PLATFORMS = frozenset({"youtube", "douyin", "wechat_channels"})
 
-# bilibili 站内音/视频混布，采集前按 URL 路径区分：
-# /video/ 与 /BV… 是视频分区，其余（/audio/、audio 区播客等）维持音频推断
-_BILI_VIDEO_URL_RE = re.compile(r"bilibili\.com/(video/|BV[0-9A-Za-z]+)|b23\.tv/(BV[0-9A-Za-z]+|av\d+)", re.IGNORECASE)
+# 站内音/视频混布平台：采集前按 URL 路径推断视频
+# （xhs / twitter 不在此表 —— 其 URL 无法区分图文与视频，只能靠 worker capture
+#   提升 raw.content_type，该回写通道见 executor._update_article_from_raw_dict）
+_MIXED_URL_RULES: dict[str, re.Pattern[str]] = {
+    # bilibili：/video/ 与 /BV… 是视频分区，其余（/audio/ 等）维持音频推断
+    "bilibili": re.compile(
+        r"bilibili\.com/(video/|BV[0-9A-Za-z]+)|b23\.tv/(BV[0-9A-Za-z]+|av\d+)",
+        re.IGNORECASE,
+    ),
+}
 
 
 def _infer_content_type(platform: str | None, url: str | None = None) -> str:
     """URL 验证后对 stub content_type 的最优猜测（worker capture 后会以 raw 为准修正）。
 
-    - 纯视频平台（youtube / douyin）→ video：read 页从创建起即视频布局
-    - bilibili 音视频混布 → 按 URL 路径区分，缺省维持 audio
+    - 纯视频平台（youtube / douyin / wechat_channels）→ video：read 页从创建起即视频布局
+    - 混布平台（bilibili）→ 按 URL 路径区分，缺省维持 audio
     - 其余 → article
     """
     if platform in _VIDEO_PLATFORMS:
         return "video"
-    if platform == "bilibili" and url and _BILI_VIDEO_URL_RE.search(url):
+    rule = _MIXED_URL_RULES.get(platform or "")
+    if rule is not None and url and rule.search(url):
         return "video"
     return "audio" if platform in _AUDIO_PLATFORMS else "article"
 

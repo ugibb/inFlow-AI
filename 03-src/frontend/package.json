@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run check:platform-labels && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check:platform-labels": "node scripts/check-platform-labels.mjs"
   },
   "dependencies": {
     "@mdxeditor/editor": "^3.55.0",

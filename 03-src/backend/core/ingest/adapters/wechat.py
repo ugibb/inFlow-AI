@@ -5,7 +5,9 @@ with platform='wechat', then wraps the result in the standard RawCapture format.
 
 Supported URL patterns:
     https://mp.weixin.qq.com/s/...
-    https://weixin.qq.com/...
+    https://weixin.qq.com/...（/sph/ 除外 —— 那是视频号，见 wechat_channels.py）
+
+视频号与公众号同域，判别特征是路径前缀 ``/sph/``，不是域名。
 """
 
 from __future__ import annotations
@@ -31,7 +33,9 @@ class WechatAdapter(AbstractAdapter):
     version = "1.0.0"
 
     def can_handle(self, url: str) -> bool:
-        return bool(_WECHAT_URL_RE.match(url))
+        # 双保险：视频号分享链同域（weixin.qq.com/sph/<token>），必须让给
+        # WechatChannelsAdapter。registry 顺序已保证，这里再显式排除一次。
+        return bool(_WECHAT_URL_RE.match(url)) and "/sph/" not in url
 
     async def fetch(
         self,

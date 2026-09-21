@@ -36,9 +36,11 @@ class AdapterRegistry:
     def _build(self) -> None:
         """Import and register all adapters.  Called once on first resolve()."""
         from backend.core.ingest.adapters.wechat import WechatAdapter
+        from backend.core.ingest.adapters.wechat_channels import WechatChannelsAdapter
         from backend.core.ingest.adapters.bilibili import BilibiliAdapter
         from backend.core.ingest.adapters.xiaoyuzhou import XiaoyuzhouAdapter
         from backend.core.ingest.adapters.xhs import XhsAdapter
+        from backend.core.ingest.adapters.twitter import TwitterAdapter
         from backend.core.ingest.adapters.douyin import DouyinAdapter
         from backend.core.ingest.adapters.youtube import YoutubeAdapter
         from backend.core.ingest.adapters.toutiao import ToutiaoAdapter
@@ -48,10 +50,14 @@ class AdapterRegistry:
         from backend.core.ingest.adapters.generic import GenericAdapter
 
         self._adapters = [
+            # WechatChannelsAdapter 必须排在 WechatAdapter 之前：视频号与公众号同域
+            # （weixin.qq.com），后者是宽松的域前缀正则，会抢先认领 /sph/ 分享链。
+            WechatChannelsAdapter(),
             WechatAdapter(),
             BilibiliAdapter(),
             XiaoyuzhouAdapter(),
             XhsAdapter(),
+            TwitterAdapter(),
             DouyinAdapter(),
             YoutubeAdapter(),
             ToutiaoAdapter(),

@@ -7,7 +7,7 @@ import os
 import tempfile
 from pathlib import Path
 from typing import Dict, Optional
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse, urlsplit
 from bs4 import BeautifulSoup
 from markdownify import markdownify as md_convert
 
@@ -21,6 +21,7 @@ class ParserServiceBase:
     PLATFORM_DETECT = {
         'weixin.qq.com': 'wechat',
         'mp.weixin.qq.com': 'wechat',
+        'channels.weixin.qq.com': 'wechat_channels',  # 视频号网页域
         'toutiao.com': 'toutiao',
         'jianshu.com': 'jianshu',
         'csdn.net': 'csdn',
@@ -38,15 +39,42 @@ class ParserServiceBase:
         'xhslink.com': 'xhs',          # 小红书短链
         'youtube.com': 'youtube',      # YouTube
         'youtu.be': 'youtube',         # YouTube 短链
+        'twitter.com': 'twitter',      # X / Twitter
+        'x.com': 'twitter',
+        't.co': 'twitter',             # X 短链
         'feishu.cn': 'feishu',         # 飞书（国内版）
         'larksuite.com': 'feishu',     # 飞书（海外版 Lark）
     }
 
+    # 路径优先表：同域不同平台，靠路径前缀区分（hostname 匹配做不到）。
+    # 视频号分享链 https://weixin.qq.com/sph/<token> 与公众号同域，是唯一判别特征。
+    PLATFORM_PATH_RULES = (
+        (re.compile(r'^weixin\.qq\.com/sph/', re.IGNORECASE), 'wechat_channels'),
+    )
+
     def detect_platform(self, url: str) -> str:
-        """Detect source platform from URL."""
-        for domain, platform in self.PLATFORM_DETECT.items():
-            if domain in url:
+        """Detect source platform from URL（hostname 精确/后缀匹配 + 路径优先表）。
+
+        不能用子串包含：``'x.com' in url`` 会命中 ``netflix.com``，
+        ``'weixin.qq.com' in url`` 会把视频号网页域 ``channels.weixin.qq.com``
+        也算成公众号。与本地 worker 的 skills/_shared/fetcher 保持同口径。
+        """
+        try:
+            parsed = urlsplit(url)
+        except ValueError:
+            return 'other'
+        host = (parsed.hostname or '').lower().rstrip('.')
+        if not host:
+            return 'other'
+        path = parsed.path or '/'
+        for pattern, platform in self.PLATFORM_PATH_RULES:
+            if pattern.match(f'{host}{path}'):
                 return platform
+        parts = host.split('.')
+        for i in range(len(parts) - 1):          # 最长后缀优先
+            candidate = '.'.join(parts[i:])
+            if candidate in self.PLATFORM_DETECT:
+                return self.PLATFORM_DETECT[candidate]
         return 'other'
 
     def _get_headers(self, platform: str, url: str) -> Dict[str, str]:

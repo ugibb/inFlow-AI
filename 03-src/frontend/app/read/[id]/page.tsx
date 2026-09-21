@@ -46,6 +46,7 @@ import { api } from '@/lib/api';
 import type { ArticleDetail, Folder as FolderType, Tag as TagType, RelatedArticlesResponse, JobTranscript, ArticleChaptersResponse, IngestJob, ContentBlockKey } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { PipelineBar } from '@/components/PipelineBar';
+import ManualActionBanner from '@/components/ManualActionBanner';
 import { DeepReadPanel } from '@/components/deep-read-panel';
 import { format, parseISO } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -153,8 +154,9 @@ function getPlatformStyle(platform?: string): string {
 function getPlatformLabel(platform?: string): string {
   if (!platform) return '网页';
   const map: Record<string, string> = {
-    wechat: '微信公众号', bilibili: 'B 站', xiaoyuzhou: '小宇宙',
+    wechat: '微信公众号', wechat_channels: '微信视频号', bilibili: 'B 站', xiaoyuzhou: '小宇宙',
     xhs: '小红书', douyin: '抖音', youtube: 'YouTube',
+    twitter: 'X / Twitter',
     toutiao: '今日头条', juejin: '掘金', csdn: 'CSDN',
     feishu: '飞书', generic: '网页', note: '笔记', upload: '上传文件',
     medium: 'Medium',
@@ -1406,6 +1408,14 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                 }
               />
             </div>
+          )}
+
+          {/* 人工介入横幅 — manual_action 时 PipelineBar 只说"卡在哪"，这里说"做什么" */}
+          {processingJob?.error_stage === 'manual_action' && (
+            <ManualActionBanner
+              message={processingJob.error_message}
+              onRetry={() => handleRetry('capturing')}
+            />
           )}
 
           {/* Title — click to edit */}

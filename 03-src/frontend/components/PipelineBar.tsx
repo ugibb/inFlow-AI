@@ -60,13 +60,17 @@ function resolveSteps(
   if (status === 'ready') return steps.map(() => 'done');
 
   if (status === 'failed' || status === 'cancelled') {
+    // 'manual_action' 是"为什么失败"（需人工介入），不是步骤名：它永远发生在
+    // 采集步（人工动作的产物是外部世界状态，只能回 capture 重跑）。不归一的话
+    // 这里匹配不到任何步骤，失败点会被兜底逻辑错标成倒数第二步。
+    const stage = errorStage === 'manual_action' ? 'capturing' : errorStage;
     let failedIdx = -1;
-    if (errorStage) {
+    if (stage) {
       failedIdx = steps.findIndex(
         (s) =>
-          s.activeStatuses.includes(errorStage) ||
-          s.doneStatus === errorStage ||
-          s.retryFrom === errorStage,
+          s.activeStatuses.includes(stage) ||
+          s.doneStatus === stage ||
+          s.retryFrom === stage,
       );
     }
     if (failedIdx < 0) failedIdx = steps.length - 2;

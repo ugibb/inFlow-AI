@@ -17,11 +17,13 @@ import { useAuth } from '@/contexts/AuthContext';
 // ─── Platform labels (shared with processing page) ───────────────────────────
 
 const PLATFORM_LABELS: Record<string, string> = {
-  wechat: '微信公众号', bilibili: 'B 站', xiaoyuzhou: '小宇宙',
+  wechat: '微信公众号', wechat_channels: '微信视频号', bilibili: 'B 站', xiaoyuzhou: '小宇宙',
   xhs: '小红书', douyin: '抖音', youtube: 'YouTube',
+  twitter: 'X / Twitter',
   toutiao: '今日头条', juejin: '掘金', csdn: 'CSDN',
   '36kr': '36 氪', sspai: '少数派', jianshu: '简书',
   weibo: '微博', douban: '豆瓣', medium: 'Medium',
+  feishu: '飞书',
   upload: '上传文件', generic: '网页', note: '笔记',
   spark: 'AI 生成', other: '其他',
 };
@@ -30,9 +32,13 @@ const PLATFORM_GRADIENTS: Record<string, string> = {
   xiaoyuzhou: 'linear-gradient(135deg, #ff9500 0%, #e07800 100%)',
   bilibili:   'linear-gradient(135deg, #fb7299 0%, #e0507a 100%)',
   wechat:     'linear-gradient(135deg, #34c759 0%, #22a344 100%)',
+  // 视频号与公众号刻意不同色（#07c160 vs #34c759），避免视觉上仍被当成同一个平台
+  wechat_channels: 'linear-gradient(135deg, #07c160 0%, #059948 100%)',
   youtube:    'linear-gradient(135deg, #ff3b30 0%, #c0392b 100%)',
+  twitter:    'linear-gradient(135deg, #1d9bf0 0%, #0d6ea8 100%)',
   xhs:        'linear-gradient(135deg, #ff2d55 0%, #cc1f44 100%)',
   douyin:     'linear-gradient(135deg, #444 0%, #111 100%)',
+  feishu:     'linear-gradient(135deg, #3370ff 0%, #1a53cc 100%)',
   note:       'linear-gradient(135deg, #5856d6 0%, #3a38b0 100%)',
   upload:     'linear-gradient(135deg, #8e8e93 0%, #636366 100%)',
   juejin:     'linear-gradient(135deg, #007fff 0%, #0055cc 100%)',
