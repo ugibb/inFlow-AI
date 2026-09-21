@@ -98,7 +98,7 @@ function supportsChapterOverview(contentType?: string): boolean {
   return contentType === 'audio' || contentType === 'article' || contentType === 'video';
 }
 
-/** 有逐句转录（teleprompter）的类型：音频站内播、视频跳原平台看 */
+/** 有逐句转录（teleprompter）的类型：音频/视频（视频音轨经 worker 本地外链站内播） */
 function hasTranscript(contentType?: string): boolean {
   return contentType === 'audio' || contentType === 'video';
 }
@@ -1208,6 +1208,19 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
   const jobBusy =
     !!processingJob && !['ready', 'failed', 'cancelled'].includes(processingJob.status);
 
+  // 可播音轨外链：小宇宙 CDN 与 worker 本地音轨（视频「本地方案」）均 ≠ url →
+  // 播放器接管。视频 capture 期 media_url 暂存平台页地址（== url），不算可播。
+  const playableMediaUrl =
+    article.media_url && article.media_url !== article.url ? article.media_url : undefined;
+  // 播放器就绪（有可播源且未加载失败）：转录句点选跳转/章节跳转的可用性判据
+  const playerReady = !!playableMediaUrl && !audioFailed;
+  // 视频卡时长标签：播放器实读时长 → 转录时长 → 阅读时长估算
+  const videoDurationLabel = audioDuration > 0
+    ? formatDuration(audioDuration)
+    : transcript?.duration
+      ? formatDuration(transcript.duration)
+      : article.reading_time > 0 ? `约 ${formatReadingTime(article.reading_time)}` : '';
+
   /** 单块「重新生成」footer：仅重新生成该块，idle 时才显示 */
   const renderBlockRegenFooter = (block: ContentBlockKey) => {
     if (!blockMap?.[block]?.applicable) return null;
@@ -1479,7 +1492,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
             )}
 
             {/* Reading / listen time */}
-            {article.content_type === 'audio' ? (
+            {hasTranscript(article.content_type) ? (
               audioDuration > 0 && (
                 <span className="flex items-center gap-1.5">
                   <Clock size={14} />
@@ -1586,55 +1599,40 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
             </div>
           )}
 
-          {/* Video card — 站内不托管 mp4（不回传），封面卡 + 跳原平台观看 */}
-          {article.content_type === 'video' && (
+          {/* 播放卡 — audio：CDN 外链站内播；video：worker 本地音轨外链（media_url，
+              「本地方案」与小宇宙外链同机制）。同一套播放器，转录句点选跳转/逐句跟播/
+              章节跳转全激活。视频无可播外链（老数据/服务未启/音源加载失败）→ 降级跳原平台 */}
+          {hasTranscript(article.content_type) && (playableMediaUrl || article.cover_image) && (
             <div className="mb-5 bg-[#f5f5f7] rounded-2xl p-4 border border-[#e5e5ea]">
-              <div className="flex items-center gap-4">
+              <div className="flex items-start gap-4">
                 {article.cover_image && (
                   <div className="relative flex-shrink-0">
                     <img
                       src={article.cover_image}
                       alt={article.title}
-                      className="w-32 h-[4.5rem] rounded-xl object-cover shadow-sm"
+                      className={
+                        article.content_type === 'video'
+                          ? 'w-32 h-[4.5rem] rounded-xl object-cover shadow-sm'
+                          : 'w-16 h-16 rounded-xl object-cover shadow-sm'
+                      }
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                     />
-                    <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <span className="w-7 h-7 rounded-full bg-black/50 flex items-center justify-center">
-                        <Play size={13} className="text-white ml-0.5" fill="currentColor" strokeWidth={0} />
+                    {article.content_type === 'video' && (
+                      <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <span className="w-7 h-7 rounded-full bg-black/50 flex items-center justify-center">
+                          <Play size={13} className="text-white ml-0.5" fill="currentColor" strokeWidth={0} />
+                        </span>
                       </span>
-                    </span>
+                    )}
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-[#6e6e73] uppercase tracking-wider truncate mb-2">
-                    {getPlatformLabel(article.source_platform)} · 视频
-                    {transcript?.duration
-                      ? ` · ${formatDuration(transcript.duration)}`
-                      : article.reading_time > 0 ? ` · 约 ${formatReadingTime(article.reading_time)}` : ''}
-                  </p>
-                  <ExternalListenLink url={article.url} platform={article.source_platform} kind="video" />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Podcast card — custom player for audio articles */}
-          {article.content_type === 'audio' && (article.media_url || article.cover_image) && (
-            <div className="mb-5 bg-[#f5f5f7] rounded-2xl p-4 border border-[#e5e5ea]">
-              <div className="flex items-start gap-4">
-                {article.cover_image && (
-                  <img
-                    src={article.cover_image}
-                    alt={article.title}
-                    className="w-16 h-16 rounded-xl object-cover flex-shrink-0 shadow-sm"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  />
-                )}
-                <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-[#6e6e73] mb-3 uppercase tracking-wider truncate">
-                    {article.author || '音频'}
+                    {article.content_type === 'video'
+                      ? `${getPlatformLabel(article.source_platform)} · 视频${videoDurationLabel ? ` · ${videoDurationLabel}` : ''}`
+                      : (article.author || '音频')}
                   </p>
-                  {article.media_url && !audioFailed ? (
+                  {playableMediaUrl && !audioFailed ? (
                     <div className="space-y-2">
                       {/* Hidden audio element — controlled via ref.
                           src 直连（非 <source> 子元素）保证 403/404 触发 onError 降级。 */}
@@ -1642,7 +1640,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                         ref={audioRef}
                         preload="metadata"
                         className="hidden"
-                        src={article.media_url}
+                        src={playableMediaUrl}
                         onError={() => setAudioFailed(true)}
                       />
 
@@ -1716,9 +1714,21 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                           </button>
                         ))}
                       </div>
+
+                      {/* 视频听声模式的画面出口：跳原平台看视频 */}
+                      {article.content_type === 'video' && (
+                        <div className="flex items-center gap-2 pt-1 pl-[68px]">
+                          <span className="text-[11px] text-[#aeaeb2]">看画面</span>
+                          <ExternalListenLink url={article.url} platform={article.source_platform} kind="video" />
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <ExternalListenLink url={article.url} platform={article.source_platform} />
+                    <ExternalListenLink
+                      url={article.url}
+                      platform={article.source_platform}
+                      kind={article.content_type === 'video' ? 'video' : 'audio'}
+                    />
                   )}
                 </div>
               </div>
@@ -2073,7 +2083,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                             }
                           }}
                           className="w-16 flex-shrink-0 text-right text-xs font-mono text-[#8e8e93] hover:text-[#007aff] pt-0.5 transition-colors"
-                          title={article.content_type === 'audio' ? '点击跳转到此章节' : '章节时间点'}
+                          title={playerReady ? '点击跳转到此章节' : '章节时间点'}
                         >
                           {formatHMS(ch.start_time)}
                         </button>
@@ -2172,7 +2182,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* ── Tab: 全文转录（audio 站内跟播可点选 / video 静态逐句列表） ───── */}
+        {/* ── Tab: 全文转录（音/视频共用 teleprompter；有可播源时句点选跳转跟播）── */}
         {activeTab === 'transcript' && (
           <div className="relative">
             {transcriptLoading ? (
@@ -2211,7 +2221,7 @@ export default function ReaderPage({ params }: { params: { id: string } }) {
                             }
                           }}
                           className={`flex gap-3 py-1.5 px-3 rounded-lg border-l-2 transition-all duration-300 ${
-                            article.content_type === 'audio' ? 'cursor-pointer' : ''
+                            playerReady ? 'cursor-pointer' : ''
                           } ${
                             isActive
                               ? 'bg-[#007aff]/8 border-[#007aff]'
