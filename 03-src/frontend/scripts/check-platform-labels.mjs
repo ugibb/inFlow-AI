@@ -10,9 +10,14 @@
  * 1. REQUIRED_PLATFORMS 在每个文件的标签表里都存在
  * 2. 标签值互不相同（视频号复制公众号那行就会被抓住）
  * 3. ArticleCard / read 页的 key 集合是 library 页的子集（library 是全量基准表）
+ *
+ * 构建上下文：本脚本挂在 `npm run build` 前，而前端镜像是**只以 03-src/frontend 为
+ * 上下文**构建的（docker-compose.yml 的 `context: ./03-src/frontend`），镜像里没有
+ * ../miniprogram。所以 Web 三处表**必须存在**（路径写错要当场炸），小程序表标
+ * `optional`：文件不在就跳过并打印，否则会把镜像构建带崩。
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -33,9 +38,10 @@ const GRADIENT_TARGETS = [
   { file: 'components/ArticleCard.tsx', marker: "const PLATFORM_GRADIENTS" },
 ];
 
+// optional：小程序不在前端镜像的构建上下文里，缺文件跳过（见文件头说明）
 const MINIPROGRAM_TARGETS = [
-  { file: '../miniprogram/config/index.ts', marker: "export const PLATFORM_LABELS" },
-  { file: '../miniprogram/config/index.ts', marker: "export const PLATFORM_GRADIENTS" },
+  { file: '../miniprogram/config/index.ts', marker: "export const PLATFORM_LABELS", optional: true },
+  { file: '../miniprogram/config/index.ts', marker: "export const PLATFORM_GRADIENTS", optional: true },
 ];
 
 /** 取出 `marker` 后第一个 `{...}` 对象字面量（带引号状态跟踪，避免被字符串里的 } 骗到） */
@@ -71,12 +77,20 @@ function parseEntries(body) {
   return entries;
 }
 
-function loadEntries({ file, marker }) {
-  const src = readFileSync(join(ROOT, file), 'utf8');
-  return parseEntries(extractObjectBody(src, marker));
+function loadEntries({ file, marker, optional = false }) {
+  const path = join(ROOT, file);
+  if (!existsSync(path)) {
+    // 非 optional 的缺文件是真错误（多半是路径写错了），必须炸；optional 的
+    // 只在仓库里存在（本地跑得到），镜像里没有 —— 记下来，不静默
+    if (!optional) throw new Error(`找不到文件：${path}`);
+    skipped.push(file);
+    return null;
+  }
+  return parseEntries(extractObjectBody(readFileSync(path, 'utf8'), marker));
 }
 
 const failures = [];
+const skipped = [];
 
 // ── 1 + 2：标签表 ────────────────────────────────────────────────────────────
 for (const target of WEB_LABEL_TARGETS) {
@@ -109,6 +123,7 @@ if (base) {
 // ── 渐变表 + 小程序 ─────────────────────────────────────────────────────────
 for (const target of [...GRADIENT_TARGETS, ...MINIPROGRAM_TARGETS]) {
   const entries = loadEntries(target);
+  if (!entries) continue; // 小程序不在构建上下文里
   for (const platform of REQUIRED_PLATFORMS) {
     if (!entries.has(platform)) {
       failures.push(`${target.file}: 缺 "${platform}"（${target.marker}）`);
@@ -126,4 +141,9 @@ if (failures.length) {
   for (const f of failures) console.error(`  - ${f}`);
   process.exit(1);
 }
-console.log('✓ 平台名映射一致（web 3 处 + 小程序 2 表，新增平台均已就位）');
+// 报"实际查了什么"，别把跳过的算成查过
+const skippedFiles = [...new Set(skipped)];
+const scope = skippedFiles.length
+  ? `web ${WEB_LABEL_TARGETS.length} 处 + 渐变 ${GRADIENT_TARGETS.length} 处；跳过 ${skippedFiles.join('、')}（不在本次构建上下文内）`
+  : `web ${WEB_LABEL_TARGETS.length} 处 + 小程序 2 表`;
+console.log(`✓ 平台名映射一致（${scope}，新增平台均已就位）`);
