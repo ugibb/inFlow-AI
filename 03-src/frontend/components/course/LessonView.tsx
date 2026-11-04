@@ -154,7 +154,12 @@ export default function LessonView({
   const [selStart, setSelStart] = useState<number | null>(null);
   const [selEnd, setSelEnd] = useState<number | null>(null);
 
-  const [noteCtx, setNoteCtx] = useState<{ time: number; quote?: string } | null>(null);
+  const [noteCtx, setNoteCtx] = useState<{
+    time: number;
+    end?: number;
+    quote?: string;
+    lines?: { time: number; text: string }[];
+  } | null>(null);
   const [noteText, setNoteText] = useState('');
   const [sourceTime, setSourceTime] = useState<number | null>(null);
 
@@ -164,6 +169,7 @@ export default function LessonView({
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
+  const noteInputRef = useRef<HTMLTextAreaElement>(null);
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
   const programmaticAt = useRef(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -460,13 +466,19 @@ export default function LessonView({
     }
   }
 
+  function pauseMedia() {
+    const el = getMedia();
+    if (el && !el.paused) el.pause();
+    setPlaying(false);
+  }
+
   function enterSelection() {
+    pauseMedia();
     setSelectionMode(true);
     setSelStart(currentLine >= 0 ? currentLine : 0);
     setSelEnd(null);
-    setPlaying(false);
     setTab('transcript');
-    showToast('点击另一行选择结束位置，或直接记录想法');
+    setTimeout(() => scrollToCurrent(true), 60);
   }
 
   function exitSelection() {
@@ -480,18 +492,36 @@ export default function LessonView({
       showToast('请先选择原文');
       return;
     }
-    const quote = transcript
+    const lines = transcript
       .slice(range.from, range.to + 1)
-      .map((s) => s.text)
-      .join(' ');
-    openNoteModal(transcript[range.from].start, quote);
+      .map((s) => ({ time: s.start, text: s.text }));
+    const quote = lines.map((l) => l.text).join(' ');
+    exitSelection();
+    openNoteModal(
+      transcript[range.from].start,
+      quote,
+      lines,
+      transcript[range.to].end
+    );
   }
 
   /* ---------------- notes ---------------- */
-  function openNoteModal(t?: number, quote?: string) {
-    setNoteCtx({ time: t !== undefined ? t : time, quote });
+  function openNoteModal(
+    t?: number,
+    quote?: string,
+    lines?: { time: number; text: string }[],
+    end?: number
+  ) {
+    pauseMedia();
+    setNoteCtx({ time: t !== undefined ? t : time, end, quote, lines });
     setNoteText('');
   }
+
+  useEffect(() => {
+    if (!noteCtx) return;
+    const timer = setTimeout(() => noteInputRef.current?.focus(), 60);
+    return () => clearTimeout(timer);
+  }, [noteCtx]);
 
   function saveNote() {
     const text = noteText.trim();
@@ -1215,14 +1245,6 @@ export default function LessonView({
                     我的想法 <span className="count">{study.notes.length}</span>
                   </button>
                 </div>
-                <button
-                  className="icon-btn sm"
-                  title="记录想法"
-                  aria-label="记录想法"
-                  onClick={() => openNoteModal()}
-                >
-                  <Icon name="pen" size="sm" />
-                </button>
               </div>
 
               <div className="transcript-tools">
@@ -1253,11 +1275,29 @@ export default function LessonView({
                 </button>
               </div>
 
+              {selectionMode && (
+                <div className="selection-banner">
+                  <Icon name={selEnd !== null ? 'check-circle' : 'pen'} size="sm" />
+                  <span>
+                    {selEnd !== null
+                      ? '已选定范围，可点击其他行重新选择'
+                      : '点击选择结束行，或直接提交想法'}
+                  </span>
+                </div>
+              )}
+
               <div
                 className="transcript-scroll"
                 ref={transcriptScrollRef}
                 onScroll={handleTranscriptScroll}
               >
+                <button
+                  className={'back-current' + (!follow ? ' show' : '')}
+                  onClick={goCurrent}
+                >
+                  <Icon name="down" size="sm" />
+                  回到当前
+                </button>
                 <div>
                   {transcript.map((seg, i) => {
                     const dim = !!searchNorm && !seg.text.toLowerCase().includes(searchNorm);
@@ -1292,13 +1332,6 @@ export default function LessonView({
                 >
                   没有找到匹配的原文，换个关键词试试。
                 </div>
-                <button
-                  className={'back-current' + (!follow ? ' show' : '')}
-                  onClick={goCurrent}
-                >
-                  <Icon name="down" size="sm" />
-                  回到当前
-                </button>
               </div>
 
               <div className="notes-scroll">
@@ -1344,6 +1377,18 @@ export default function LessonView({
                   )}
                 </div>
               </div>
+
+              {tab === 'transcript' && (
+                <div className="notequick">
+                  <b>此刻发生了什么？</b>
+                  <p className="muted small">
+                    视频正在讲一个知识点。你的笔记会自动绑定当前时间，并在课后归入对应节点。
+                  </p>
+                  <button className="btn primary-blue" onClick={enterSelection}>
+                    ＋ 记录此刻想法
+                  </button>
+                </div>
+              )}
             </aside>
           </div>
         </div>
@@ -1930,11 +1975,27 @@ export default function LessonView({
             </button>
           </div>
           <div className="modal-meta">
-            <span className="badge blue">{fmt(noteCtx ? noteCtx.time : time)}</span>
+            <span className="badge blue">
+              {noteCtx && noteCtx.end !== undefined && noteCtx.end > noteCtx.time
+                ? `${fmt(noteCtx.time)} – ${fmt(noteCtx.end)}`
+                : fmt(noteCtx ? noteCtx.time : time)}
+            </span>
             <span>{noteNode ? noteNode.title : ''}</span>
             <span className="muted">已自动绑定</span>
           </div>
-          {noteCtx?.quote ? (
+          {noteCtx?.lines?.length ? (
+            <div className="quote-box quote-lines">
+              <span className="q-label">针对以下原文</span>
+              {noteCtx.lines.map((line, i) => (
+                <div className="quote-line" key={i}>
+                  <span className="ql-time">{fmt(line.time)}</span>
+                  <span>
+                    {line.text.length > 40 ? line.text.slice(0, 40) + '…' : line.text}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : noteCtx?.quote ? (
             <div className="quote-box">
               <span className="q-label">针对以下原文</span>
               {noteCtx.quote}
@@ -1942,6 +2003,7 @@ export default function LessonView({
           ) : null}
           <textarea
             id="noteText"
+            ref={noteInputRef}
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
             placeholder="例如：这里老师说填空和判断占了 20 题，我之前的复习顺序可能排反了……"

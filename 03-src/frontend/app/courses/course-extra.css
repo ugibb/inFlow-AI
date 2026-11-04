@@ -83,3 +83,71 @@
 .ifc .media-toggle:disabled { opacity: .5; cursor: default; }
 /* Keep "全屏" / "1.0×" on one line on narrow screens. */
 .ifc .speed-btn { white-space: nowrap; }
+
+/* "回到当前" now floats at the top-right of the transcript list (prototype v3). */
+.ifc .back-current {
+  position: sticky;
+  top: 8px;
+  margin: 0 4px 6px auto;
+  display: none;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--accent);
+  padding: 5px 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  z-index: 6;
+}
+.ifc .back-current.show { display: flex; }
+.ifc .back-current:hover { background: var(--accent-light); }
+
+/* Selection-mode hint, sits between tools and transcript list (prototype v3). */
+.ifc .selection-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 8px 12px;
+  background: var(--accent-light);
+  border-bottom: 1px solid var(--border-color);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* "此刻发生了什么？" card pinned below the transcript (prototype v3). */
+.ifc .notequick {
+  flex: none;
+  margin: 8px 10px 10px;
+  padding: 12px 14px;
+  background: var(--accent-light);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+.ifc .notequick b { font-size: 12px; color: var(--text-primary); }
+.ifc .notequick p { margin: 5px 0 9px; line-height: 1.6; }
+.ifc .notequick .btn { width: 100%; justify-content: center; }
+.ifc .notequick .btn.primary-blue {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.ifc .notequick .btn.primary-blue:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+/* Per-line quote previews inside the note modal. */
+.ifc .quote-box.quote-lines { max-height: 150px; }
+.ifc .quote-line { display: flex; gap: 6px; margin-bottom: 3px; }
+.ifc .quote-line .ql-time {
+  flex: none;
+  color: var(--accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
