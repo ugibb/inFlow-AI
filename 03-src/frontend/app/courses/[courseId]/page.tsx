@@ -1,253 +1,306 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, BookOpen, Clock, CheckCircle, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { CourseDetail, LessonSummary } from '@/lib/types';
+import { Icon, fmt } from '@/components/course/CourseUI';
 
-// ─── Subject color mapping ────────────────────────────────────────────────────
+const PIPE_STEPS = ['目录索引', '音频 / 转写', '章节归并', '四阶段编译', '发布'];
+const COVER_COLORS = ['blue', 'orange', 'purple', 'green', 'gray'];
 
-const CHAPTER_COLORS: Record<string, { bg: string; text: string; border: string; icon: string }> = {
-  reading: { bg: 'bg-blue-50 dark:bg-blue-900/20', text: 'text-blue-600 dark:text-blue-400', border: 'border-blue-200 dark:border-blue-800', icon: '📖' },
-  listening: { bg: 'bg-orange-50 dark:bg-orange-900/20', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-200 dark:border-orange-800', icon: '🎧' },
-  speaking: { bg: 'bg-purple-50 dark:bg-purple-900/20', text: 'text-purple-600 dark:text-purple-400', border: 'border-purple-200 dark:border-purple-800', icon: '🗣️' },
-  writing: { bg: 'bg-green-50 dark:bg-green-900/20', text: 'text-green-600 dark:text-green-400', border: 'border-green-200 dark:border-green-800', icon: '✍️' },
-};
-
-const DEFAULT_COLOR = { bg: 'bg-gray-50 dark:bg-gray-800', text: 'text-gray-600 dark:text-gray-400', border: 'border-gray-200 dark:border-gray-700', icon: '📘' };
-
-function getChapterColor(chapterId?: string) {
-  if (!chapterId) return DEFAULT_COLOR;
-  return CHAPTER_COLORS[chapterId.toLowerCase()] || DEFAULT_COLOR;
+function hashStr(str: string) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  return h;
 }
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: string }) {
-  const config = {
-    draft: { label: '草稿', className: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
-    ready: { label: '已就绪', className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-    published: { label: '已发布', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-  };
-  const { label, className } = config[status as keyof typeof config] || config.draft;
-
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${className}`}>
-      {label}
-    </span>
-  );
+function coverChar(course: { subject?: string; title?: string }) {
+  const raw = course.subject || course.title || '课';
+  const cleaned = raw.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, '');
+  return (cleaned[0] || '课').toUpperCase();
 }
 
-// ─── Lesson Row ───────────────────────────────────────────────────────────────
-
-function LessonRow({ lesson, courseId }: { lesson: LessonSummary; courseId: string }) {
-  const durationMin = Math.round(lesson.duration_sec / 60);
-
-  return (
-    <Link
-      href={`/courses/${courseId}/${lesson.lesson_key}`}
-      className="flex items-center gap-4 p-4 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-[var(--accent)]/30 hover:shadow-md transition-all duration-200"
-    >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm font-medium text-[var(--text-primary)] truncate">
-            {lesson.lesson_key}
-          </span>
-          <StatusBadge status={lesson.status} />
-        </div>
-        <h4 className="text-base font-semibold text-[var(--text-primary)] truncate">
-          {lesson.title}
-        </h4>
-        {lesson.chapter_title && (
-          <p className="text-sm text-[var(--text-tertiary)] mt-0.5">
-            {lesson.chapter_title}
-          </p>
-        )}
-      </div>
-      <div className="flex items-center gap-4 text-sm text-[var(--text-secondary)]">
-        <div className="flex items-center gap-1">
-          <Clock size={14} />
-          <span>{durationMin} 分</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <BookOpen size={14} />
-          <span>{lesson.segment_count} 段</span>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-// ─── Chapter Section ──────────────────────────────────────────────────────────
-
-function ChapterSection({
-  chapterId,
-  chapterTitle,
-  lessons,
-  courseId,
-  defaultExpanded = false,
-}: {
-  chapterId: string;
-  chapterTitle: string;
+interface ChapterGroup {
+  id: string;
+  title: string;
   lessons: LessonSummary[];
-  courseId: string;
-  defaultExpanded?: boolean;
-}) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-  const color = getChapterColor(chapterId);
-  const readyCount = lessons.filter(l => l.status === 'ready').length;
-
-  return (
-    <div className={`rounded-xl border ${color.border} overflow-hidden`}>
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className={`w-full flex items-center gap-3 p-4 ${color.bg} hover:opacity-80 transition-opacity`}
-      >
-        {expanded ? <ChevronDown size={20} className={color.text} /> : <ChevronRight size={20} className={color.text} />}
-        <span className="text-2xl">{color.icon}</span>
-        <div className="flex-1 text-left">
-          <h3 className={`text-lg font-semibold ${color.text}`}>{chapterTitle}</h3>
-          <p className="text-sm text-[var(--text-secondary)]">
-            {lessons.length} 课时 · {readyCount} 已就绪
-          </p>
-        </div>
-      </button>
-      {expanded && (
-        <div className="p-4 space-y-2 bg-[var(--bg-primary)]">
-          {lessons.map(lesson => (
-            <LessonRow key={lesson.id} lesson={lesson} courseId={courseId} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  ready: number;
+  hours: number;
+  segments: number;
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+function groupChapters(lessons: LessonSummary[]): ChapterGroup[] {
+  const map = new Map<string, ChapterGroup>();
+  lessons.forEach((l) => {
+    const id = l.chapter_id || 'default';
+    if (!map.has(id)) {
+      map.set(id, {
+        id,
+        title: l.chapter_title || '未分章',
+        lessons: [],
+        ready: 0,
+        hours: 0,
+        segments: 0,
+      });
+    }
+    const g = map.get(id)!;
+    g.lessons.push(l);
+    if (l.status === 'ready' || l.status === 'published') g.ready += 1;
+    g.hours += (l.duration_sec || 0) / 3600;
+    g.segments += l.segment_count || 0;
+  });
+  return Array.from(map.values());
+}
+
+function lessonNo(index: number) {
+  return `第${String(index + 1).padStart(2, '0')}讲`;
+}
 
 export default function CourseDetailPage() {
-  const params = useParams();
-  const courseId = params.courseId as string;
-
+  const params = useParams<{ courseId: string }>();
+  const courseId = params?.courseId;
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (courseId) {
-      loadCourse();
-    }
+    if (!courseId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.getCourse(courseId);
+        if (!cancelled) {
+          setCourse(data);
+          const first = groupChapters(data.lessons || [])[0];
+          if (first) setOpen({ [first.id]: true });
+        }
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || '课程加载失败');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [courseId]);
 
-  async function loadCourse() {
-    try {
-      setLoading(true);
-      const data = await api.getCourse(courseId);
-      setCourse(data);
-    } catch (error) {
-      console.error('Failed to load course:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const chapters = useMemo(() => groupChapters(course?.lessons || []), [course]);
+  const totals = useMemo(() => {
+    const lessons = course?.lessons || [];
+    return {
+      lessons: lessons.length,
+      hours: lessons.reduce((s, l) => s + (l.duration_sec || 0), 0) / 3600,
+      ready: lessons.filter((l) => l.status === 'ready' || l.status === 'published').length,
+      segments: lessons.reduce((s, l) => s + (l.segment_count || 0), 0),
+    };
+  }, [course]);
+
+  const steps = totals.ready > 0 && totals.ready === totals.lessons ? 4 : totals.lessons > 0 ? 3 : 1;
+  const pipelineLabel =
+    totals.lessons === 0
+      ? '仅索引 · 未转写'
+      : totals.ready > 0
+        ? `四阶段编译中 · ${totals.ready} / ${totals.lessons}`
+        : '已转写 · 待 AI 编译';
+  const color = COVER_COLORS[hashStr(course?.course_key || course?.title || '') % COVER_COLORS.length];
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 size={40} className="animate-spin text-[var(--accent)]" />
+      <div className="page-inner">
+        <div className="lib-empty">正在加载课程…</div>
       </div>
     );
   }
 
-  if (!course) {
+  if (error || !course) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-20 text-center">
-        <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">课程不存在</h2>
-        <p className="text-[var(--text-secondary)]">请返回课程库查看</p>
-        <Link href="/courses" className="inline-flex items-center gap-2 mt-6 px-4 py-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90">
-          <ArrowLeft size={16} /> 返回课程库
-        </Link>
+      <div className="page-inner">
+        <div className="breadcrumb">
+          <Link href="/courses">课程库</Link>
+          <Icon name="chevron" />
+          <span>课程</span>
+        </div>
+        <div className="lib-empty">{error || '课程不存在'}</div>
       </div>
     );
   }
-
-  // Group lessons by chapter
-  const lessonsByChapter = new Map<string, LessonSummary[]>();
-  course.lessons.forEach(lesson => {
-    const chapterId = lesson.chapter_id || 'other';
-    if (!lessonsByChapter.has(chapterId)) {
-      lessonsByChapter.set(chapterId, []);
-    }
-    lessonsByChapter.get(chapterId)!.push(lesson);
-  });
-
-  // Calculate stats
-  const totalLessons = course.lessons.length;
-  const readyLessons = course.lessons.filter(l => l.status === 'ready').length;
-  const totalDuration = course.lessons.reduce((sum, l) => sum + l.duration_sec, 0);
-  const totalHours = (totalDuration / 3600).toFixed(1);
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-6">
-        <Link href="/courses" className="hover:text-[var(--accent)]">课程库</Link>
-        <span>/</span>
-        <span className="text-[var(--text-primary)]">{course.title}</span>
+    <div className="page-inner">
+      <div className="breadcrumb">
+        <Link href="/courses">课程库</Link>
+        <Icon name="chevron" />
+        <span>{course.title}</span>
       </div>
 
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">{course.title}</h1>
-        {course.description && (
-          <p className="text-[var(--text-secondary)]">{course.description}</p>
-        )}
+      <div className="course-hero">
+        <div className={`course-cover cover-lg ${color}`}>{coverChar(course)}</div>
+        <div className="course-hero-body">
+          <h1>{course.title}</h1>
+          <div className="course-hero-meta">
+            <span>{course.stage || '未标注'}</span>
+            <span>{course.subject || '课程'}</span>
+            <span>{chapters.length} 个章节</span>
+            <span>{totals.lessons.toLocaleString()} 节</span>
+            <span>{totals.hours.toFixed(1)} 小时</span>
+          </div>
+          <div className="course-tags">
+            <span className="course-tag">{course.course_key}</span>
+            <span className="course-tag">{totals.segments > 0 ? `真实转写 ${totals.segments} 段` : '待转写'}</span>
+            <span className="course-tag">{totals.ready} 节已编译</span>
+          </div>
+        </div>
+        <div className="course-hero-stat">
+          <div>
+            <b>{totals.lessons.toLocaleString()}</b>
+            <span>节目录</span>
+          </div>
+          <div>
+            <b>{totals.hours.toFixed(1)}</b>
+            <span>小时</span>
+          </div>
+          <div>
+            <b>{totals.ready}</b>
+            <span>份转写</span>
+          </div>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] p-4">
-          <div className="text-xs text-[var(--text-tertiary)] mb-1">章节</div>
-          <div className="text-2xl font-bold text-[var(--text-primary)]">{lessonsByChapter.size}</div>
-        </div>
-        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] p-4">
-          <div className="text-xs text-[var(--text-tertiary)] mb-1">课时</div>
-          <div className="text-2xl font-bold text-[var(--text-primary)]">{totalLessons}</div>
-        </div>
-        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] p-4">
-          <div className="text-xs text-[var(--text-tertiary)] mb-1">总时长</div>
-          <div className="text-2xl font-bold text-[var(--text-primary)]">{totalHours}h</div>
-        </div>
-        <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] p-4">
-          <div className="text-xs text-[var(--text-tertiary)] mb-1">已就绪</div>
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">{readyLessons}</div>
-        </div>
-      </div>
-
-      {/* Chapter Sections */}
-      <div className="space-y-4">
-        {Array.from(lessonsByChapter.entries()).map(([chapterId, lessons], index) => {
-          const chapterTitle = lessons[0]?.chapter_title || chapterId;
+      <div className="pipeline-bar">
+        {PIPE_STEPS.map((name, i) => {
+          const cls = i < steps ? 'done' : i === steps ? 'now' : '';
           return (
-            <ChapterSection
-              key={chapterId}
-              chapterId={chapterId}
-              chapterTitle={chapterTitle}
-              lessons={lessons}
-              courseId={courseId}
-              defaultExpanded={index === 0}
-            />
+            <React.Fragment key={name}>
+              <span className={`pipeline-step ${cls}`}>
+                <span className="n">{i < steps ? <Icon name="check" size="sm" /> : i + 1}</span>
+                {name}
+              </span>
+              {i < PIPE_STEPS.length - 1 && <span className="pipeline-sep">/</span>}
+            </React.Fragment>
+          );
+        })}
+        <span style={{ marginLeft: 'auto', color: 'var(--text-tertiary)' }}>{pipelineLabel}</span>
+      </div>
+
+      <div className="section-head">
+        <h2>章节</h2>
+        <span className="badge gray">由目录结构自动识别</span>
+        <span className="muted small" style={{ marginLeft: 'auto' }}>
+          {chapters.length} 个章节 · {totals.lessons.toLocaleString()} 节
+        </span>
+      </div>
+
+      <div className="section-list">
+        {chapters.length === 0 && (
+          <div className="card lesson-empty">
+            <div className="empty-icon">
+              <Icon name="layers" size="lg" />
+            </div>
+            <h3>还没有课时数据</h3>
+            <p>目录已建立，等待音频、转写与四阶段编译结果写入云端数据库。</p>
+          </div>
+        )}
+        {chapters.map((ch, i) => {
+          const isOpen = open[ch.id] ?? false;
+          return (
+            <div key={ch.id} className={`section-card ${i === 0 && totals.ready > 0 ? 'pilot' : ''}`}>
+              <div
+                className="section-card-head"
+                onClick={() => setOpen((prev) => ({ ...prev, [ch.id]: !isOpen }))}
+              >
+                <span className="section-idx">{i + 1}</span>
+                <div style={{ minWidth: 0 }}>
+                  <div className="section-name">{ch.title}</div>
+                  <div className="section-sub">
+                    {ch.lessons.length} 节 · {ch.hours.toFixed(1)} 小时
+                  </div>
+                </div>
+                <div className="section-counts">
+                  <span>
+                    {ch.lessons.length} 节 · {ch.hours.toFixed(1)} 小时
+                  </span>
+                  {ch.ready > 0 ? (
+                    <span className="badge green">已编译 {ch.ready}</span>
+                  ) : (
+                    <span className="badge gray">待编译</span>
+                  )}
+                  <Icon name={isOpen ? 'up' : 'down'} size="sm" />
+                </div>
+              </div>
+              {isOpen && (
+                <>
+                  <div className="section-body">
+                    {ch.lessons.map((lesson, li) => {
+                      const ready = lesson.status === 'ready' || lesson.status === 'published';
+                      const row = (
+                        <>
+                          <div className="lesson-no">{lessonNo(li)}</div>
+                          <div className="lesson-main">
+                            <div className="lesson-title">{lesson.title}</div>
+                            <div className="lesson-sub">
+                              <span>{lesson.lesson_key}</span>
+                              <span>{lesson.segment_count} 段转写</span>
+                              <span>{ready ? '四阶段已编译' : '待 AI 编译'}</span>
+                            </div>
+                          </div>
+                          <div className="lesson-side">
+                            <span className="lesson-dur">{fmt(lesson.duration_sec || 0)}</span>
+                            {ready ? (
+                              <span className="badge green">可学习</span>
+                            ) : (
+                              <span className="badge gray">待编译</span>
+                            )}
+                            <span className="lesson-go">
+                              <Icon name={ready ? 'right' : 'lock'} size="sm" />
+                            </span>
+                          </div>
+                        </>
+                      );
+                      return ready ? (
+                        <Link
+                          key={lesson.id}
+                          href={`/courses/${course.id}/${lesson.lesson_key}`}
+                          className="lesson-row"
+                        >
+                          {row}
+                        </Link>
+                      ) : (
+                        <div key={lesson.id} className="lesson-row disabled">
+                          {row}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="section-foot">
+                    <span>
+                      共 {ch.lessons.length} 节 · {ch.ready} 份已编译
+                    </span>
+                    <span>{ch.ready > 0 ? '点击课时进入四阶段学习' : '先完成音频 / 转写'}</span>
+                  </div>
+                </>
+              )}
+            </div>
           );
         })}
       </div>
 
-      {/* Empty state */}
-      {course.lessons.length === 0 && (
-        <div className="text-center py-20 text-[var(--text-tertiary)]">
-          暂无课时数据
-        </div>
-      )}
+      <div className="course-note">
+        <b>章节是从目录结构自动识别的，不是手填的。</b>导入时第二层目录 → 章节，视频 / 音频文件 → 课时；
+        可以在 <b>course.yaml</b> 里改名、合并、隐藏或调整顺序。
+        {course.description ? (
+          <>
+            <br />
+            <b>这门课：</b>
+            {course.description}。
+          </>
+        ) : null}
+        <br />
+        媒体文件与转写就绪后，按“预习 → 学习 → 复习 → 练习”依次生成学习资产。
+      </div>
     </div>
   );
 }

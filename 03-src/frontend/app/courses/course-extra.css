@@ -1,0 +1,57 @@
+/* Small app-integration layer on top of prototype.css (scoped, never leaks). */
+.ifc-shell {
+  min-height: 100vh;
+  background: var(--bg-secondary);
+  padding-bottom: 1px;
+}
+
+/* Card / row anchors must not inherit the global blue link color. */
+.ifc a.course-card,
+.ifc a.lesson-row,
+.ifc a.subject-card,
+.ifc a.course-hero-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Global app CSS forces video sizing; keep the prototype player geometry. */
+.ifc .lesson-video,
+.ifc .lesson-video video {
+  max-width: none !important;
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* Audio-only media still renders via the prototype waveform. */
+.ifc .waveform audio { display: none; }
+
+/* Keep the native range input visually consistent inside the player. */
+.ifc .seek input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* Selected transcript lines keep a visible tint in both themes. */
+.ifc .tline.selected { background: var(--accent-light); }
+
+/* Highlighted anchor targets inside long prototype pages. */
+.ifc [data-flash="1"] { animation: ifcFadeIn .35s ease; }
+
+/* Real lessons can carry 10+ chapters, so the prototype's single-row status
+   strip is folded into a 6-column grid instead of squeezing every label. */
+.ifc .chapter-status.many {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 9px 8px;
+}
+
+/* Keep the media title on one line even when the course title is long. */
+.ifc .player-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Long auto-recognised chapter names must not squeeze "0 / 1 已揭开". */
+.ifc .chapter-head > div:nth-child(2) { min-width: 0; }
+.ifc .chapter-progress { white-space: nowrap; flex: none; }
