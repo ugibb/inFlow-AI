@@ -84,27 +84,34 @@
 /* Keep "全屏" / "1.0×" on one line on narrow screens. */
 .ifc .speed-btn { white-space: nowrap; }
 
-/* "回到当前" now floats at the top-right of the transcript list (prototype v3). */
-.ifc .back-current {
-  position: sticky;
-  top: 8px;
-  margin: 0 4px 6px auto;
+/* "回到当前" sits at the top-right corner of the 逐句原文 header row (prototype v3). */
+.ifc .transcript-head .back-current {
   display: none;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  flex: none;
+  margin-left: auto;
   width: fit-content;
   border: 1px solid var(--accent);
-  border-radius: 8px;
+  border-radius: 999px;
   background: var(--bg-primary);
   color: var(--accent);
-  padding: 5px 10px;
-  font-size: 10.5px;
+  padding: 3px 9px;
+  font-size: 10px;
   font-weight: 600;
-  box-shadow: var(--shadow-sm);
-  z-index: 6;
+  line-height: 1.4;
 }
-.ifc .back-current.show { display: flex; }
-.ifc .back-current:hover { background: var(--accent-light); }
+.ifc .transcript-head .back-current.show { display: inline-flex; }
+.ifc .transcript-head .back-current:hover { background: var(--accent-light); }
+
+/* The transcript panel must end inside the viewport so the bottom
+   "＋ 记录此刻想法" card is always visible without scrolling the page. */
+@media (min-width: 1221px) {
+  .ifc .transcript-panel {
+    height: calc(100vh - 204px);
+    min-height: 460px;
+  }
+}
 
 /* Selection-mode hint, sits between tools and transcript list (prototype v3). */
 .ifc .selection-banner {

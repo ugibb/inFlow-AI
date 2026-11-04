@@ -1245,6 +1245,13 @@ export default function LessonView({
                     我的想法 <span className="count">{study.notes.length}</span>
                   </button>
                 </div>
+                <button
+                  className={'back-current' + (!follow ? ' show' : '')}
+                  onClick={goCurrent}
+                >
+                  <Icon name="down" size="sm" />
+                  回到当前
+                </button>
               </div>
 
               <div className="transcript-tools">
@@ -1291,13 +1298,6 @@ export default function LessonView({
                 ref={transcriptScrollRef}
                 onScroll={handleTranscriptScroll}
               >
-                <button
-                  className={'back-current' + (!follow ? ' show' : '')}
-                  onClick={goCurrent}
-                >
-                  <Icon name="down" size="sm" />
-                  回到当前
-                </button>
                 <div>
                   {transcript.map((seg, i) => {
                     const dim = !!searchNorm && !seg.text.toLowerCase().includes(searchNorm);
