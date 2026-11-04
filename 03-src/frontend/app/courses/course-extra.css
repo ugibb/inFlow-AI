@@ -55,3 +55,31 @@
 /* Long auto-recognised chapter names must not squeeze "0 / 1 已揭开". */
 .ifc .chapter-head > div:nth-child(2) { min-width: 0; }
 .ifc .chapter-progress { white-space: nowrap; flex: none; }
+
+/* Video is the default media; this button swaps to the extracted MP3. */
+.ifc .player-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.ifc .player-tools .badge { margin-left: 0; }
+.ifc .media-toggle {
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border-radius: 7px;
+  padding: 4px 9px;
+  font-size: 11px;
+  line-height: 1.4;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ifc .media-toggle:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+.ifc .media-toggle:disabled { opacity: .5; cursor: default; }
+/* Keep "全屏" / "1.0×" on one line on narrow screens. */
+.ifc .speed-btn { white-space: nowrap; }

@@ -65,6 +65,48 @@ function sameLine(a: string, b: string): boolean {
   return short.length >= 8 && long.includes(short);
 }
 
+/** Same-origin candidates with the localhost fallback used during development. */
+function withCandidates(raw: string): string[] {
+  let pathOnly = raw;
+  try {
+    if (/^https?:\/\//i.test(raw)) {
+      const parsed = new URL(raw);
+      pathOnly = `${parsed.pathname}${parsed.search}`;
+      if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') return [raw];
+    }
+  } catch {
+    /* parse failure: keep original */
+  }
+  const normalized = pathOnly.startsWith('/') ? pathOnly : `/${pathOnly}`;
+  return [raw, `http://localhost${normalized}`];
+}
+
+/**
+ * Lessons keep the video and the extracted audio side by side
+ * (`01-MP4/xxx.mp4` and `02-MP3/xxx.mp3`), so either one can be derived
+ * from the other when the API only stores a single media_url.
+ */
+function deriveMediaSources(raw?: string | null): { video: string[]; audio: string[] } {
+  if (!raw) return { video: [], audio: [] };
+  const isVideo = /\.(mp4|m4v|webm)(?=\?|$)/i.test(raw);
+  if (isVideo) {
+    const audioRaw = raw
+      .replace(/\/01-MP4\//i, '/02-MP3/')
+      .replace(/\.(mp4|m4v|webm)(?=\?|$)/i, '.mp3');
+    return {
+      video: withCandidates(raw),
+      audio: audioRaw !== raw ? withCandidates(audioRaw) : [],
+    };
+  }
+  const videoRaw = raw
+    .replace(/\/02-MP3\//i, '/01-MP4/')
+    .replace(/\.mp3(?=\?|$)/i, '.mp4');
+  return {
+    video: videoRaw !== raw ? withCandidates(videoRaw) : [],
+    audio: withCandidates(raw),
+  };
+}
+
 function Waveform({ progress }: { progress: number }) {
   return (
     <div className="waveform">
@@ -99,6 +141,7 @@ export default function LessonView({
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [follow, setFollow] = useState(true);
+  const [wantVideo, setWantVideo] = useState(true);
 
   const [tab, setTab] = useState<'transcript' | 'notes'>('transcript');
   const [search, setSearch] = useState('');
@@ -118,6 +161,7 @@ export default function LessonView({
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [toast, setToast] = useState('');
 
+  const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
@@ -157,46 +201,70 @@ export default function LessonView({
     toastTimer.current = setTimeout(() => setToast(''), 2300);
   }
 
-  /* ---------------- audio ---------------- */
-  const candidates = useMemo(() => {
-    const mediaUrl = lesson.media_url;
-    if (!mediaUrl) return [] as string[];
-    let pathOnly = mediaUrl;
-    try {
-      if (/^https?:\/\//i.test(mediaUrl)) {
-        const parsed = new URL(mediaUrl);
-        pathOnly = `${parsed.pathname}${parsed.search}`;
-        if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') return [mediaUrl];
-      }
-    } catch {
-      /* parse failure: keep original */
-    }
-    const normalized = pathOnly.startsWith('/') ? pathOnly : `/${pathOnly}`;
-    return [mediaUrl, `http://localhost${normalized}`];
-  }, [lesson.media_url]);
+  /* ---------------- media (video by default, audio optional) ---------------- */
+  const media = useMemo(() => deriveMediaSources(lesson.media_url), [lesson.media_url]);
+  const mediaMode: 'video' | 'audio' = wantVideo && media.video.length > 0 ? 'video' : 'audio';
+  const sources = mediaMode === 'video' ? media.video : media.audio;
 
   const [srcIndex, setSrcIndex] = useState(0);
-  const currentSrc = candidates[srcIndex];
-  const mediaFailed = candidates.length === 0 || srcIndex >= candidates.length;
+  const currentSrc = sources[srcIndex];
+  const mediaFailed = sources.length === 0 || srcIndex >= sources.length;
 
   useEffect(() => {
+    setWantVideo(true);
     setSrcIndex(0);
   }, [lesson.media_url]);
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.playbackRate = speed;
+    setSrcIndex(0);
+  }, [mediaMode]);
+
+  const getMedia = () => (mediaMode === 'video' ? videoRef.current : audioRef.current);
+
+  function switchMedia(next: 'video' | 'audio') {
+    if (next === mediaMode || (next === 'video' && media.video.length === 0)) return;
+    setWantVideo(next === 'video');
+    setSrcIndex(0);
+    showToast(next === 'video' ? '已切换为视频' : '已切换为音频');
+  }
+
+  function handleMediaError() {
+    if (srcIndex + 1 < sources.length) {
+      setSrcIndex(srcIndex + 1);
+      return;
+    }
+    if (mediaMode === 'video') {
+      setWantVideo(false);
+      setSrcIndex(0);
+      showToast('视频不可用，已切换为音频');
+    }
+  }
+
+  function resumePlayback(el: HTMLMediaElement) {
+    el.playbackRate = speed;
+    if (timeRef.current > 1 && Number.isFinite(el.duration)) {
+      try {
+        el.currentTime = Math.min(timeRef.current, Math.max(0, el.duration - 0.25));
+      } catch {
+        /* metadata not ready */
+      }
+    }
+  }
+
+  useEffect(() => {
+    const el = getMedia();
+    if (!el) return;
+    el.playbackRate = speed;
     if (playing) {
-      audio.play().catch(() => {
+      el.play().catch(() => {
         setPlaying(false);
         showToast('浏览器拦截了自动播放，请再点一次播放');
       });
     } else {
-      audio.pause();
+      el.pause();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, currentSrc, speed]);
+  }, [playing, currentSrc, speed, mediaMode]);
 
   useEffect(() => {
     if (studyReady) writeStudyState(lessonKey, { ...study, position: time });
@@ -206,10 +274,10 @@ export default function LessonView({
   function seekTo(t: number, opts: { play?: boolean } = {}) {
     const target = Math.min(duration, Math.max(0, Number(t) || 0));
     setTime(target);
-    const audio = audioRef.current;
-    if (audio && audio.readyState >= 1) {
+    const el = getMedia();
+    if (el && el.readyState >= 1) {
       try {
-        audio.currentTime = target;
+        el.currentTime = target;
       } catch {
         /* metadata not ready */
       }
@@ -220,19 +288,19 @@ export default function LessonView({
 
   function togglePlay() {
     if (mediaFailed) {
-      showToast('音频未加载：课程音视频保存在本机，只有同一台电脑打开时才能播放');
+      showToast('音视频未加载：请确认保存课程文件的本机在线');
       return;
     }
     setPlaying((p) => !p);
   }
 
   function enterFullscreen() {
-    const el = playerRef.current;
-    if (!el) return;
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
       return;
     }
+    const el = mediaMode === 'video' ? videoRef.current : playerRef.current;
+    if (!el) return;
     const p = el.requestFullscreen ? el.requestFullscreen() : null;
     if (p && p.catch) p.catch(() => showToast('当前浏览器不支持全屏'));
     else if (!el.requestFullscreen) showToast('当前浏览器不支持全屏');
@@ -899,37 +967,65 @@ export default function LessonView({
                   <div style={{ minWidth: 0 }}>
                     <div className="player-kicker">
                       <span className="live-dot" />
-                      本地音频 · 真实播放
+                      {mediaMode === 'video' ? '本地视频 · 真实播放' : '本地音频 · 真实播放'}
                     </div>
                     <div className="player-title">
                       {lesson.title} · {course.title}
                     </div>
                   </div>
-                  <span className="badge blue" style={{ marginLeft: 'auto' }}>
-                    音频 · {fmt(Math.round(duration))}
-                  </span>
+                  <div className="player-tools">
+                    <button
+                      type="button"
+                      className="media-toggle"
+                      disabled={!media.video.length}
+                      title={mediaMode === 'video' ? '切换为音频播放' : '切换为视频播放'}
+                      onClick={() => switchMedia(mediaMode === 'video' ? 'audio' : 'video')}
+                    >
+                      {mediaMode === 'video' ? '切换音频' : '切换视频'}
+                    </button>
+                    <span className="badge blue">
+                      {mediaMode === 'video' ? '视频' : '音频'} · {fmt(Math.round(duration))}
+                    </span>
+                  </div>
                 </div>
 
-                {currentSrc && !mediaFailed && (
+                {currentSrc && !mediaFailed && mediaMode === 'video' && (
+                  <video
+                    ref={videoRef}
+                    className="lesson-video"
+                    src={currentSrc}
+                    preload="metadata"
+                    playsInline
+                    title="点击播放 / 暂停"
+                    onClick={togglePlay}
+                    onDoubleClick={enterFullscreen}
+                    onLoadedMetadata={(e) => resumePlayback(e.currentTarget)}
+                    onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
+                    onPlay={() => setPlaying(true)}
+                    onEnded={() => setPlaying(false)}
+                    onError={handleMediaError}
+                  />
+                )}
+                {currentSrc && !mediaFailed && mediaMode === 'audio' && (
                   <audio
                     ref={audioRef}
                     src={currentSrc}
                     preload="metadata"
+                    onLoadedMetadata={(e) => resumePlayback(e.currentTarget)}
                     onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
                     onPlay={() => setPlaying(true)}
-                    onPause={() => setPlaying(false)}
                     onEnded={() => setPlaying(false)}
-                    onError={() => setSrcIndex((i) => i + 1)}
+                    onError={handleMediaError}
                   />
                 )}
 
                 {mediaFailed ? (
                   <div className="video-fallback show">
-                    音频不可达：课程音视频保存在本机，只有同一台电脑打开时才能播放。
+                    音视频不可达：请确认保存课程文件的本机在线。
                     <br />
                     转写与四阶段仍可正常使用。
                   </div>
-                ) : (
+                ) : mediaMode === 'video' ? null : (
                   <div
                     onClick={(e) => {
                       const rect = e.currentTarget.getBoundingClientRect();
