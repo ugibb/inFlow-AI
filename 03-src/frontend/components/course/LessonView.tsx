@@ -175,6 +175,7 @@ export default function LessonView({
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeRef = useRef(0);
   const studyRef = useRef<StudyState>(emptyStudy());
+  const resumeAfterNote = useRef(false);
 
   timeRef.current = time;
   studyRef.current = study;
@@ -219,6 +220,7 @@ export default function LessonView({
   useEffect(() => {
     setWantVideo(true);
     setSrcIndex(0);
+    resumeAfterNote.current = false;
   }, [lesson.media_url]);
 
   useEffect(() => {
@@ -466,6 +468,11 @@ export default function LessonView({
     }
   }
 
+  function mediaPlaying() {
+    const el = getMedia();
+    return !!el && !el.paused && !el.ended;
+  }
+
   function pauseMedia() {
     const el = getMedia();
     if (el && !el.paused) el.pause();
@@ -473,6 +480,7 @@ export default function LessonView({
   }
 
   function enterSelection() {
+    if (mediaPlaying()) resumeAfterNote.current = true;
     pauseMedia();
     setSelectionMode(true);
     setSelStart(currentLine >= 0 ? currentLine : 0);
@@ -482,6 +490,8 @@ export default function LessonView({
   }
 
   function exitSelection() {
+    // Cancelled: keep the player paused, like prototype v3.
+    resumeAfterNote.current = false;
     setSelectionMode(false);
     setSelStart(null);
     setSelEnd(null);
@@ -496,13 +506,16 @@ export default function LessonView({
       .slice(range.from, range.to + 1)
       .map((s) => ({ time: s.start, text: s.text }));
     const quote = lines.map((l) => l.text).join(' ');
-    exitSelection();
     openNoteModal(
       transcript[range.from].start,
       quote,
       lines,
       transcript[range.to].end
     );
+    // Leave selection mode without clearing the resume flag.
+    setSelectionMode(false);
+    setSelStart(null);
+    setSelEnd(null);
   }
 
   /* ---------------- notes ---------------- */
@@ -512,9 +525,18 @@ export default function LessonView({
     lines?: { time: number; text: string }[],
     end?: number
   ) {
+    if (!selectionMode && mediaPlaying()) resumeAfterNote.current = true;
     pauseMedia();
     setNoteCtx({ time: t !== undefined ? t : time, end, quote, lines });
     setNoteText('');
+  }
+
+  function closeNoteModal() {
+    setNoteCtx(null);
+    if (resumeAfterNote.current) {
+      resumeAfterNote.current = false;
+      setPlaying(true);
+    }
   }
 
   useEffect(() => {
@@ -539,8 +561,7 @@ export default function LessonView({
     };
     patchStudy({ notes: [...study.notes, note] });
     const node = findNode(nodes, note.time);
-    if (ctx.quote) exitSelection();
-    setNoteCtx(null);
+    closeNoteModal();
     setTab('notes');
     showToast(`已保存 · ${fmt(note.time)}${node ? ' · ' + node.title : ''}`);
   }
@@ -1135,7 +1156,7 @@ export default function LessonView({
                     全屏
                   </button>
                   <div className="player-extra">
-                    <button className="btn soft sm" onClick={() => openNoteModal()}>
+                    <button className="btn soft sm" onClick={enterSelection}>
                       <Icon name="pen" size="sm" />
                       记录想法
                     </button>
@@ -1170,7 +1191,7 @@ export default function LessonView({
                       <Icon name="search" size="sm" />
                       查看老师原文 {fmt(current.start)}
                     </button>
-                    <button className="btn ghost sm" onClick={() => openNoteModal()}>
+                    <button className="btn ghost sm" onClick={enterSelection}>
                       <Icon name="pen" size="sm" />
                       记录想法
                     </button>
@@ -1960,7 +1981,7 @@ export default function LessonView({
       <div
         className={'modal' + (noteCtx ? ' open' : '')}
         onClick={(e) => {
-          if (e.target === e.currentTarget) setNoteCtx(null);
+          if (e.target === e.currentTarget) closeNoteModal();
         }}
       >
         <div className="modal-box">
@@ -1969,7 +1990,7 @@ export default function LessonView({
             <button
               className="icon-btn"
               aria-label="关闭"
-              onClick={() => setNoteCtx(null)}
+              onClick={closeNoteModal}
             >
               <Icon name="x" />
             </button>
@@ -2013,7 +2034,7 @@ export default function LessonView({
           </div>
           <div className="modal-actions">
             <span className="spacer" />
-            <button className="btn" onClick={() => setNoteCtx(null)}>
+            <button className="btn" onClick={closeNoteModal}>
               取消
             </button>
             <button className="btn primary" onClick={saveNote}>
