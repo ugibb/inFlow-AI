@@ -17,7 +17,7 @@ from backend.core.utils.logger import (
 )
 from backend.core.database import get_db, init_db
 from backend.core.observer import observer_loop
-from .routers import articles, knowledge, system, assistant, auth, users
+from .routers import articles, knowledge, system, assistant, auth, users, courses
 from backend.core.ingest.router import router as ingest_router
 from .routers.research import router as research_router
 from backend.plugins.manager import plugin_manager
@@ -152,6 +152,9 @@ app.include_router(research_router)
 
 # Phase 1: Ingest pipeline API
 app.include_router(ingest_router)
+
+# Course module
+app.include_router(courses.router)
 
 # ── 插件体系 ──────────────────────────────────────────────
 # 管理 API：全插件状态快照 + 启停（超管）

@@ -659,6 +659,40 @@ class ApiClient {
   }> {
     return this.request('/api/review/preview', { method: 'POST' });
   }
+
+  // ─── Course API ──────────────────────────────────────────────────────────────
+
+  async listCourses(): Promise<import('./types').CourseSummary[]> {
+    return this.request('/api/courses');
+  }
+
+  async getCourse(courseId: string): Promise<import('./types').CourseDetail> {
+    return this.request(`/api/courses/${courseId}`);
+  }
+
+  async getLesson(courseId: string, lessonKey: string): Promise<import('./types').LessonDetail> {
+    return this.request(`/api/courses/${courseId}/lessons/${lessonKey}`);
+  }
+
+  async getTranscript(courseId: string, lessonKey: string): Promise<import('./types').LessonTranscript> {
+    return this.request(`/api/courses/${courseId}/lessons/${lessonKey}/transcript`);
+  }
+
+  async updateProgress(
+    courseId: string,
+    lessonKey: string,
+    data: {
+      status?: 'not_started' | 'in_progress' | 'completed';
+      current_sec?: number;
+      notes?: any[];
+      exercise_answers?: any[];
+    }
+  ): Promise<import('./types').CourseProgress> {
+    return this.request(`/api/courses/${courseId}/lessons/${lessonKey}/progress`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const api = new ApiClient(API_BASE);

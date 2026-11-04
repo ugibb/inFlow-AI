@@ -302,3 +302,77 @@ export interface LoginResponse {
   token_type: string;
   user: User;
 }
+
+// ─── Course Types ─────────────────────────────────────────────────────────────
+
+export interface CourseSummary {
+  id: string;
+  course_key: string;
+  title: string;
+  subject?: string;
+  stage?: string;
+  description?: string;
+  total_lessons: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LessonSummary {
+  id: string;
+  lesson_key: string;
+  title: string;
+  chapter_id?: string;
+  chapter_title?: string;
+  order_index: number;
+  duration_sec: number;
+  segment_count: number;
+  status: 'draft' | 'ready' | 'published';
+  media_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CourseDetail extends CourseSummary {
+  lessons: LessonSummary[];
+}
+
+export interface LessonDetail {
+  lesson: LessonSummary;
+  chapters?: any;
+  knowledge_tree?: any;
+  teaching?: any;
+  views?: {
+    preview?: any;
+    learning?: any;
+    review?: any;
+    practice?: any;
+  };
+  audit?: any;
+  transcript?: any;
+}
+
+export interface TranscriptSegment {
+  id: number;
+  start: number;
+  end: number;
+  text: string;
+  language?: string;
+}
+
+export interface LessonTranscript {
+  lesson_key: string;
+  language?: string;
+  duration?: number;
+  segments: TranscriptSegment[];
+}
+
+export interface CourseProgress {
+  id: string;
+  user_id: string;
+  lesson_id: string;
+  status: 'not_started' | 'in_progress' | 'completed';
+  current_sec: number;
+  notes?: any[];
+  exercise_answers?: any[];
+  updated_at: string;
+}
