@@ -122,7 +122,7 @@ async def import_course(args):
         lesson.source_hash = hashlib.sha256(hash_content.encode()).hexdigest()
 
         await db.commit()
-        print(f"\n✓ Import complete:")
+        print("\n[OK] Import complete:")
         print(f"  Course: {course.title} ({course.id})")
         print(f"  Lesson: {lesson.title} ({lesson.id})")
         print(f"  Duration: {lesson.duration_sec:.1f}s")
