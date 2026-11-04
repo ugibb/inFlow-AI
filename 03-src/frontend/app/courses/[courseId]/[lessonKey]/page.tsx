@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -79,6 +79,37 @@ function AudioPlayer({
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
 
+  // 候选音源：同源正向地址 → 本机回环（http://localhost 属浏览器"可信来源"，
+  // 不会被 https 页面的混合内容策略拦截）。课程音视频不落云端，直接读本机文件。
+  const candidates = useMemo(() => {
+    if (!mediaUrl) return [] as string[];
+    let pathOnly = mediaUrl;
+    try {
+      if (/^https?:\/\//i.test(mediaUrl)) {
+        const parsed = new URL(mediaUrl);
+        pathOnly = `${parsed.pathname}${parsed.search}`;
+        if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') return [mediaUrl];
+      }
+    } catch {
+      /* 解析失败按原样处理 */
+    }
+    const normalized = pathOnly.startsWith('/') ? pathOnly : `/${pathOnly}`;
+    return [mediaUrl, `http://localhost${normalized}`];
+  }, [mediaUrl]);
+
+  const [srcIndex, setSrcIndex] = useState(0);
+  const currentSrc = candidates[srcIndex];
+  const exhausted = candidates.length > 0 && srcIndex >= candidates.length;
+
+  useEffect(() => {
+    setSrcIndex(0);
+  }, [mediaUrl]);
+
+  function handleAudioError() {
+    // src 变化后浏览器会自动重新加载，无需手动 load()
+    setSrcIndex((i) => i + 1);
+  }
+
   useEffect(() => {
     if (audioRef.current) {
       if (isPlaying) {
@@ -124,7 +155,15 @@ function AudioPlayer({
 
   return (
     <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] p-4">
-      {mediaUrl && <audio ref={audioRef} src={mediaUrl} onTimeUpdate={handleTimeUpdate} />}
+      {currentSrc && !exhausted && (
+        <audio
+          ref={audioRef}
+          src={currentSrc}
+          preload="metadata"
+          onTimeUpdate={handleTimeUpdate}
+          onError={handleAudioError}
+        />
+      )}
 
       <div className="flex items-center gap-3 mb-3">
         <button
@@ -153,6 +192,12 @@ function AudioPlayer({
       {!mediaUrl && (
         <div className="text-xs text-[var(--text-tertiary)] text-center py-2">
           音频文件未配置
+        </div>
+      )}
+
+      {exhausted && (
+        <div className="text-xs text-[var(--text-tertiary)] text-center py-2">
+          音频未加载——课程音视频保存在本机，只有同一台电脑打开时才能播放。
         </div>
       )}
     </div>
