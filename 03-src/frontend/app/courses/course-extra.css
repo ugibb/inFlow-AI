@@ -84,6 +84,23 @@
 /* Keep "全屏" / "1.0×" on one line on narrow screens. */
 .ifc .speed-btn { white-space: nowrap; }
 
+/* Phase switcher now sits in the old title-actions slot, right of the lesson title. */
+.ifc .lesson-title-row { flex-wrap: wrap; }
+.ifc .lesson-title-row > div:first-child { flex: 1 1 auto; }
+.ifc .lesson-title-row > .phase-bar {
+  margin-top: 0;
+  margin-left: auto;
+  flex: none;
+  max-width: 100%;
+}
+@media (max-width: 1220px) {
+  .ifc .lesson-title-row > .phase-bar .ph-sub { display: none; }
+}
+
+/* Player header: title leads, the media-source kicker becomes its subtitle. */
+.ifc .player-title { margin-top: 0; }
+.ifc .player-kicker { margin-top: 4px; }
+
 /* "回到当前" sits at the top-right corner of the 逐句原文 header row (prototype v3). */
 .ifc .transcript-head .back-current {
   display: none;

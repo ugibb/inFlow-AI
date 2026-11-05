@@ -682,40 +682,32 @@ export default function LessonView({
                 <span>{transcript.length} 段转写</span>
               </div>
             </div>
-            <div className="lesson-title-actions">
-              <span className="badge green">AI 编译 · 已核对</span>
-              <span className="proto-chip">
-                <span className="dot" />
-                本机音视频
-              </span>
+            <div className="phase-bar">
+              {PHASES.map((p, i) => {
+                const idx = PHASES.findIndex((x) => x.key === phase);
+                return (
+                  <React.Fragment key={p.key}>
+                    {i > 0 && (
+                      <span className={'phase-sep' + (i <= idx ? ' passed' : '')}>
+                        <Icon name="right" />
+                      </span>
+                    )}
+                    <button
+                      className={
+                        'phase-btn' +
+                        (p.key === phase ? ' active' : '') +
+                        (i < idx ? ' passed' : '')
+                      }
+                      onClick={() => setPhaseView(p.key)}
+                    >
+                      <span className="ph-num">{i + 1}</span>
+                      <span>{p.label}</span>
+                      <span className="ph-sub">{p.sub}</span>
+                    </button>
+                  </React.Fragment>
+                );
+              })}
             </div>
-          </div>
-
-          <div className="phase-bar">
-            {PHASES.map((p, i) => {
-              const idx = PHASES.findIndex((x) => x.key === phase);
-              return (
-                <React.Fragment key={p.key}>
-                  {i > 0 && (
-                    <span className={'phase-sep' + (i <= idx ? ' passed' : '')}>
-                      <Icon name="right" />
-                    </span>
-                  )}
-                  <button
-                    className={
-                      'phase-btn' +
-                      (p.key === phase ? ' active' : '') +
-                      (i < idx ? ' passed' : '')
-                    }
-                    onClick={() => setPhaseView(p.key)}
-                  >
-                    <span className="ph-num">{i + 1}</span>
-                    <span>{p.label}</span>
-                    <span className="ph-sub">{p.sub}</span>
-                  </button>
-                </React.Fragment>
-              );
-            })}
           </div>
         </div>
 
@@ -1016,12 +1008,11 @@ export default function LessonView({
               <div className="panel player-panel" ref={playerRef}>
                 <div className="player-head">
                   <div style={{ minWidth: 0 }}>
-                    <div className="player-kicker">
-                      <span className="live-dot" />
-                      {mediaMode === 'video' ? '本地视频 · 真实播放' : '本地音频 · 真实播放'}
-                    </div>
                     <div className="player-title">
                       {lesson.title} · {course.title}
+                    </div>
+                    <div className="player-kicker">
+                      {mediaMode === 'video' ? '本地视频 · 真实播放' : '本地音频 · 真实播放'}
                     </div>
                   </div>
                   <div className="player-tools">
