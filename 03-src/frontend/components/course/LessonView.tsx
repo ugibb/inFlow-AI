@@ -1011,9 +1011,6 @@ export default function LessonView({
                     <div className="player-title">
                       {lesson.title} · {course.title}
                     </div>
-                    <div className="player-kicker">
-                      {mediaMode === 'video' ? '本地视频 · 真实播放' : '本地音频 · 真实播放'}
-                    </div>
                   </div>
                   <div className="player-tools">
                     <button

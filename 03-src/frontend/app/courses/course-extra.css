@@ -97,9 +97,8 @@
   .ifc .lesson-title-row > .phase-bar .ph-sub { display: none; }
 }
 
-/* Player header: title leads, the media-source kicker becomes its subtitle. */
+/* Player header: single title line. */
 .ifc .player-title { margin-top: 0; }
-.ifc .player-kicker { margin-top: 4px; }
 
 /* "回到当前" sits at the top-right corner of the 逐句原文 header row (prototype v3). */
 .ifc .transcript-head .back-current {
