@@ -712,6 +712,11 @@
 .ifc .chapter-progress{ margin-left: auto; font-size: 11px; color: var(--text-tertiary); }
 .ifc .chapter-progress b{ color: var(--accent); }
 .ifc .chapter-body{ padding: 12px 14px 14px; }
+.ifc .chapter-head{ cursor: pointer; }
+.ifc .chapter-caret{ display: inline-flex; flex: none; color: var(--text-tertiary); transition: transform .15s; }
+.ifc .chapter-card.collapsed .chapter-caret{ transform: rotate(-90deg); }
+.ifc .chapter-card.collapsed .chapter-body{ display: none; }
+.ifc .chapter-card.collapsed .chapter-head{ border-bottom: none; }
 .ifc .module-grid{ display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 9px; }
 .ifc .module{
   border: 1px dashed var(--border-strong);

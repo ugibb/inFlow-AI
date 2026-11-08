@@ -149,6 +149,7 @@ export default function LessonView({
   const [previewCollapsed, setPreviewCollapsed] = useState<Set<number>>(new Set());
   const [treeCollapsed, setTreeCollapsed] = useState<Set<number>>(new Set());
   const [openRecall, setOpenRecall] = useState<Set<number>>(new Set());
+  const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
 
   const [selectionMode, setSelectionMode] = useState(false);
   const [selStart, setSelStart] = useState<number | null>(null);
@@ -443,8 +444,19 @@ export default function LessonView({
   }
 
   function scrollToPreviewChapter(seq: number) {
+    // 从左侧章节状态跳过来时，目标卡片默认是收起的，先展开再滚动，否则只能看到标题
+    setExpandedCards((prev) => new Set(prev).add(seq));
     const el = document.getElementById(`preview-ch-${seq}`);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function toggleChapterCard(seq: number) {
+    setExpandedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(seq)) next.delete(seq);
+      else next.add(seq);
+      return next;
+    });
   }
 
   function togglePreviewChapter(seq: number) {
@@ -799,9 +811,19 @@ export default function LessonView({
                 {chapters.map((ch, ci) => {
                   if (!ch.preview) return null;
                   const revealed = discovered.has(ch.seq);
+                  const expanded = expandedCards.has(ch.seq);
                   return (
-                    <div className="chapter-card" id={`preview-ch-${ch.seq}`} key={ch.seq}>
-                      <div className="chapter-head">
+                    <div
+                      className={'chapter-card' + (expanded ? '' : ' collapsed')}
+                      id={`preview-ch-${ch.seq}`}
+                      key={ch.seq}
+                    >
+                      <div
+                        className="chapter-head"
+                        onClick={() => toggleChapterCard(ch.seq)}
+                        role="button"
+                        aria-expanded={expanded}
+                      >
                         <span className="chapter-index">{ci + 1}</span>
                         <div>
                           <div className="chapter-title">{ch.title}</div>
@@ -810,6 +832,9 @@ export default function LessonView({
                         <div className="chapter-progress">
                           <b>{revealed ? 1 : 0}</b> / 1 已揭开
                         </div>
+                        <span className="chapter-caret">
+                          <Icon name="down" size="sm" />
+                        </span>
                       </div>
                       <div className="chapter-body">
                         <div className="module-grid">
