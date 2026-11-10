@@ -690,62 +690,101 @@
   margin-bottom: 12px;
   overflow: hidden;
   scroll-margin-top: 130px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow .25s ease, border-color .25s ease;
 }
+.ifc .chapter-card:hover{ box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+.ifc .chapter-card.partial{ border-color: var(--accent); }
+.ifc .chapter-card:has(.module.revealed){ border-color: color-mix(in srgb, var(--success) 55%, var(--border-color)); }
 .ifc .chapter-head{
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
+  gap: 14px;
+  padding: 18px 20px;
   border-bottom: 1px solid var(--border-color);
 }
 .ifc .chapter-index{
-  width: 27px; height: 27px;
-  border-radius: 8px;
-  background: var(--accent-light);
-  color: var(--accent);
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-tertiary);
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 800;
+  font-size: 14px; font-weight: 800;
   flex: none;
+  transition: background .2s ease, color .2s ease;
 }
-.ifc .chapter-title{ font-size: 14px; font-weight: 700; }
-.ifc .chapter-sub{ font-size: 11px; color: var(--text-tertiary); margin-top: 1px; }
-.ifc .chapter-progress{ margin-left: auto; font-size: 11px; color: var(--text-tertiary); }
+.ifc .chapter-card.partial .chapter-index{ background: var(--accent); color: #fff; }
+.ifc .chapter-card:has(.module.revealed) .chapter-index{ background: var(--success); color: #fff; }
+.ifc .chapter-title{ font-size: 15px; font-weight: 700; line-height: 1.35; }
+.ifc .chapter-sub{ font-size: 12px; color: var(--text-tertiary); margin-top: 2px; line-height: 1.5; }
+.ifc .chapter-progress{
+  margin-left: auto; flex: none;
+  font-size: 11px; color: var(--text-tertiary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
 .ifc .chapter-progress b{ color: var(--accent); }
-.ifc .chapter-body{ padding: 12px 14px 14px; }
+.ifc .chapter-card:has(.module.revealed) .chapter-progress{ background: var(--success-light); border-color: transparent; color: var(--success); }
+.ifc .chapter-card:has(.module.revealed) .chapter-progress b{ color: var(--success); }
+.ifc .chapter-body{ padding: 14px 20px 20px; }
 .ifc .chapter-head{ cursor: pointer; }
 .ifc .chapter-caret{ display: inline-flex; flex: none; color: var(--text-tertiary); transition: transform .15s; }
 .ifc .chapter-card.collapsed .chapter-caret{ transform: rotate(-90deg); }
 .ifc .chapter-card.collapsed .chapter-body{ display: none; }
 .ifc .chapter-card.collapsed .chapter-head{ border-bottom: none; }
-.ifc .module-grid{ display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 9px; }
+.ifc .module-grid{ display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 10px; }
 .ifc .module{
   border: 1px dashed var(--border-strong);
   background: var(--bg-secondary);
-  border-radius: 11px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 14px;
   cursor: pointer;
-  transition: border-color .15s, background .15s, transform .15s;
-  min-height: 76px;
+  transition: border-color .15s, background .15s, transform .15s, box-shadow .15s;
+  min-height: 84px;
 }
-.ifc .module:hover{ border-color: var(--accent); background: var(--accent-light); transform: translateY(-1px); }
-.ifc .module.revealed{ border-style: solid; border-color: var(--border-color); background: var(--bg-primary); cursor: default; transform: none; }
+.ifc .module:hover{ border-color: var(--accent); background: var(--accent-light); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.ifc .module.revealed{ border-style: solid; border-color: var(--border-color); background: var(--bg-primary); cursor: default; transform: none; box-shadow: var(--shadow-sm); }
 .ifc .module.revealed:hover{ border-color: var(--border-color); background: var(--bg-primary); }
-.ifc .module-top{ display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.ifc .module-top{ display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 650; color: var(--text-secondary); }
 .ifc .module.revealed .module-top{ color: var(--text-primary); }
 .ifc .module-top .ic{ width: 13px; height: 13px; color: var(--text-tertiary); }
 .ifc .module.revealed .module-top .ic{ color: var(--success); }
-.ifc .module-hint{ font-size: 10.5px; color: var(--text-tertiary); margin-top: 7px; line-height: 1.55; }
+.ifc .module-hint{ font-size: 11px; color: var(--text-tertiary); margin-top: 8px; line-height: 1.55; }
 .ifc .module-insight{ display: none; }
-.ifc .module.revealed .module-insight{ display: block; animation: ifcFadeIn .25s ease-out; }
-.ifc .module-insight p{ font-size: 12px; color: var(--text-secondary); line-height: 1.65; margin-top: 8px; }
+.ifc .module.revealed .module-insight{
+  display: block;
+  margin-top: 11px;
+  padding: 12px 14px;
+  background: var(--warning-light);
+  border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+  border-radius: 10px;
+  animation: ifcFadeIn .28s ease-out;
+}
+.ifc .module-insight::before{
+  content: "老师要你注意";
+  display: block;
+  font-size: 10px; font-weight: 750; letter-spacing: .08em;
+  color: color-mix(in srgb, var(--warning) 55%, var(--text-primary));
+  margin-bottom: 5px;
+}
+.ifc .module-insight p{
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--warning) 45%, var(--text-primary));
+  line-height: 1.7;
+  margin: 0;
+}
 .ifc .module-src{
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-top: 8px;
+  margin-top: 9px;
   font-size: 10.5px;
-  font-weight: 600;
-  color: var(--accent);
+  font-weight: 700;
+  color: color-mix(in srgb, var(--warning) 60%, var(--text-primary));
   cursor: pointer;
 }
 .ifc .module-src .ic{ width: 11px; height: 11px; }
@@ -1544,5 +1583,9 @@
 .ifc .phase-btn{ padding: 6px 8px; font-size: 12px; }
 .ifc .phase-btn .ph-num{ width: 17px; height: 17px; font-size: 9px; }
 .ifc .rating-row{ margin-left: 0; width: 100%; }
+.ifc .chapter-head{ padding: 14px 15px; gap: 11px; }
+.ifc .chapter-index{ width: 32px; height: 32px; border-radius: 9px; font-size: 13px; }
+.ifc .chapter-progress{ font-size: 10px; padding: 3px 8px; }
+.ifc .chapter-body{ padding: 12px 15px 16px; }
 
 }
